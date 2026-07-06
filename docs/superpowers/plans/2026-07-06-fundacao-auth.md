@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Todo o código roda no runtime **workerd** — apenas APIs edge/Web (Web Crypto, `fetch`, `crypto.randomUUID`); **nenhuma API de Node** (`fs`, `crypto` de node, `Buffer`).
-- Versões (pinar em `package.json`, sem `^`): `hono@4.12.28`, `drizzle-orm@0.45.2`, `drizzle-kit@0.31.10`, `zod@4.4.3`, `jose@6.2.3`, `wrangler@4.107.0`, `vitest@4.1.10`, `@cloudflare/vitest-pool-workers@0.18.0`, `@cloudflare/workers-types@5.20260706.1`.
+- Versões (pinar em `package.json`, sem `^`): `hono@4.12.28`, `drizzle-orm@0.45.2`, `drizzle-kit@0.31.10`, `zod@4.4.3`, `jose@6.2.3`, `wrangler@4.107.0`, `vitest@4.1.10`, `@cloudflare/vitest-pool-workers@0.18.0`, `@cloudflare/workers-types@4.20260702.1`.
 - Cookies **sempre** `HttpOnly; Secure; SameSite=Lax; Path=/`.
 - Segredos **nunca** em código nem no repositório — via `wrangler secret` (prod) e bindings do Miniflare (testes).
 - Banco: **apenas** queries via Drizzle (parametrizadas); sem interpolação de string em SQL.
@@ -78,7 +78,7 @@ Tudo dentro de `api/`:
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.18.0",
-    "@cloudflare/workers-types": "5.20260706.1",
+    "@cloudflare/workers-types": "4.20260702.1",
     "drizzle-kit": "0.31.10",
     "vitest": "4.1.10",
     "wrangler": "4.107.0"
@@ -126,16 +126,18 @@ Run: `cd api && npm install`
 }
 ```
 
-- [ ] **Step 4: `worker-env.d.ts`**
+- [ ] **Step 4: `worker-env.d.ts`** (API v4 do pool-workers: augmenta `Cloudflare.Env`; v4 removeu `ProvidedEnv`)
 
 ```ts
-/// <reference types="@cloudflare/vitest-pool-workers" />
-import type { D1Migration } from "@cloudflare/vitest-pool-workers/config";
-import type { Env } from "./src/config/env";
+/// <reference types="@cloudflare/vitest-pool-workers/types" />
+import type { D1Migration } from "@cloudflare/vitest-pool-workers";
+import type { Env as WorkerEnv } from "./src/config/env";
 
-declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {
-    TEST_MIGRATIONS: D1Migration[];
+declare global {
+  namespace Cloudflare {
+    interface Env extends WorkerEnv {
+      TEST_MIGRATIONS: D1Migration[];
+    }
   }
 }
 ```
@@ -165,36 +167,37 @@ export function getAdminEmails(env: Env): string[] {
 }
 ```
 
-- [ ] **Step 6: `vitest.config.ts`** (bindings de teste incluem já todos os secrets que as tarefas seguintes usam)
+- [ ] **Step 6: `vitest.config.ts`** (API v4: plugin `cloudflareTest` + `defineConfig` do `vitest/config`; bindings de teste incluem já todos os secrets que as tarefas seguintes usam)
 
 ```ts
-import { defineWorkersConfig, readD1Migrations } from "@cloudflare/vitest-pool-workers/config";
+import { defineConfig } from "vitest/config";
+import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 
 const migrations = await readD1Migrations("./migrations");
 
-export default defineWorkersConfig({
-  test: {
-    setupFiles: ["./test/apply-migrations.ts"],
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: {
-          d1Databases: ["DB"],
-          bindings: {
-            TEST_MIGRATIONS: migrations,
-            JWT_SECRET: "test-jwt-secret",
-            COOKIE_SIGNING_KEY: "test-cookie-key",
-            ADMIN_EMAILS: "admin@test.com",
-            HOTMART_CLIENT_ID: "cid",
-            HOTMART_CLIENT_SECRET: "csecret",
-            HOTMART_REDIRECT_URI: "https://app.test/auth/callback",
-            HOTMART_AUTHORIZE_URL: "https://hotmart.test/authorize",
-            HOTMART_TOKEN_URL: "https://hotmart.test/token",
-            HOTMART_USERINFO_URL: "https://hotmart.test/userinfo",
-          },
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.jsonc" },
+      miniflare: {
+        d1Databases: ["DB"],
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          JWT_SECRET: "test-jwt-secret",
+          COOKIE_SIGNING_KEY: "test-cookie-key",
+          ADMIN_EMAILS: "admin@test.com",
+          HOTMART_CLIENT_ID: "cid",
+          HOTMART_CLIENT_SECRET: "csecret",
+          HOTMART_REDIRECT_URI: "https://app.test/auth/callback",
+          HOTMART_AUTHORIZE_URL: "https://hotmart.test/authorize",
+          HOTMART_TOKEN_URL: "https://hotmart.test/token",
+          HOTMART_USERINFO_URL: "https://hotmart.test/userinfo",
         },
       },
-    },
+    }),
+  ],
+  test: {
+    setupFiles: ["./test/apply-migrations.ts"],
   },
 });
 ```
