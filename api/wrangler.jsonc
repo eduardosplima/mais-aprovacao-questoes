@@ -1,0 +1,13 @@
+{
+  "name": "mais-aprovacao-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mais-aprovacao-db",
+      "database_id": "REPLACE_WITH_REAL_ID_BEFORE_DEPLOY",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
