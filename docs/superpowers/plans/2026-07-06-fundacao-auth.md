@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Todo o código roda no runtime **workerd** — apenas APIs edge/Web (Web Crypto, `fetch`, `crypto.randomUUID`); **nenhuma API de Node** (`fs`, `crypto` de node, `Buffer`).
-- Versões (pinar em `package.json`, sem `^`): `hono@4.12.28`, `drizzle-orm@0.45.2`, `drizzle-kit@0.31.10`, `zod@4.4.3`, `jose@6.2.3`, `wrangler@4.107.0`, `vitest@4.1.10`, `@cloudflare/vitest-pool-workers@0.18.0`, `@cloudflare/workers-types@4.20250101.0`.
+- Versões (pinar em `package.json`, sem `^`): `hono@4.12.28`, `drizzle-orm@0.45.2`, `drizzle-kit@0.31.10`, `zod@4.4.3`, `jose@6.2.3`, `wrangler@4.107.0`, `vitest@4.1.10`, `@cloudflare/vitest-pool-workers@0.18.0`, `@cloudflare/workers-types@5.20260706.1`.
 - Cookies **sempre** `HttpOnly; Secure; SameSite=Lax; Path=/`.
 - Segredos **nunca** em código nem no repositório — via `wrangler secret` (prod) e bindings do Miniflare (testes).
 - Banco: **apenas** queries via Drizzle (parametrizadas); sem interpolação de string em SQL.
@@ -78,7 +78,7 @@ Tudo dentro de `api/`:
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.18.0",
-    "@cloudflare/workers-types": "4.20250101.0",
+    "@cloudflare/workers-types": "5.20260706.1",
     "drizzle-kit": "0.31.10",
     "vitest": "4.1.10",
     "wrangler": "4.107.0"
