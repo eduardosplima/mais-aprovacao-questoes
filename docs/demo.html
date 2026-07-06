@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>mais questões — demonstração</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --roxo:#6d28d9;
+    --roxo-2:#7c3aed;
+    --roxo-bg:#f1ecfd;
+    --roxo-bg-2:#ede7fb;
+    --pagina:#f7f6fb;
+    --card:#ffffff;
+    --borda:#ececf2;
+    --borda-2:#e4e2ec;
+    --txt:#221d3a;
+    --txt-2:#6b6780;
+    --txt-3:#9b97a8;
+    --erro:#e5484d;
+    --erro-bg:#fdecec;
+    --ok:#16a34a;
+    --ok-bg:#e9f7ee;
+    --sombra:0 1px 2px rgba(34,29,58,.04), 0 8px 24px rgba(34,29,58,.05);
+    --sombra-2:0 1px 3px rgba(34,29,58,.06), 0 12px 32px rgba(34,29,58,.08);
+    --r-card:18px;
+    --r-row:14px;
+    --r-btn:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:var(--pagina);
+    color:var(--txt);
+    line-height:1.5;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  .wrap{max-width:1320px;margin:0 auto;padding:0 24px}
+
+  /* ---------- Topbar ---------- */
+  .topbar{background:var(--card);border-bottom:1px solid var(--borda)}
+  .topbar .wrap{display:flex;align-items:center;gap:24px;height:84px}
+  .logo{display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .logo-mark{width:46px;height:46px;flex-shrink:0}
+  .logo-mark-2{height:68px;flex-shrink:0}
+  .logo-txt{font-family:'Poppins',sans-serif;font-weight:700;font-size:26px;letter-spacing:-.5px;line-height:1}
+  .logo-txt .mais{color:var(--txt)}
+  .logo-txt .q{color:var(--roxo)}
+  .nav{display:flex;align-items:center;gap:34px;margin-left:18px}
+  .nav a{display:flex;align-items:center;gap:8px;color:var(--txt-2);font-weight:600;font-size:15px;padding:6px 2px;position:relative}
+  .nav a.ativo{color:var(--roxo)}
+  .nav a.ativo::after{content:"";position:absolute;left:0;right:0;bottom:-28px;height:3px;border-radius:3px;background:var(--roxo)}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:20px}
+  .bell{position:relative;width:24px;height:24px;color:var(--txt-2)}
+  .bell .dot{position:absolute;top:-4px;right:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--erro);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .user{display:flex;align-items:center;gap:9px}
+  .avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#c4b5fd,#a78bfa);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px}
+  .user span{font-weight:600;font-size:15px;color:var(--txt)}
+  .user .caret{color:var(--txt-3)}
+  .burger{display:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--borda);align-items:center;justify-content:center;color:var(--txt-2)}
+
+  /* ---------- Filtros ---------- */
+  .filtros{padding:22px 0 4px}
+  .filtros-grid{
+    background:var(--card);border:1px solid var(--borda);border-radius:var(--r-card);
+    box-shadow:var(--sombra);padding:18px 20px;
+    display:grid;grid-template-columns:repeat(5,1fr);gap:18px;
+  }
+  .campo label{display:block;font-size:13px;font-weight:700;color:var(--txt);margin-bottom:8px}
+  .select{
+    width:100%;height:50px;border:1px solid var(--borda-2);border-radius:var(--r-btn);
+    background:#fff;display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--txt);
+    font-size:14.5px;font-weight:500;cursor:pointer;transition:border-color .15s,box-shadow .15s;
+  }
+  .select:hover{border-color:#cfc7e6}
+  .select .ico{color:var(--roxo);display:flex;flex-shrink:0}
+  .select .val{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .select .caret{color:var(--txt-3);flex-shrink:0}
+
+  /* ---------- Conteúdo ---------- */
+  .conteudo{display:grid;grid-template-columns:1fr 318px;gap:24px;padding:24px 0 56px;align-items:start}
+
+  .qcard{background:var(--card);border:1px solid var(--borda);border-radius:var(--r-card);box-shadow:var(--sombra);padding:28px 30px}
+  .qhead{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+  .qtag{background:var(--roxo-bg);color:var(--roxo);font-weight:700;font-size:14px;padding:7px 14px;border-radius:9px;white-space:nowrap}
+  .qmeta{color:var(--txt-2);font-size:14px;font-weight:500}
+  .qmark{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--roxo);font-weight:600;font-size:14.5px;padding:6px;border-radius:8px;transition:background .15s}
+  .qmark:hover{background:var(--roxo-bg)}
+  .qmark.on svg{fill:var(--roxo)}
+
+  .enunciado{font-size:18px;font-weight:700;color:var(--txt);line-height:1.5;margin-bottom:22px}
+  .enunciado b{color:var(--roxo)}
+
+  .alts{display:flex;flex-direction:column;gap:12px}
+  .alt{
+    display:flex;align-items:center;gap:16px;width:100%;text-align:left;
+    border:1px solid var(--borda);border-radius:var(--r-row);background:#fff;
+    padding:16px 18px;transition:background .15s,border-color .15s,box-shadow .15s;
+  }
+  .alt:hover{border-color:#cfc7e6;background:#fcfbff}
+  .alt .badge{
+    width:42px;height:42px;border-radius:50%;background:#f1f1f4;color:var(--txt-2);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;
+    transition:background .15s,color .15s;
+  }
+  .alt .texto{font-size:15.5px;color:var(--txt);font-weight:500}
+  .alt.sel{background:var(--roxo-bg);border-color:#d6c9f7}
+  .alt.sel .badge{background:var(--roxo);color:#fff}
+  .alt.sel .texto{color:var(--roxo);font-weight:600}
+  .alt.correta{background:var(--ok-bg);border-color:#bfe7cc}
+  .alt.correta .badge{background:var(--ok);color:#fff}
+  .alt.errada{background:var(--erro-bg);border-color:#f4cfd0}
+  .alt.errada .badge{background:var(--erro);color:#fff}
+  .alt.travada{cursor:default;pointer-events:none}
+
+  .acao{display:flex;align-items:center;gap:18px;margin-top:24px;flex-wrap:wrap}
+  .responder{
+    background:var(--roxo);color:#fff;font-weight:700;font-size:15px;letter-spacing:.3px;
+    padding:0 30px;height:54px;border-radius:var(--r-btn);box-shadow:0 6px 16px rgba(109,40,217,.28);
+    transition:transform .12s,box-shadow .12s,background .15s;
+  }
+  .responder:hover{background:var(--roxo-2)}
+  .responder:active{transform:translateY(1px)}
+  .responder:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+  .feedback{display:none;align-items:center;gap:11px;font-weight:700;font-size:15px}
+  .feedback .fico{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+  .feedback.err{color:var(--erro)}
+  .feedback.err .fico{background:var(--erro)}
+  .feedback.acerto{color:var(--ok)}
+  .feedback.acerto .fico{background:var(--ok)}
+
+  .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:26px}
+  .tab{
+    display:flex;align-items:center;justify-content:center;gap:11px;
+    border:1px solid var(--borda-2);border-radius:var(--r-btn);background:#fff;
+    padding:16px;color:var(--txt);font-weight:600;font-size:14.5px;transition:border-color .15s,background .15s,color .15s;
+  }
+  .tab:hover{border-color:#cfc7e6;background:#fcfbff}
+  .tab.aberta{border-color:var(--roxo);background:var(--roxo-bg);color:var(--roxo)}
+  .tab .ico{color:var(--roxo);display:flex}
+  .tab .cnt{color:var(--txt-3);font-weight:600}
+
+  .painel{display:none;margin-top:18px;border:1px solid var(--borda);border-radius:var(--r-row);padding:20px;background:#fcfbff}
+  .painel.show{display:block;animation:fade .2s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .painel h4{font-size:14px;color:var(--roxo);font-weight:700;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
+  .painel p{font-size:15px;color:var(--txt);margin-bottom:12px}
+  .painel .videobox{aspect-ratio:16/9;border-radius:12px;background:linear-gradient(135deg,#2a2640,#4c1d95);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+  .play{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+
+  .coment{display:flex;gap:12px;margin-bottom:16px}
+  .coment .av{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
+  .coment .corpo{flex:1}
+  .coment .nome{font-weight:700;font-size:14px}
+  .coment .quando{color:var(--txt-3);font-size:12.5px;font-weight:500}
+  .coment .txt{font-size:14.5px;color:var(--txt);margin-top:3px}
+  .escrever{display:flex;gap:10px;margin-top:4px}
+  textarea{
+    flex:1;border:1px solid var(--borda-2);border-radius:12px;padding:12px 14px;font-family:inherit;
+    font-size:14.5px;color:var(--txt);resize:vertical;min-height:46px;outline:none;transition:border-color .15s;
+  }
+  textarea:focus{border-color:var(--roxo)}
+  .enviar{background:var(--roxo);color:#fff;font-weight:700;border-radius:12px;padding:0 22px;font-size:14px;flex-shrink:0}
+  .enviar:hover{background:var(--roxo-2)}
+
+  .pag{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:26px}
+  .pag button{display:flex;align-items:center;gap:7px;color:var(--roxo);font-weight:600;font-size:14.5px;padding:11px 18px;border-radius:10px;border:1px solid var(--borda);background:#fff;transition:background .15s}
+  .pag button:hover{background:var(--roxo-bg)}
+  .pag .meio{color:var(--txt-2);font-weight:600;font-size:14.5px;padding:0 4px}
+
+  /* ---------- Sidebar ---------- */
+  .side{display:flex;flex-direction:column;gap:20px;position:sticky;top:24px}
+  .progresso{background:var(--card);border:1px solid var(--borda);border-radius:var(--r-card);box-shadow:var(--sombra);padding:22px}
+  .progresso .topo{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .progresso .topo h3{font-size:17px;font-weight:700}
+  .progresso .topo a{color:var(--roxo);font-weight:600;font-size:13px}
+  .stat{display:flex;align-items:center;gap:14px;padding:12px 0}
+  .stat + .stat{border-top:1px solid var(--borda)}
+  .stat .ico{width:44px;height:44px;border-radius:12px;background:var(--roxo-bg);color:var(--roxo);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .stat .num{font-size:22px;font-weight:800;line-height:1.1}
+  .stat .lbl{font-size:13.5px;color:var(--txt-2);font-weight:500}
+
+  .gratis{background:linear-gradient(140deg,#6d28d9,#4c1d95);border-radius:var(--r-card);box-shadow:var(--sombra-2);padding:22px;color:#fff}
+  .gratis h3{font-size:16px;font-weight:700;margin-bottom:6px}
+  .gratis .barra{height:9px;border-radius:6px;background:rgba(255,255,255,.22);overflow:hidden;margin:14px 0 8px}
+  .gratis .barra i{display:block;height:100%;background:#fff;border-radius:6px;transition:width .4s}
+  .gratis .sub{font-size:13px;color:rgba(255,255,255,.85);font-weight:500}
+  .gratis .assinar{margin-top:16px;width:100%;background:#fff;color:var(--roxo);font-weight:700;font-size:14.5px;height:46px;border-radius:11px;transition:transform .12s}
+  .gratis .assinar:hover{transform:translateY(-1px)}
+
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+    background:#221d3a;color:#fff;font-size:14px;font-weight:600;padding:13px 20px;border-radius:12px;
+    box-shadow:0 12px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.25s;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---------- Responsivo ---------- */
+  @media (max-width:1000px){
+    .conteudo{grid-template-columns:1fr}
+    .side{position:static;flex-direction:row;flex-wrap:wrap}
+    .progresso,.gratis{flex:1;min-width:260px}
+  }
+  @media (max-width:760px){
+    .wrap{padding:0 16px}
+    .topbar .wrap{height:68px;gap:12px}
+    .nav,.user span,.user .caret{display:none}
+    .burger{display:flex}
+    .logo-txt{font-size:22px}.logo-mark{width:40px;height:40px}
+    .filtros-grid{grid-template-columns:1fr 1fr;gap:14px;padding:16px}
+    .qcard{padding:20px 18px}
+    .enunciado{font-size:16.5px}
+    .qhead{flex-wrap:wrap;gap:10px}
+    .qmark{margin-left:0;order:3;width:100%;justify-content:flex-start}
+    .alt{padding:14px}.alt .badge{width:38px;height:38px;font-size:15px}.alt .texto{font-size:14.5px}
+    .acao{flex-direction:column;align-items:stretch}
+    .responder{width:100%}
+    .tabs{grid-template-columns:1fr}
+    .side{flex-direction:column}
+    .progresso,.gratis{min-width:0}
+  }
+  @media (max-width:430px){
+    .filtros-grid{grid-template-columns:1fr}
+  }
+  :focus-visible{outline:3px solid #c4b5fd;outline-offset:2px;border-radius:8px}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ===== TOPBAR ===== -->
+<header class="topbar">
+  <div class="wrap">
+    <a class="logo" href="#">
+      <img src="logo.png" alt="Mais Aprovação Questões" class="logo-mark-2" />
+      <!-- <svg class="logo-mark" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle cx="20" cy="20" r="14" stroke="#6d28d9" stroke-width="5"/>
+        <line x1="30" y1="30" x2="40" y2="40" stroke="#6d28d9" stroke-width="6" stroke-linecap="round"/>
+        <path d="M27 27l5 5" stroke="#a78bfa" stroke-width="3.4" stroke-linecap="round"/>
+        <path d="M9 8.5v7M5.5 12h7" stroke="#a78bfa" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <span class="logo-txt"><span class="mais">mais</span> <span class="q">questões</span></span> -->
+    </a>
+    <nav class="nav">
+      <a href="#"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Início</a>
+      <a href="#" class="ativo"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Questões</a>
+    </nav>
+    <div class="topbar-right">
+      <button class="bell" aria-label="Notificações">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="dot">2</span>
+      </button>
+      <div class="user">
+        <div class="avatar">E</div>
+        <span>Olá, Elis</span>
+        <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <button class="burger" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===== FILTROS ===== -->
+<section class="filtros">
+  <div class="wrap">
+    <div class="filtros-grid">
+      <div class="campo">
+        <label>Assunto</label>
+        <div class="select"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span><span class="val">Direito Administrativo</span><span class="caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></span></div>
+      </div>
+      <div class="campo">
+        <label>Banca</label>
+        <div class="select"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="val">Cespe / Cebraspe</span><span class="caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></span></div>
+      </div>
+      <div class="campo">
+        <label>Ano</label>
+        <div class="select"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span class="val">2023</span><span class="caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></span></div>
+      </div>
+      <div class="campo">
+        <label>Cargo</label>
+        <div class="select"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span><span class="val">Analista Judiciário</span><span class="caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></span></div>
+      </div>
+      <div class="campo">
+        <label>Nível</label>
+        <div class="select"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/></svg></span><span class="val">Superior</span><span class="caret"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CONTEÚDO ===== -->
+<main class="wrap">
+  <div class="conteudo">
+
+    <!-- Card da questão -->
+    <section class="qcard">
+      <div class="qhead">
+        <span class="qtag">Questão 12</span>
+        <span class="qmeta">Cespe / Cebraspe – Analista Judiciário – 2023</span>
+        <button class="qmark" id="btnMark" aria-pressed="false">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          <span id="markTxt">Marcar</span>
+        </button>
+      </div>
+
+      <p class="enunciado">De acordo com a <b>Lei nº 8.666/1993</b>, acerca da dispensa e da inexigibilidade de licitação, assinale a alternativa correta.</p>
+
+      <div class="alts" id="alts">
+        <button class="alt" data-letra="A"><span class="badge">A</span><span class="texto">A dispensa de licitação é cabível apenas nos casos expressamente previstos na lei.</span></button>
+        <button class="alt" data-letra="B"><span class="badge">B</span><span class="texto">A inexigibilidade de licitação ocorre quando há inviabilidade de competição.</span></button>
+        <button class="alt" data-letra="C"><span class="badge">C</span><span class="texto">A dispensa de licitação pode ser utilizada para qualquer valor, desde que haja justificativa.</span></button>
+        <button class="alt" data-letra="D"><span class="badge">D</span><span class="texto">A inexigibilidade de licitação não se aplica a serviços técnicos especializados.</span></button>
+        <button class="alt" data-letra="E"><span class="badge">E</span><span class="texto">A dispensa e a inexigibilidade de licitação dependem sempre de autorização prévia do Tribunal de Contas.</span></button>
+      </div>
+
+      <div class="acao">
+        <button class="responder" id="btnResponder" disabled>RESPONDER</button>
+        <div class="feedback" id="feedback"></div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab" data-painel="gabarito"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>Gabarito Comentado <span class="cnt">(1)</span></button>
+        <button class="tab" data-painel="comentarios"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Comentários <span class="cnt" id="cntCom">(1)</span></button>
+        <button class="tab" data-painel="anotacoes"><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg></span>Criar anotações</button>
+      </div>
+
+      <!-- Painel: Gabarito comentado -->
+      <div class="painel" id="p-gabarito">
+        <div class="videobox"><div class="play"><svg width="26" height="26" viewBox="0 0 24 24" fill="#fff"><polygon points="6 4 20 12 6 20 6 4"/></svg></div></div>
+        <h4>Resolução em vídeo + texto</h4>
+        <p><b>Gabarito: B.</b> A inexigibilidade pressupõe a inviabilidade de competição (art. 25 da Lei 8.666/93) — quando não há como comparar fornecedores, por exemplo produtor ou serviço exclusivo. Já a dispensa (art. 24) trata de casos em que a competição é viável, mas a lei dispensa o procedimento. As demais alternativas confundem hipóteses de dispensa, valores e a inexigibilidade para serviços técnicos especializados de notória especialização, que de fato se aplica.</p>
+      </div>
+
+      <!-- Painel: Comentários -->
+      <div class="painel" id="p-comentarios">
+        <div class="coment">
+          <div class="av" style="background:linear-gradient(135deg,#34d399,#059669)">M</div>
+          <div class="corpo">
+            <span class="nome">Marina R.</span> <span class="quando">· há 3 dias</span>
+            <div class="txt">Dica: inexigibilidade = inviável competir; dispensa = poderia competir, mas a lei permite não competir. Isso resolve 80% das questões.</div>
+          </div>
+        </div>
+        <div id="listaCom"></div>
+        <div class="escrever">
+          <textarea id="campoCom" placeholder="Escreva um comentário…"></textarea>
+          <button class="enviar" id="enviarCom">Publicar</button>
+        </div>
+      </div>
+
+      <!-- Painel: Anotações -->
+      <div class="painel" id="p-anotacoes">
+        <h4>Minha anotação nesta questão</h4>
+        <p style="color:var(--txt-2);font-size:14px">Suas anotações ficam vinculadas a esta questão e disponíveis no seu caderno de estudos.</p>
+        <div class="escrever">
+          <textarea id="campoNota" placeholder="Ex.: Revisar art. 24 x art. 25 da 8.666…"></textarea>
+          <button class="enviar" id="salvarNota">Salvar</button>
+        </div>
+      </div>
+
+      <!-- Paginação -->
+      <div class="pag">
+        <button><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>Anterior</button>
+        <span class="meio">12 de 50</span>
+        <button>Próxima<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </section>
+
+    <!-- Sidebar -->
+    <aside class="side">
+      <div class="progresso">
+        <div class="topo"><h3>Progresso</h3><a href="#">Ver desempenho</a></div>
+        <div class="stat">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+          <div><div class="num" id="stRespondidas">12</div><div class="lbl">Respondidas</div></div>
+        </div>
+        <div class="stat">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></div>
+          <div><div class="num" id="stMarcadas">3</div><div class="lbl">Marcadas</div></div>
+        </div>
+        <div class="stat">
+          <div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+          <div><div class="num">78%</div><div class="lbl">Aproveitamento</div></div>
+        </div>
+      </div>
+
+      <div class="gratis">
+        <h3>Plano gratuito</h3>
+        <div class="sub" id="gratisSub">Você respondeu 12 de 15 questões de hoje</div>
+        <div class="barra"><i id="gratisBarra" style="width:80%"></i></div>
+        <div class="sub">Renova em 11h. Assine para questões ilimitadas + gabarito em vídeo.</div>
+        <button class="assinar" id="btnAssinar">Assinar premium</button>
+      </div>
+    </aside>
+
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var CORRETA = "B";
+  var selecionada = null, respondido = false;
+  var alts = document.getElementById('alts');
+  var btnResp = document.getElementById('btnResponder');
+  var feedback = document.getElementById('feedback');
+
+  function toast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(function(){t.classList.remove('show')}, 2200);
+  }
+
+  // Selecionar alternativa
+  alts.addEventListener('click', function(e){
+    var alt = e.target.closest('.alt');
+    if(!alt || respondido) return;
+    Array.prototype.forEach.call(alts.children, function(a){a.classList.remove('sel')});
+    alt.classList.add('sel');
+    selecionada = alt.getAttribute('data-letra');
+    btnResp.disabled = false;
+  });
+
+  // Responder
+  btnResp.addEventListener('click', function(){
+    if(!selecionada || respondido) return;
+    respondido = true;
+    btnResp.disabled = true;
+    Array.prototype.forEach.call(alts.children, function(a){
+      a.classList.add('travada'); a.classList.remove('sel');
+      var l = a.getAttribute('data-letra');
+      if(l === CORRETA) a.classList.add('correta');
+      else if(l === selecionada) a.classList.add('errada');
+    });
+    var acertou = selecionada === CORRETA;
+    feedback.className = 'feedback ' + (acertou ? 'acerto' : 'err');
+    feedback.style.display = 'flex';
+    if(acertou){
+      feedback.innerHTML = '<span class="fico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span> Correta! Gabarito oficial da banca: B';
+    } else {
+      feedback.innerHTML = '<span class="fico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span> Incorreta. Gabarito oficial da banca: B';
+    }
+    // abre o gabarito comentado
+    abrirPainel('gabarito', document.querySelector('.tab[data-painel="gabarito"]'));
+    // atualiza progresso (demonstração do modelo freemium)
+    var st = document.getElementById('stRespondidas');
+    var n = parseInt(st.textContent,10) + 1; st.textContent = n;
+    var usado = Math.min(n, 15);
+    document.getElementById('gratisSub').textContent = 'Você respondeu '+usado+' de 15 questões de hoje';
+    document.getElementById('gratisBarra').style.width = (usado/15*100)+'%';
+    if(usado >= 15){
+      toast('Limite gratuito atingido — assine para continuar');
+    }
+  });
+
+  // Tabs / painéis
+  var tabsAbertas = {};
+  function abrirPainel(nome, tabEl){
+    var painel = document.getElementById('p-'+nome);
+    var aberto = painel.classList.contains('show');
+    // fecha todos
+    document.querySelectorAll('.painel').forEach(function(p){p.classList.remove('show')});
+    document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('aberta')});
+    if(!aberto){ painel.classList.add('show'); if(tabEl) tabEl.classList.add('aberta'); }
+  }
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.addEventListener('click', function(){ abrirPainel(tab.getAttribute('data-painel'), tab); });
+  });
+
+  // Favoritar
+  var btnMark = document.getElementById('btnMark');
+  btnMark.addEventListener('click', function(){
+    var on = btnMark.classList.toggle('on');
+    btnMark.setAttribute('aria-pressed', on);
+    document.getElementById('markTxt').textContent = on ? 'Marcada' : 'Marcar';
+    var m = document.getElementById('stMarcadas');
+    m.textContent = parseInt(m.textContent,10) + (on ? 1 : -1);
+    toast(on ? 'Questão adicionada às marcadas' : 'Removida das marcadas');
+  });
+
+  // Comentários
+  document.getElementById('enviarCom').addEventListener('click', function(){
+    var c = document.getElementById('campoCom');
+    var v = c.value.trim(); if(!v) return;
+    var div = document.createElement('div'); div.className = 'coment';
+    div.innerHTML = '<div class="av" style="background:linear-gradient(135deg,#c4b5fd,#7c3aed)">E</div>'+
+      '<div class="corpo"><span class="nome">Elis</span> <span class="quando">· agora</span>'+
+      '<div class="txt"></div></div>';
+    div.querySelector('.txt').textContent = v;
+    document.getElementById('listaCom').appendChild(div);
+    c.value = '';
+    var cc = document.getElementById('cntCom');
+    cc.textContent = '('+(parseInt(cc.textContent.replace(/\D/g,''),10)+1)+')';
+    toast('Comentário publicado');
+  });
+
+  // Anotação
+  document.getElementById('salvarNota').addEventListener('click', function(){
+    var n = document.getElementById('campoNota');
+    if(!n.value.trim()) return;
+    toast('Anotação salva no seu caderno');
+  });
+
+  document.getElementById('btnAssinar').addEventListener('click', function(){
+    toast('Fluxo de assinatura (PIX / cartão) — etapa do checkout');
+  });
+})();
+</script>
+</body>
+</html>
