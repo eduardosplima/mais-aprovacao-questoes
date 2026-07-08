@@ -988,15 +988,18 @@ cd api && git add -A && git commit -m "feat(api): middlewares requireSession e r
 
 > **Verificação manual obrigatória (Task 8, sandbox):** o mapeamento do JSON de `fetchIdentity` (campos `id`/`user_id`/`email`) e as URLs reais de authorize/token/userinfo dependem da resposta real da Hotmart. Confirme contra o sandbox e ajuste `createHotmartClient`/os `HOTMART_*_URL` se divergir. Os testes abaixo fixam o **contrato interno**, não a resposta real da Hotmart.
 
-- [ ] **Step 1: Escreva os testes que falham — `test/hotmart.test.ts`** (usa `fetchMock` do pool-workers)
+- [ ] **Step 1: Escreva os testes que falham — `test/hotmart.test.ts`**
+
+> **Mock de `fetch`:** `fetchMock` de `cloudflare:test` foi **removido** no pool-workers ≥0.13.0 (linha Vitest 4). Mockamos `globalThis.fetch` via `vi.stubGlobal("fetch", ...)` e limpamos com `vi.unstubAllGlobals()` no `afterEach`. O spy roteia pela URL (`String(input)`).
 
 ```ts
-import { env, fetchMock } from "cloudflare:test";
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { env } from "cloudflare:test";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { createHotmartClient } from "../src/lib/hotmart";
 
-beforeAll(() => fetchMock.activate());
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("createHotmartClient", () => {
   it("authorizeUrl inclui client_id, redirect_uri, response_type e state", () => {
@@ -1011,29 +1014,37 @@ describe("createHotmartClient", () => {
   });
 
   it("exchangeCode troca code por access_token", async () => {
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/token", method: "POST" })
-      .reply(200, { access_token: "AT" });
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(env.HOTMART_TOKEN_URL);
+      return new Response(JSON.stringify({ access_token: "AT" }), {
+        status: 200,
+      });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
     const out = await createHotmartClient(env).exchangeCode("the-code");
     expect(out.accessToken).toBe("AT");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("exchangeCode lança em status != 2xx", async () => {
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/token", method: "POST" })
-      .reply(401, {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({}), { status: 401 })),
+    );
     await expect(
       createHotmartClient(env).exchangeCode("bad"),
     ).rejects.toThrow();
   });
 
   it("fetchIdentity mapeia id e email", async () => {
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/userinfo", method: "GET" })
-      .reply(200, { id: 987, email: "quem@test.com" });
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(env.HOTMART_USERINFO_URL);
+      return new Response(
+        JSON.stringify({ id: 987, email: "quem@test.com" }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
     const id = await createHotmartClient(env).fetchIdentity("AT");
     expect(id).toEqual({ hotmartUserId: "987", email: "quem@test.com" });
   });
@@ -1135,15 +1146,18 @@ cd api && git add -A && git commit -m "feat(api): HotmartClient (authorize/excha
 - [ ] **Step 1: Escreva os testes que falham — `test/auth-routes.test.ts`**
 
 ```ts
-import { env, fetchMock } from "cloudflare:test";
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { env } from "cloudflare:test";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import app from "../src/index";
 import { getDb } from "../src/db/client";
 import { users } from "../src/db/schema";
 
-beforeAll(() => fetchMock.activate());
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+// `fetchMock` de cloudflare:test foi removido (pool-workers >=0.13.0);
+// mockamos globalThis.fetch e roteamos pela URL.
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function cookieFrom(res: Response, name: string): string | null {
   const raw = res.headers.get("set-cookie");
@@ -1179,15 +1193,25 @@ describe("/auth", () => {
     const state = new URL(loc).searchParams.get("state")!;
     const stateCookie = cookieFrom(login, "oauth_state")!;
 
-    // 2. stub das chamadas Hotmart
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/token", method: "POST" })
-      .reply(200, { access_token: "AT" });
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/userinfo", method: "GET" })
-      .reply(200, { id: 42, email: "novo@test.com" });
+    // 2. stub das chamadas Hotmart (roteia por URL)
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const u = String(input);
+        if (u === env.HOTMART_TOKEN_URL) {
+          return new Response(JSON.stringify({ access_token: "AT" }), {
+            status: 200,
+          });
+        }
+        if (u === env.HOTMART_USERINFO_URL) {
+          return new Response(
+            JSON.stringify({ id: 42, email: "novo@test.com" }),
+            { status: 200 },
+          );
+        }
+        throw new Error("fetch inesperado: " + u);
+      }),
+    );
 
     // 3. callback
     const cb = await app.request(
