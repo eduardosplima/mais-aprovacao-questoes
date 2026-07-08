@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Todo o código roda no runtime **workerd** — apenas APIs edge/Web (Web Crypto, `fetch`, `crypto.randomUUID`); **nenhuma API de Node** (`fs`, `crypto` de node, `Buffer`).
-- Versões (pinar em `package.json`, sem `^`): `hono@4.12.28`, `drizzle-orm@0.45.2`, `drizzle-kit@0.31.10`, `zod@4.4.3`, `jose@6.2.3`, `wrangler@4.107.0`, `vitest@4.1.10`, `@cloudflare/vitest-pool-workers@0.18.0`, `@cloudflare/workers-types@4.20250101.0`.
+- Versões (pinar em `package.json`, sem `^`): `hono@4.12.28`, `drizzle-orm@0.45.2`, `drizzle-kit@0.31.10`, `zod@4.4.3`, `jose@6.2.3`, `wrangler@4.107.0`, `vitest@4.1.10`, `@cloudflare/vitest-pool-workers@0.18.0`, `@cloudflare/workers-types@4.20260702.1`.
 - Cookies **sempre** `HttpOnly; Secure; SameSite=Lax; Path=/`.
 - Segredos **nunca** em código nem no repositório — via `wrangler secret` (prod) e bindings do Miniflare (testes).
 - Banco: **apenas** queries via Drizzle (parametrizadas); sem interpolação de string em SQL.
@@ -78,7 +78,7 @@ Tudo dentro de `api/`:
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.18.0",
-    "@cloudflare/workers-types": "4.20250101.0",
+    "@cloudflare/workers-types": "4.20260702.1",
     "drizzle-kit": "0.31.10",
     "vitest": "4.1.10",
     "wrangler": "4.107.0"
@@ -126,16 +126,18 @@ Run: `cd api && npm install`
 }
 ```
 
-- [ ] **Step 4: `worker-env.d.ts`**
+- [ ] **Step 4: `worker-env.d.ts`** (API v4 do pool-workers: augmenta `Cloudflare.Env`; v4 removeu `ProvidedEnv`)
 
 ```ts
-/// <reference types="@cloudflare/vitest-pool-workers" />
-import type { D1Migration } from "@cloudflare/vitest-pool-workers/config";
-import type { Env } from "./src/config/env";
+/// <reference types="@cloudflare/vitest-pool-workers/types" />
+import type { D1Migration } from "@cloudflare/vitest-pool-workers";
+import type { Env as WorkerEnv } from "./src/config/env";
 
-declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {
-    TEST_MIGRATIONS: D1Migration[];
+declare global {
+  namespace Cloudflare {
+    interface Env extends WorkerEnv {
+      TEST_MIGRATIONS: D1Migration[];
+    }
   }
 }
 ```
@@ -165,36 +167,37 @@ export function getAdminEmails(env: Env): string[] {
 }
 ```
 
-- [ ] **Step 6: `vitest.config.ts`** (bindings de teste incluem já todos os secrets que as tarefas seguintes usam)
+- [ ] **Step 6: `vitest.config.ts`** (API v4: plugin `cloudflareTest` + `defineConfig` do `vitest/config`; bindings de teste incluem já todos os secrets que as tarefas seguintes usam)
 
 ```ts
-import { defineWorkersConfig, readD1Migrations } from "@cloudflare/vitest-pool-workers/config";
+import { defineConfig } from "vitest/config";
+import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 
 const migrations = await readD1Migrations("./migrations");
 
-export default defineWorkersConfig({
-  test: {
-    setupFiles: ["./test/apply-migrations.ts"],
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: {
-          d1Databases: ["DB"],
-          bindings: {
-            TEST_MIGRATIONS: migrations,
-            JWT_SECRET: "test-jwt-secret",
-            COOKIE_SIGNING_KEY: "test-cookie-key",
-            ADMIN_EMAILS: "admin@test.com",
-            HOTMART_CLIENT_ID: "cid",
-            HOTMART_CLIENT_SECRET: "csecret",
-            HOTMART_REDIRECT_URI: "https://app.test/auth/callback",
-            HOTMART_AUTHORIZE_URL: "https://hotmart.test/authorize",
-            HOTMART_TOKEN_URL: "https://hotmart.test/token",
-            HOTMART_USERINFO_URL: "https://hotmart.test/userinfo",
-          },
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.jsonc" },
+      miniflare: {
+        d1Databases: ["DB"],
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          JWT_SECRET: "test-jwt-secret",
+          COOKIE_SIGNING_KEY: "test-cookie-key",
+          ADMIN_EMAILS: "admin@test.com",
+          HOTMART_CLIENT_ID: "cid",
+          HOTMART_CLIENT_SECRET: "csecret",
+          HOTMART_REDIRECT_URI: "https://app.test/auth/callback",
+          HOTMART_AUTHORIZE_URL: "https://hotmart.test/authorize",
+          HOTMART_TOKEN_URL: "https://hotmart.test/token",
+          HOTMART_USERINFO_URL: "https://hotmart.test/userinfo",
         },
       },
-    },
+    }),
+  ],
+  test: {
+    setupFiles: ["./test/apply-migrations.ts"],
   },
 });
 ```
@@ -715,7 +718,7 @@ describe("cookies", () => {
     expect(await res2.text()).toBe("jwt-token");
   });
 
-  it("state: assina e valida; retorna false se adulterado", async () => {
+  it("state: assina e valida; rejeita cookie adulterado", async () => {
     const app = new Hono();
     app.get("/set", async (c) => {
       await setStateCookie(c, "abc123", KEY);
@@ -735,7 +738,11 @@ describe("cookies", () => {
     const tampered = await app.request("/get", {
       headers: { cookie: cookie + "x" },
     });
-    expect((await tampered.json()).v).toBe(false);
+    // Hono rejeita a assinatura inválida (retorna false ou undefined,
+    // nunca o valor original) — ambos são tratados como state inválido.
+    const v = (await tampered.json()).v;
+    expect(v).not.toBe("abc123");
+    expect(v).toBeFalsy();
   });
 });
 ```
@@ -855,7 +862,9 @@ function buildApp() {
 
 async function sessionCookieFor(email: string): Promise<string> {
   const db = getDb(env);
-  const id = await upsertUser(db, { hotmartUserId: "h", email }, [
+  // hotmartUserId único por e-mail: o D1 de teste é compartilhado entre os
+  // casos deste arquivo, então "h" fixo colidiria na constraint UNIQUE.
+  const id = await upsertUser(db, { hotmartUserId: `h-${email}`, email }, [
     "admin@test.com",
   ]);
   await ensureSubscription(db, id);
@@ -979,15 +988,18 @@ cd api && git add -A && git commit -m "feat(api): middlewares requireSession e r
 
 > **Verificação manual obrigatória (Task 8, sandbox):** o mapeamento do JSON de `fetchIdentity` (campos `id`/`user_id`/`email`) e as URLs reais de authorize/token/userinfo dependem da resposta real da Hotmart. Confirme contra o sandbox e ajuste `createHotmartClient`/os `HOTMART_*_URL` se divergir. Os testes abaixo fixam o **contrato interno**, não a resposta real da Hotmart.
 
-- [ ] **Step 1: Escreva os testes que falham — `test/hotmart.test.ts`** (usa `fetchMock` do pool-workers)
+- [ ] **Step 1: Escreva os testes que falham — `test/hotmart.test.ts`**
+
+> **Mock de `fetch`:** `fetchMock` de `cloudflare:test` foi **removido** no pool-workers ≥0.13.0 (linha Vitest 4). Mockamos `globalThis.fetch` via `vi.stubGlobal("fetch", ...)` e limpamos com `vi.unstubAllGlobals()` no `afterEach`. O spy roteia pela URL (`String(input)`).
 
 ```ts
-import { env, fetchMock } from "cloudflare:test";
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { env } from "cloudflare:test";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { createHotmartClient } from "../src/lib/hotmart";
 
-beforeAll(() => fetchMock.activate());
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("createHotmartClient", () => {
   it("authorizeUrl inclui client_id, redirect_uri, response_type e state", () => {
@@ -1002,29 +1014,37 @@ describe("createHotmartClient", () => {
   });
 
   it("exchangeCode troca code por access_token", async () => {
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/token", method: "POST" })
-      .reply(200, { access_token: "AT" });
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(env.HOTMART_TOKEN_URL);
+      return new Response(JSON.stringify({ access_token: "AT" }), {
+        status: 200,
+      });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
     const out = await createHotmartClient(env).exchangeCode("the-code");
     expect(out.accessToken).toBe("AT");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("exchangeCode lança em status != 2xx", async () => {
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/token", method: "POST" })
-      .reply(401, {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({}), { status: 401 })),
+    );
     await expect(
       createHotmartClient(env).exchangeCode("bad"),
     ).rejects.toThrow();
   });
 
   it("fetchIdentity mapeia id e email", async () => {
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/userinfo", method: "GET" })
-      .reply(200, { id: 987, email: "quem@test.com" });
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(env.HOTMART_USERINFO_URL);
+      return new Response(
+        JSON.stringify({ id: 987, email: "quem@test.com" }),
+        { status: 200 },
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
     const id = await createHotmartClient(env).fetchIdentity("AT");
     expect(id).toEqual({ hotmartUserId: "987", email: "quem@test.com" });
   });
@@ -1126,20 +1146,24 @@ cd api && git add -A && git commit -m "feat(api): HotmartClient (authorize/excha
 - [ ] **Step 1: Escreva os testes que falham — `test/auth-routes.test.ts`**
 
 ```ts
-import { env, fetchMock } from "cloudflare:test";
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { env } from "cloudflare:test";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import app from "../src/index";
 import { getDb } from "../src/db/client";
 import { users } from "../src/db/schema";
 
-beforeAll(() => fetchMock.activate());
-afterEach(() => fetchMock.assertNoPendingInterceptors());
+// `fetchMock` de cloudflare:test foi removido (pool-workers >=0.13.0);
+// mockamos globalThis.fetch e roteamos pela URL.
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function cookieFrom(res: Response, name: string): string | null {
-  const raw = res.headers.get("set-cookie");
-  if (!raw) return null;
-  const m = raw.split(/,(?=[^ ])/).find((p) => p.trim().startsWith(name + "="));
+  // getSetCookie() retorna cada Set-Cookie intacto; `get("set-cookie")`
+  // junta múltiplos com ", " e fica ambíguo com vírgulas de atributos.
+  const all = res.headers.getSetCookie();
+  const m = all.find((p) => p.startsWith(name + "="));
   return m ? m.split(";")[0].trim() : null;
 }
 
@@ -1170,15 +1194,25 @@ describe("/auth", () => {
     const state = new URL(loc).searchParams.get("state")!;
     const stateCookie = cookieFrom(login, "oauth_state")!;
 
-    // 2. stub das chamadas Hotmart
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/token", method: "POST" })
-      .reply(200, { access_token: "AT" });
-    fetchMock
-      .get("https://hotmart.test")
-      .intercept({ path: "/userinfo", method: "GET" })
-      .reply(200, { id: 42, email: "novo@test.com" });
+    // 2. stub das chamadas Hotmart (roteia por URL)
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const u = String(input);
+        if (u === env.HOTMART_TOKEN_URL) {
+          return new Response(JSON.stringify({ access_token: "AT" }), {
+            status: 200,
+          });
+        }
+        if (u === env.HOTMART_USERINFO_URL) {
+          return new Response(
+            JSON.stringify({ id: 42, email: "novo@test.com" }),
+            { status: 200 },
+          );
+        }
+        throw new Error("fetch inesperado: " + u);
+      }),
+    );
 
     // 3. callback
     const cb = await app.request(
