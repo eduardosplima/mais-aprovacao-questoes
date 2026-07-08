@@ -718,7 +718,7 @@ describe("cookies", () => {
     expect(await res2.text()).toBe("jwt-token");
   });
 
-  it("state: assina e valida; retorna false se adulterado", async () => {
+  it("state: assina e valida; rejeita cookie adulterado", async () => {
     const app = new Hono();
     app.get("/set", async (c) => {
       await setStateCookie(c, "abc123", KEY);
@@ -738,7 +738,11 @@ describe("cookies", () => {
     const tampered = await app.request("/get", {
       headers: { cookie: cookie + "x" },
     });
-    expect((await tampered.json()).v).toBe(false);
+    // Hono rejeita a assinatura inválida (retorna false ou undefined,
+    // nunca o valor original) — ambos são tratados como state inválido.
+    const v = (await tampered.json()).v;
+    expect(v).not.toBe("abc123");
+    expect(v).toBeFalsy();
   });
 });
 ```
