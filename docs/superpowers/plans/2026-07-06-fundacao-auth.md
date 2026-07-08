@@ -862,7 +862,9 @@ function buildApp() {
 
 async function sessionCookieFor(email: string): Promise<string> {
   const db = getDb(env);
-  const id = await upsertUser(db, { hotmartUserId: "h", email }, [
+  // hotmartUserId único por e-mail: o D1 de teste é compartilhado entre os
+  // casos deste arquivo, então "h" fixo colidiria na constraint UNIQUE.
+  const id = await upsertUser(db, { hotmartUserId: `h-${email}`, email }, [
     "admin@test.com",
   ]);
   await ensureSubscription(db, id);
