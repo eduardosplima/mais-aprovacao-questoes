@@ -15,7 +15,11 @@ function cookieFrom(res: Response, name: string): string | null {
   // Multiple Set-Cookie headers are joined by `res.headers.get("set-cookie")`
   // using ", " (comma+space), which is ambiguous with commas inside cookie
   // attributes. Use getSetCookie() to read each Set-Cookie value untouched.
-  const all = res.headers.getSetCookie();
+  // getSetCookie() exists at runtime (Workers/undici Headers) but isn't in the
+  // default @cloudflare/workers-types Headers type, so we cast at this one site.
+  const all = (
+    res.headers as unknown as { getSetCookie(): string[] }
+  ).getSetCookie();
   const m = all.find((p) => p.startsWith(name + "="));
   return m ? m.split(";")[0].trim() : null;
 }

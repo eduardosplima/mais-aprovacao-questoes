@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "../config/env";
 import { getAdminEmails } from "../config/env";
-import type { Entitlement } from "../db/users";
+import type { Entitlement, HotmartIdentity } from "../db/users";
 import { getDb } from "../db/client";
 import { upsertUser, ensureSubscription } from "../db/users";
 import { signSession } from "../lib/jwt";
@@ -36,7 +36,7 @@ auth.get("/callback", async (c) => {
   }
 
   const hotmart = createHotmartClient(c.env);
-  let identity;
+  let identity: HotmartIdentity;
   try {
     const { accessToken } = await hotmart.exchangeCode(code);
     identity = await hotmart.fetchIdentity(accessToken);

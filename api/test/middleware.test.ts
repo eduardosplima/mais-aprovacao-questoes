@@ -44,7 +44,7 @@ describe("middlewares", () => {
       env,
     );
     expect(res.status).toBe(200);
-    expect((await res.json()).email).toBe("m1@test.com");
+    expect(((await res.json()) as { email: unknown }).email).toBe("m1@test.com");
   });
 
   it("403 em rota admin para usuário comum", async () => {

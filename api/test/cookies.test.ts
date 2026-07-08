@@ -47,14 +47,14 @@ describe("cookies", () => {
     expect(cookie).toContain("oauth_state=");
 
     const ok = await app.request("/get", { headers: { cookie } });
-    expect((await ok.json()).v).toBe("abc123");
+    expect(((await ok.json()) as { v: unknown }).v).toBe("abc123");
 
     const tampered = await app.request("/get", {
       headers: { cookie: cookie + "x" },
     });
     // Hono rejeita a assinatura inválida (retorna false ou undefined,
     // nunca o valor original) — ambos são tratados como state inválido.
-    const v = (await tampered.json()).v;
+    const v = ((await tampered.json()) as { v: unknown }).v;
     expect(v).not.toBe("abc123");
     expect(v).toBeFalsy();
   });

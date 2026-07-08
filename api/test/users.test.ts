@@ -57,4 +57,21 @@ describe("users repo", () => {
     const db = getDb(env);
     expect(await loadEntitlement(db, "nao-existe")).toBeNull();
   });
+
+  it("normaliza e-mail: upsert é idempotente entre maiúsculas/minúsculas", async () => {
+    const db = getDb(env);
+    const first = await upsertUser(
+      db,
+      { hotmartUserId: "h4", email: "Mixed@Test.com" },
+      admins,
+    );
+    const second = await upsertUser(
+      db,
+      { hotmartUserId: "h4-new", email: "mixed@test.com" },
+      admins,
+    );
+    expect(second).toBe(first);
+    const ent = await loadEntitlement(db, first);
+    expect(ent?.email).toBe("mixed@test.com");
+  });
 });

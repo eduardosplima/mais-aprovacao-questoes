@@ -21,13 +21,12 @@ export async function upsertUser(
   identity: HotmartIdentity,
   adminEmails: string[],
 ): Promise<string> {
-  const role = adminEmails.includes(identity.email.toLowerCase())
-    ? "admin"
-    : "user";
+  const email = identity.email.trim().toLowerCase();
+  const role = adminEmails.includes(email) ? "admin" : "user";
   const existing = await db
     .select()
     .from(users)
-    .where(eq(users.email, identity.email))
+    .where(eq(users.email, email))
     .get();
   if (existing) {
     await db
@@ -42,7 +41,7 @@ export async function upsertUser(
     .insert(users)
     .values({
       id,
-      email: identity.email,
+      email,
       hotmartUserId: identity.hotmartUserId,
       role,
       createdAt: new Date(),
