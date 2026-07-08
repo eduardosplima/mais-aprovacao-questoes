@@ -1160,9 +1160,10 @@ afterEach(() => {
 });
 
 function cookieFrom(res: Response, name: string): string | null {
-  const raw = res.headers.get("set-cookie");
-  if (!raw) return null;
-  const m = raw.split(/,(?=[^ ])/).find((p) => p.trim().startsWith(name + "="));
+  // getSetCookie() retorna cada Set-Cookie intacto; `get("set-cookie")`
+  // junta múltiplos com ", " e fica ambíguo com vírgulas de atributos.
+  const all = res.headers.getSetCookie();
+  const m = all.find((p) => p.startsWith(name + "="));
   return m ? m.split(";")[0].trim() : null;
 }
 
