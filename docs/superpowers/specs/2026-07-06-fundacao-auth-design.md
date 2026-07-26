@@ -126,6 +126,30 @@ conta excluída na madrugada seguinte e envia um email de boas-vindas a quem ped
 para sair. Implementá-las depois significaria mexer nos dois fluxos mais delicados
 do sistema já em produção.
 
+A tombstone **continua necessária mesmo com o cancelamento de assinatura** na
+exclusão (ver abaixo): assinatura cancelada tem `date_next_charge` no futuro — é a
+data do último acesso pago — então o cron ainda a encontraria na API, ausente no
+D1, e recriaria a conta.
+
+### Leitura e escrita da API Hotmart em módulos separados
+
+A exclusão de conta cancela as assinaturas do titular na Hotmart antes de apagar a
+conta (`POST /subscriptions/{subscriber_code}/cancel`). Isso torna
+`HOTMART_CLIENT_SECRET` uma credencial **destrutiva**: quem a obtiver pode cancelar
+toda a base de assinantes.
+
+Daí a separação:
+
+- `lib/hotmartApi.ts` — **somente leitura** (`client_credentials` +
+  `listSubscriptions`). É o que o cron usa. **Construído nesta Fundação.**
+- `lib/hotmartCancel.ts` — **a chamada de escrita**, usada exclusivamente pelo
+  caminho de exclusão de conta. **Ships no sub-projeto 4**, junto da rota.
+
+Não é organização estética: é a garantia estrutural de que o job que roda sozinho
+toda madrugada não alcança a função que cancela assinaturas. Um bug na
+reconciliação que chamasse esse endpoint destruiria a receita do negócio em uma
+execução. **Invariante testada:** o cron não importa nem alcança `cancelSubscription`.
+
 ### Documento (CPF) nunca em claro
 
 HMAC-SHA256 com pepper em secret, sobre os dígitos normalizados. Hash simples não
@@ -177,6 +201,8 @@ por ser binding do `env`.
 - `src/lib/email.ts` — templates e envio via `env.EMAIL`.
 - `src/lib/turnstile.ts` — verificação `siteverify`.
 - `src/lib/hotmartApi.ts` — `client_credentials` + `listSubscriptions` paginado.
+  **Somente leitura** — a chamada de cancelamento fica fora deste módulo por
+  decisão de segurança (ver decisões-chave).
 - `src/lib/jwt.ts` — assinar/verificar o JWT de sessão *(mantido)*.
 - `src/lib/cookies.ts` — cookie de sessão *(enxugado: o state cookie morre)*.
 - `src/webhooks/hotmart.ts` — rota, validação Zod e despacho de eventos.
@@ -205,7 +231,8 @@ São 11 arquivos novos. É deliberado: cada um é uma unidade pequena, de propó
 
 **Removidos:** `GET /auth/login` (redirect OAuth) e `GET /auth/callback`.
 
-**Fora deste sub-projeto:** `DELETE /auth/me` (sub-projeto 4, junto da sua tela).
+**Fora deste sub-projeto:** `DELETE /auth/me` e o `cancelSubscription` que ela
+consome (sub-projeto 4, junto da sua tela).
 
 ## Fluxo do webhook
 
@@ -399,6 +426,9 @@ assinaturas, uma válida → assinante.
 
 **cascata:** `DELETE FROM users` remove tokens e assinaturas do usuário.
 
+**invariante de escrita:** o job de reconciliação não alcança
+`cancelSubscription` — o módulo de leitura não a exporta.
+
 **Mantidos:** `lib/jwt` (sign/verify, expirado, assinatura inválida),
 `lib/cookies`, `middleware/rbac`.
 
@@ -407,6 +437,12 @@ recebido → definir senha → login → `/auth/me` com `tier=assinante`; cancel
 `access_until` ajustado; e **conferência dos fixtures contra o payload real**, já
 que os atuais são derivados da documentação. Confirmar também o host e o token URL
 da API de dados.
+
+A documentação do sandbox fornece valores fixos de teste para o cancelamento —
+`subscriber_code` `B2HNQAXJ` responde 200, `X53ZPFQZ` responde 400 ("já
+cancelada"), e qualquer outro valor responde 404. Servem para exercitar os três
+ramos de tratamento sem cancelar assinatura real, e entram no runbook do
+sub-projeto 4.
 
 ## Remoção do código de OAuth
 
@@ -434,7 +470,8 @@ dashboard.
 ## Fora de escopo (Fundação)
 
 Frontend e todas as telas (login, definir senha, recuperar acesso, excluir conta);
-widget Turnstile; `DELETE /auth/me`; KV; refresh token; portal de gestão de
+widget Turnstile; `DELETE /auth/me` e `lib/hotmartCancel.ts`; KV; refresh token;
+cancelar assinatura sem excluir a conta; portal de gestão de
 assinatura; e todas as demais tabelas do ERD (Question, Alternative, Explanation,
 Attempt, Comment, Note, Favorite, taxonomias). CI/CD: apenas scripts locais
 (`npm test`, `wrangler deploy` manual) — GitHub Actions adiado.

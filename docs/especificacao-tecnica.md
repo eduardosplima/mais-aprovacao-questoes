@@ -183,9 +183,24 @@ Diário, não mensal: o caso que dói é *"paguei e não recebi acesso"*, que é
 
 ### 3.6 Exclusão de conta (LGPD)
 
-`DELETE /auth/me` — exige sessão válida **e a senha atual** no corpo (reautenticação para ação destrutiva). Apaga o usuário; a cascata do banco leva tokens, assinaturas e dados de estudo.
+`DELETE /auth/me` — exige sessão válida **e a senha atual** no corpo (reautenticação para ação destrutiva).
 
-**O problema que a exclusão ingênua cria:** na madrugada seguinte o cron veria "assinatura ativa na Hotmart, ausente no D1", recriaria a conta e enviaria um email de boas-vindas — desfazendo a exclusão em menos de 24 horas. A renovação via webhook faria o mesmo.
+A exclusão **cancela as assinaturas do aluno na Hotmart** antes de apagar a conta, via `POST /subscriptions/{subscriber_code}/cancel`, com a flag de notificação ligada — a confirmação de que a cobrança parou deve vir de quem cobra.
+
+**A ordem é cancelar e depois apagar, nunca o contrário.** Se apagássemos primeiro e o cancelamento falhasse, o aluno ficaria pagando por uma conta que não existe mais, e sem nenhum registro nosso do `subscriber_code` para consertar. Cancelando primeiro, uma falha apenas aborta a exclusão com mensagem clara — o titular tenta de novo, e nada foi perdido.
+
+| Resposta do cancelamento | Tratamento |
+|---|---|
+| 200 | segue para a exclusão |
+| 400 (já cancelada) | idempotente do nosso ponto de vista → segue |
+| 404 (código desconhecido) | não há cobrança que possamos parar → registra e segue |
+| 5xx / rede | **aborta a exclusão** e devolve erro ao titular |
+
+Com 1:N, todas as assinaturas do usuário são canceladas antes do `DELETE`.
+
+O cancelamento **notifica o webhook de volta** (a própria documentação diz que o endpoint "notifica o cancelamento para sub-sistemas como Club e Webhook"). Chega então um `SUBSCRIPTION_CANCELLATION` com um `subscriber_code` que a cascata já apagou — e o handler o trata como código desconhecido, `ignored`. O laço se fecha sem efeito colateral.
+
+**O problema que a exclusão ingênua ainda cria:** o cancelamento não elimina a necessidade da tombstone. Assinatura cancelada tem `date_next_charge` no futuro (é a data do último acesso pago), então o cron da madrugada seguinte ainda a veria na API, ausente no D1, e recriaria a conta com email de boas-vindas.
 
 Por isso a exclusão grava uma **tombstone** (`deleted_accounts`: HMAC do email + data, sem nenhum dado legível):
 
@@ -197,7 +212,11 @@ Por isso a exclusão grava uma **tombstone** (`deleted_accounts`: HMAC do email 
 
 A última linha impede que a tombstone se torne banimento perpétuo.
 
-**Consequência que aparece na tela de confirmação e no recibo por email:** excluir a conta **não cancela a assinatura na Hotmart** — não temos como interromper cobrança do lado deles. Quem excluir e continuar pagando fica sem acesso e sem retorno automático (o recover não ressuscita conta excluída; se ressuscitasse, qualquer um com email e CPF desfaria a exclusão). Retorno é caso de suporte.
+**Consequência que aparece na tela de confirmação e no recibo por email:** excluir a conta **cancela a assinatura e interrompe as cobranças**, e o acesso termina na hora — inclusive os dias já pagos do ciclo corrente, que são perdidos. Para voltar é preciso assinar novamente (o recover não ressuscita conta excluída; se ressuscitasse, qualquer um com email e CPF desfaria a exclusão).
+
+Optamos por não postergar a exclusão até o fim do período pago: atrasar o atendimento de um pedido de exclusão em até um mês é pior, sob a LGPD, do que perder dias de acesso — e o titular decide com a informação na tela.
+
+**Invariante de segurança:** só a exclusão iniciada pelo titular chama o cancelamento. O cron **nunca** cancela nada — um bug na reconciliação que chamasse esse endpoint destruiria a receita do negócio em uma execução. Por isso a chamada de escrita vive num módulo separado do cliente de leitura que o cron usa (seção 5).
 
 Comentários públicos têm autoria anonimizada (`ON DELETE SET NULL` → "usuário removido") em vez de apagados: atende o essencial da LGPD, que é remover a identificação, sem abrir buracos em discussões que outros alunos leem e respondem.
 
@@ -315,6 +334,11 @@ JWT HS256 em cookie **HttpOnly / Secure / SameSite=Lax**, expiração de 7 dias,
 
 Em **Workers Secrets**, nunca em código: `JWT_SECRET`, `HOTMART_HOTTOK`, `HOTMART_CLIENT_ID`, `HOTMART_CLIENT_SECRET`, `DOCUMENT_HMAC_KEY`, `TURNSTILE_SECRET_KEY`.
 
+**`HOTMART_CLIENT_SECRET` passou a ter poder destrutivo.** Com o cancelamento de assinaturas em uso (seção 3.6), essa credencial não serve mais só para leitura: quem a obtiver pode cancelar toda a base de assinantes. Duas consequências de projeto:
+
+- **Separação de módulos.** O cliente de leitura (`listSubscriptions`, usado pelo cron) e a chamada de escrita (`cancelSubscription`, usada só pela exclusão de conta) ficam em módulos distintos. Não é organização estética: é a garantia de que o job que roda sozinho toda madrugada não tem acesso à função que cancela assinaturas. Um teste verifica que o cron não a alcança.
+- **Escopo mínimo na Hotmart.** Se a plataforma permitir credenciais com escopos distintos, usar uma somente-leitura para o cron e reservar a de escrita para o caminho de exclusão — a confirmar na configuração da conta.
+
 ### Autorização
 
 RBAC checado **no Worker**, nunca no frontend. `role ∈ {admin, user}`; o tier (`assinante` / `gratuito`) é **derivado** de `access_until`, não é coluna.
@@ -403,12 +427,12 @@ Produção de conteúdo (cadastro das questões e gravação dos vídeos); custo
 | Configurar o webhook na Hotmart (URL, eventos, versão 2.0.0) e obter o **hottok** | todo o provisionamento |
 | Exigir **CPF no checkout** da Hotmart | recuperação de acesso (sem ele, a validação recai só no email) |
 | **DNS do domínio de envio** (SPF/DKIM) para o Email Sending | envio de qualquer email a destinatário arbitrário |
-| Credenciais `client_id` / `client_secret` da **API de dados** | cron de reconciliação |
+| Credenciais `client_id` / `client_secret` da **API de dados**, com permissão de leitura de assinaturas e de **cancelamento** | cron de reconciliação · exclusão de conta |
 | Confirmar os **ucodes** dos produtos de assinatura | filtro de produto no webhook |
 | Chaves do **Turnstile** (site key + secret) | proteção de login e recuperação |
 | **Rate Limiting Rules** no dashboard | proteção de força bruta na borda |
 
-**Pós-MVP (roadmap):** refresh token e rotação de sessão; KV como cache de leitura do entitlement; cache do access token da API Hotmart; portal de gestão de assinatura dentro do app.
+**Pós-MVP (roadmap):** refresh token e rotação de sessão; KV como cache de leitura do entitlement; cache do access token da API Hotmart; **cancelar assinatura sem excluir a conta** — ficou barato, porque é o mesmo endpoint já integrado na exclusão, sem a cascata; portal de gestão de assinatura dentro do app.
 
 ---
 
