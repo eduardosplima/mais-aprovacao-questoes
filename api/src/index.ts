@@ -1,10 +1,5 @@
-import { Hono } from "hono";
-import type { Env } from "./config/env";
-import { auth } from "./routes/auth";
+import app from "./app";
 
-const app = new Hono<{ Bindings: Env }>();
-
-app.get("/health", (c) => c.json({ ok: true }));
-app.route("/auth", auth);
-
-export default app;
+export default {
+  fetch: app.fetch,
+};
