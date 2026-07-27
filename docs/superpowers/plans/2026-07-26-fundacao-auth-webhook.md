@@ -179,12 +179,12 @@ export const auth = new Hono<{
   Variables: { entitlement: Entitlement };
 }>();
 
+// `name` entra na resposta na Task 4, junto com o campo em `Entitlement`.
 auth.get("/me", requireSession, (c) => {
   const ent = c.get("entitlement");
   return c.json({
     id: ent.userId,
     email: ent.email,
-    name: ent.name,
     role: ent.role,
     tier: ent.tier,
   });
@@ -313,9 +313,9 @@ export default defineConfig({
 cd api && npm test && npm run typecheck
 ```
 
-Esperado: os testes remanescentes (`health`, `jwt`, `cookies`, `middleware`) passam. Se `middleware.test.ts` falhar por referenciar `Entitlement.name` (campo novo) ou o schema antigo, ajustar o teste — a definição de `Entitlement` ganha `name` na Task 4.
+Esperado: **verde**. Os testes remanescentes são `health`, `jwt`, `cookies` e `middleware`, e nenhum deles depende do que foi removido — `src/db/schema.ts` e `src/db/users.ts` não são tocados nesta tarefa, então a migração antiga continua coerente com o código.
 
-> Se `npm test` acusar erro de schema/migração neste ponto, é esperado: a migração antiga ainda descreve as tabelas antigas. A Task 2 resolve. Neste passo o critério é apenas que **não haja referência a OAuth** e o typecheck passe.
+Se algo falhar aqui, é defeito da tarefa e precisa ser corrigido antes do commit — não siga adiante com a suíte vermelha.
 
 - [ ] **Step 10: Commit**
 
@@ -949,8 +949,10 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 O ponto único onde o tier é derivado. `loadEntitlement` é a função que todo request protegido chama, e é ela que faz a revogação ser imediata.
 
 **Files:**
-- Modify: `src/db/users.ts`
+- Modify: `src/db/users.ts`, `src/routes/auth.ts`, `test/middleware.test.ts`
 - Test: `test/users.test.ts`
+
+> **Atenção — dois arquivos existentes quebram nesta tarefa.** `test/middleware.test.ts` importa `upsertUser` e `ensureSubscription`, que deixam de existir ao reescrever `src/db/users.ts`; e `/auth/me` passa a poder devolver `name`. Os Steps 4 e 5 tratam ambos. Não basta rodar `npm test` no fim e torcer.
 
 **Interfaces:**
 - Consumes: tabelas `users`, `subscriptions` (Task 2); `Db` de `src/db/client.ts`.
@@ -1279,15 +1281,54 @@ export async function loadEntitlement(
 }
 ```
 
-- [ ] **Step 4: Rodar os testes**
+- [ ] **Step 4: Adaptar `test/middleware.test.ts` à nova API**
+
+O helper `sessionCookieFor` usa `upsertUser` e `ensureSubscription`, que não existem mais. Substituir os imports e o helper:
+
+```typescript
+import { upsertUserFromPurchase } from "../src/db/users";
+```
+
+```typescript
+async function sessionCookieFor(email: string): Promise<string> {
+  const id = await upsertUserFromPurchase(
+    getDb(env),
+    { email, name: null, documentHash: null },
+    ["admin@test.com"],
+  );
+  const token = await signSession(id, env.JWT_SECRET);
+  return `session=${token}`;
+}
+```
+
+Remover o import de `ensureSubscription`. Não há mais linha de `Subscription` placeholder: sem assinatura o tier é `gratuito`, que é o que esses testes esperam. Os quatro `it` continuam válidos sem alteração.
+
+- [ ] **Step 5: Incluir `name` na resposta de `/auth/me`**
+
+Em `src/routes/auth.ts`, o handler de `/me` (deixado sem `name` na Task 1) agora pode devolvê-lo:
+
+```typescript
+auth.get("/me", requireSession, (c) => {
+  const ent = c.get("entitlement");
+  return c.json({
+    id: ent.userId,
+    email: ent.email,
+    name: ent.name,
+    role: ent.role,
+    tier: ent.tier,
+  });
+});
+```
+
+- [ ] **Step 6: Rodar os testes**
 
 ```bash
 cd api && npm test && npm run typecheck
 ```
 
-Esperado: `test/users.test.ts` passa (11 testes). Se `test/middleware.test.ts` falhar por `Entitlement` agora ter `name`, adicionar `name: null` aos objetos de entitlement montados à mão nesse teste.
+Esperado: `test/users.test.ts` passa (11 testes) e a suíte inteira fica verde, incluindo `test/middleware.test.ts` adaptado.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 cd api && git add -A . && git commit -m "feat(api): users com upsert de compra e entitlement por access_until
