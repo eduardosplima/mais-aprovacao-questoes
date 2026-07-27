@@ -1884,15 +1884,21 @@ export async function createToken(
 /**
  * Consome o token: valida, e ao aceitar marca TODOS os tokens do usuário como
  * usados. Um link novo invalida os anteriores.
+ *
+ * A validação e a queima do token são UMA operação só — um UPDATE condicional
+ * com RETURNING. Um par SELECT-depois-UPDATE abriria janela para duas chamadas
+ * concorrentes passarem pela checagem antes de qualquer escrita cair, e ambas
+ * consumirem o mesmo token. Como este é o único credencial de acesso do
+ * sistema (não há autocadastro), o uso único precisa ser atômico de verdade.
  */
 export async function consumeToken(
   db: Db,
   token: string,
 ): Promise<string | null> {
   const now = new Date();
-  const row = await db
-    .select()
-    .from(authTokens)
+  const [row] = await db
+    .update(authTokens)
+    .set({ usedAt: now })
     .where(
       and(
         eq(authTokens.tokenHash, await hashToken(token)),
@@ -1900,14 +1906,16 @@ export async function consumeToken(
         gt(authTokens.expiresAt, now),
       ),
     )
-    .get();
+    .returning({ userId: authTokens.userId });
 
   if (!row) return null;
 
+  // Invalida os DEMAIS tokens do usuário. Passo idempotente, não decide nada,
+  // e por isso não precisa ser atômico.
   await db
     .update(authTokens)
     .set({ usedAt: now })
-    .where(eq(authTokens.userId, row.userId))
+    .where(and(eq(authTokens.userId, row.userId), isNull(authTokens.usedAt)))
     .run();
 
   return row.userId;
