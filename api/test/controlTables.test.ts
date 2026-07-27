@@ -63,6 +63,25 @@ describe("claimEvent", () => {
     expect(row?.status).toBe("ignored");
     expect(row?.note).toBe("assinante desconhecido");
   });
+
+  it("duas chamadas concorrentes para o mesmo id inédito criam só uma linha", async () => {
+    // A linha nasce em 'received', então a perdedora da corrida de insert
+    // também retorna 'claimed' (regra de reprocessamento) — o que prova a
+    // correção não é o retorno das duas chamadas, e sim que só uma inserção
+    // efetivamente criou a linha.
+    const [r1, r2] = await Promise.all([
+      claimEvent(db(), "ev-concurrent", "PURCHASE_APPROVED"),
+      claimEvent(db(), "ev-concurrent", "PURCHASE_APPROVED"),
+    ]);
+    expect(r1).toBe("claimed");
+    expect(r2).toBe("claimed");
+
+    const rows = await db()
+      .select()
+      .from(webhookEvents)
+      .where(eq(webhookEvents.id, "ev-concurrent"));
+    expect(rows).toHaveLength(1);
+  });
 });
 
 describe("tombstone", () => {
