@@ -67,6 +67,42 @@ describe("password", () => {
     expect(await verifyPassword("x", "bcrypt$xyz")).toBe(false);
     expect(await verifyPassword("x", "pbkdf2$sha256$abc$a$b")).toBe(false);
   });
+
+  it("lê a contagem de iterações da string armazenada, não da constante", async () => {
+    // Gera hash com 1000 iterações (diferente da constante ITERATIONS = 100000)
+    const password = "senha-para-teste";
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iterations = 1000;
+
+    // Replica a lógica de derive() para produzir um hash com iterações customizadas
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(password),
+      "PBKDF2",
+      false,
+      ["deriveBits"],
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+      key,
+      256,
+    );
+    const hash = new Uint8Array(bits);
+
+    // Constrói a string de hash manualmente
+    const saltB64 = btoa(String.fromCharCode(...salt));
+    const hashB64 = btoa(String.fromCharCode(...hash));
+    const storedWith1000 = `pbkdf2$sha256$${iterations}$${saltB64}$${hashB64}`;
+
+    // verifyPassword deve honrar o 1000 embutido na string
+    expect(await verifyPassword(password, storedWith1000)).toBe(true);
+
+    // Verificação cruzada: uma derivação com 1000 iterações não bate contra
+    // um hash produzido com hashPassword() (que usa 100000)
+    const storedWith100k = await hashPassword(password);
+    expect(await verifyPassword(password, storedWith100k)).toBe(true);
+    expect(storedWith1000).not.toBe(storedWith100k);
+  });
 });
 
 describe("tokens", () => {
