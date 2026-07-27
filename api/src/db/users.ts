@@ -31,38 +31,34 @@ export async function upsertUser(
   if (existing) {
     await db
       .update(users)
-      .set({ hotmartUserId: identity.hotmartUserId, role })
+      .set({ role })
       .where(eq(users.id, existing.id))
       .run();
     return existing.id;
   }
   const id = crypto.randomUUID();
+  const now = new Date();
   await db
     .insert(users)
     .values({
       id,
       email,
-      hotmartUserId: identity.hotmartUserId,
       role,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
     })
     .run();
   return id;
 }
 
+// Placeholder até a Task 4 reescrever este módulo para o schema novo:
+// subscriptions agora é 1:N, com PK em hotmart_subscriber_code, e só é
+// populada a partir de eventos de webhook — não há mais um registro
+// "vazio" por usuário para garantir aqui.
 export async function ensureSubscription(
-  db: Db,
-  userId: string,
-): Promise<void> {
-  const existing = await db
-    .select()
-    .from(subscriptions)
-    .where(eq(subscriptions.userId, userId))
-    .get();
-  if (!existing) {
-    await db.insert(subscriptions).values({ userId, status: "none" }).run();
-  }
-}
+  _db: Db,
+  _userId: string,
+): Promise<void> {}
 
 export async function loadEntitlement(
   db: Db,
