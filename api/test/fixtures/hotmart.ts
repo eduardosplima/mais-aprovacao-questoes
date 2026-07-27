@@ -106,11 +106,11 @@ export function subscriptionCancellation(
 
 export function postWebhook(
   app: {
-    request: (
+    request(
       path: string,
       init: RequestInit,
-      env: any,
-    ) => Response | Promise<Response>;
+      env: unknown,
+    ): Response | Promise<Response>;
   },
   payload: unknown,
   env: unknown,
