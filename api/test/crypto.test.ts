@@ -97,11 +97,17 @@ describe("password", () => {
     // verifyPassword deve honrar o 1000 embutido na string
     expect(await verifyPassword(password, storedWith1000)).toBe(true);
 
-    // Verificação cruzada: uma derivação com 1000 iterações não bate contra
-    // um hash produzido com hashPassword() (que usa 100000)
-    const storedWith100k = await hashPassword(password);
-    expect(await verifyPassword(password, storedWith100k)).toBe(true);
-    expect(storedWith1000).not.toBe(storedWith100k);
+    // Prova que a contagem de iterações realmente afeta o resultado derivado:
+    // usa o MESMO salt com iterações diferentes e compara os bytes
+    const bitsWith100k = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
+      key,
+      256,
+    );
+    const hashWith100k = new Uint8Array(bitsWith100k);
+
+    // Os bytes derivados com 1000 iterações devem diferir dos com 100000
+    expect(hash).not.toEqual(hashWith100k);
   });
 });
 
