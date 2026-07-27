@@ -6,7 +6,13 @@ import { getDb } from "../db/client";
 import { claimEvent, markProcessed, markIgnored } from "../db/webhookEvents";
 import { equalStrings } from "../lib/constantTime";
 import { upsertUserFromPurchase, findUserByEmail } from "../db/users";
-import { upsertSubscription } from "../db/subscriptions";
+import {
+  upsertSubscription,
+  findSubscriptionByCode,
+  revokeAccess,
+  setStatus,
+  setAccessUntil,
+} from "../db/subscriptions";
 import {
   createToken,
   hasPendingToken,
@@ -194,10 +200,123 @@ async function handlePurchaseApproved(
   return { kind: "processed" };
 }
 
+/** Eventos de compra que revogam acesso, e o status que cada um grava. */
+const REVOKING_EVENTS: Record<string, string> = {
+  PURCHASE_REFUNDED: "REFUNDED",
+  PURCHASE_CHARGEBACK: "CHARGEBACK",
+  PURCHASE_PROTEST: "PROTEST",
+};
+
+/**
+ * O subscriber code de um evento de compra. Diferente do cancelamento, que o
+ * traz um nível acima (data.subscriber.code).
+ */
+function purchaseSubscriberCode(event: HotmartEvent): string | undefined {
+  return event.data?.subscription?.subscriber?.code;
+}
+
+async function handleRevocation(
+  env: Env,
+  event: HotmartEvent,
+  status: string,
+): Promise<Outcome> {
+  const code = purchaseSubscriberCode(event);
+  if (!code) return { kind: "ignored", note: "evento sem subscriber.code" };
+
+  const db = getDb(env);
+  if (!(await findSubscriptionByCode(db, code))) {
+    return { kind: "ignored", note: "subscriber.code desconhecido" };
+  }
+
+  await revokeAccess(db, code, status);
+  return { kind: "processed" };
+}
+
+/**
+ * Atraso não corta acesso: o ciclo já pago continua valendo. Só o status muda,
+ * e `access_until` fica intocado — a carência é consequência natural do
+ * predicado de data.
+ */
+async function handleDelayed(
+  env: Env,
+  event: HotmartEvent,
+): Promise<Outcome> {
+  const code = purchaseSubscriberCode(event);
+  if (!code) return { kind: "ignored", note: "evento sem subscriber.code" };
+
+  const db = getDb(env);
+  if (!(await findSubscriptionByCode(db, code))) {
+    return { kind: "ignored", note: "subscriber.code desconhecido" };
+  }
+
+  await setStatus(db, code, "DELAYED");
+  return { kind: "processed" };
+}
+
+/** Boleto/Pix não pago. Só marca se a assinatura já existir. */
+async function handleExpired(
+  env: Env,
+  event: HotmartEvent,
+): Promise<Outcome> {
+  const code = purchaseSubscriberCode(event);
+  if (!code) return { kind: "ignored", note: "evento sem subscriber.code" };
+
+  const db = getDb(env);
+  if (!(await findSubscriptionByCode(db, code))) {
+    return { kind: "ignored", note: "assinatura nunca ativada" };
+  }
+
+  await setStatus(db, code, "EXPIRED");
+  return { kind: "processed" };
+}
+
+/**
+ * Cancelamento. NÃO filtra por ucode: o payload não traz product.ucode, só
+ * product.id e product.name. O casamento pela PK subscriber_code já garante
+ * que a assinatura é nossa — código desconhecido é ignorado com segurança.
+ *
+ * O acesso vale até date_next_charge, que na assinatura cancelada é a data do
+ * último acesso pago (documentação da Hotmart).
+ */
+async function handleCancellation(
+  env: Env,
+  event: HotmartEvent,
+): Promise<Outcome> {
+  const code = event.data?.subscriber?.code;
+  if (!code) {
+    return { kind: "ignored", note: "cancelamento sem subscriber.code" };
+  }
+
+  const db = getDb(env);
+  if (!(await findSubscriptionByCode(db, code))) {
+    return { kind: "ignored", note: "subscriber.code desconhecido" };
+  }
+
+  const nextCharge = event.data?.date_next_charge;
+  if (nextCharge && nextCharge > Date.now()) {
+    await setStatus(db, code, "CANCELLED");
+    await setAccessUntil(db, code, new Date(nextCharge));
+  } else {
+    await revokeAccess(db, code, "CANCELLED");
+  }
+
+  return { kind: "processed" };
+}
+
 async function dispatch(env: Env, event: HotmartEvent): Promise<Outcome> {
+  const revokingStatus = REVOKING_EVENTS[event.event];
+  if (revokingStatus) return handleRevocation(env, event, revokingStatus);
+
   switch (event.event) {
     case "PURCHASE_APPROVED":
       return handlePurchaseApproved(env, event);
+    case "PURCHASE_DELAYED":
+      return handleDelayed(env, event);
+    case "PURCHASE_CANCELED":
+    case "PURCHASE_EXPIRED":
+      return handleExpired(env, event);
+    case "SUBSCRIPTION_CANCELLATION":
+      return handleCancellation(env, event);
     case "PURCHASE_COMPLETE":
       return { kind: "ignored", note: "fim da garantia — sem efeito no acesso" };
     default:
