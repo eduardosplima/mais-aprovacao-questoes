@@ -161,13 +161,21 @@ auth.post("/recover", async (c) => {
   // Anti email-bombing de uma vítima cujo email e CPF o atacante conheça.
   if (await issuedWithin(db, user.id, RECOVERY_COOLDOWN_MS)) return generic();
 
-  const token = await createToken(db, user.id, RECOVERY_TTL_MS);
-  await sendMagicLink(c.env, {
-    to: email,
-    name: user.name,
-    token,
-    kind: "recovery",
-  });
+  // Diferente do webhook (Finding 1): aqui NÃO há canal de retry — foi um
+  // clique do usuário. Se o envio falhar, engolir o erro é o certo: propagar
+  // viraria um 500 que só ocorre com email+CPF corretos durante uma
+  // instabilidade de envio, um oráculo de validação de CPF (Finding 2).
+  try {
+    const token = await createToken(db, user.id, RECOVERY_TTL_MS);
+    await sendMagicLink(c.env, {
+      to: email,
+      name: user.name,
+      token,
+      kind: "recovery",
+    });
+  } catch {
+    // sem retry aqui: engole e devolve o mesmo 200 genérico de sempre.
+  }
 
   return generic();
 });

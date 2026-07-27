@@ -39,6 +39,10 @@ export function findUserById(db: Db, id: string): Promise<UserRow | undefined> {
  * - `role` vem SÓ da allowlist. O webhook nunca concede admin.
  * - `name`/`documentHash` nulos no payload não sobrescrevem valores já gravados
  *   (a Hotmart só envia campos do comprador que o checkout solicitou).
+ * - `documentHash` já gravado (não nulo) NUNCA é sobrescrito, mesmo por um
+ *   valor novo não-nulo: quem compra com o email de outra pessoa poderia
+ *   assim instalar um CPF que conhece, que o /auth/recover passaria a aceitar.
+ *   Só preenche quando o campo está atualmente nulo.
  * - `passwordHash` nunca é tocado aqui.
  */
 export async function upsertUserFromPurchase(
@@ -56,7 +60,7 @@ export async function upsertUserFromPurchase(
       .set({
         role,
         name: identity.name ?? existing.name,
-        documentHash: identity.documentHash ?? existing.documentHash,
+        documentHash: existing.documentHash ?? identity.documentHash,
         updatedAt: now,
       })
       .where(eq(users.id, existing.id))

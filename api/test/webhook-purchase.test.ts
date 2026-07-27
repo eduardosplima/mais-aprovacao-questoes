@@ -1,13 +1,17 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
+import { eq } from "drizzle-orm";
 import app from "../src/app";
 import { getDb } from "../src/db/client";
+import { webhookEvents } from "../src/db/schema";
 import { findUserByEmail, setPasswordHash } from "../src/db/users";
 import { findSubscriptionByCode } from "../src/db/subscriptions";
 import { markDeleted, isDeleted } from "../src/db/deletedAccounts";
+import { hasPendingToken } from "../src/db/authTokens";
 import { hmacHex, normalizeDocument } from "../src/lib/hmac";
 import { fakeEmailSender, envWith } from "./helpers";
 import { purchaseApproved, postWebhook } from "./fixtures/hotmart";
+import type { EmailSender } from "../src/config/env";
 
 const db = () => getDb(env);
 
@@ -202,6 +206,51 @@ describe("PURCHASE_APPROVED", () => {
     expect(second.sent).toHaveLength(0);
   });
 
+  it("Finding 1: envio falha → token some, evento fica pendente, e o retry da Hotmart reenvia", async () => {
+    const eventId = "evt-retry-p9-falha";
+    const payload = purchaseApproved({
+      id: eventId,
+      email: "retry-falha@test.com",
+      subscriberCode: "SUB-P9-RETRY",
+    });
+    const failingSender: EmailSender = {
+      async send() {
+        throw new Error("smtp indisponível");
+      },
+    };
+
+    // 1ª tentativa: o envio falha, o Worker responde 5xx (Hono captura a
+    // exceção lançada pelo handler e a transforma numa resposta de erro).
+    const first = await postWebhook(app, payload, envWith({ EMAIL: failingSender }));
+    expect(first.status).toBe(500);
+
+    const user = await findUserByEmail(db(), "retry-falha@test.com");
+    expect(user).toBeDefined();
+    expect(user?.passwordHash).toBeNull();
+
+    // Sem o fix, este token ficaria pendente para sempre: hasPendingToken
+    // travaria qualquer reenvio futuro para um aluno que nunca recebeu nada.
+    expect(await hasPendingToken(db(), user!.id)).toBe(false);
+
+    // O evento nunca chegou a 'processed' — continua 'received' para a
+    // Hotmart retentar.
+    const row = await db()
+      .select()
+      .from(webhookEvents)
+      .where(eq(webhookEvents.id, eventId))
+      .get();
+    expect(row?.status).toBe("received");
+
+    // 2ª tentativa: a Hotmart reenvia o MESMO evento (mesmo id) após o 5xx.
+    // Com o slate limpo, o email agora DEVE sair.
+    const { sent, env: retryEnv } = testEnv();
+    const second = await postWebhook(app, payload, retryEnv);
+
+    expect(second.status).toBe(200);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe("retry-falha@test.com");
+  });
+
   it("não envia link para quem já definiu senha", async () => {
     const first = testEnv();
     await postWebhook(
@@ -226,6 +275,30 @@ describe("PURCHASE_APPROVED", () => {
       second.env,
     );
     expect(second.sent).toHaveLength(0);
+  });
+
+  it("Finding 3: nome com quebras de linha e caracteres de controle é gravado achatado e truncado em 60", async () => {
+    const { env: e } = testEnv();
+    const nomeMalicioso =
+      "Fulano\n\nSua assinatura venceu, clique aqui: http://phish.example\r\n\t" +
+      "x".repeat(60);
+
+    await postWebhook(
+      app,
+      purchaseApproved({
+        email: "nome-malicioso@test.com",
+        subscriberCode: "SUB-P14",
+        name: nomeMalicioso,
+      }),
+      e,
+    );
+
+    const user = await findUserByEmail(db(), "nome-malicioso@test.com");
+    expect(user?.name).not.toContain("\n");
+    expect(user?.name).not.toContain("\r");
+    expect(user?.name).not.toContain("\t");
+    expect(user?.name?.length).toBeLessThanOrEqual(60);
+    expect(user?.name).toBe(user?.name?.trim());
   });
 
   it("segunda assinatura do mesmo aluno cria segunda linha (1:N)", async () => {

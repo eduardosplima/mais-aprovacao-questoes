@@ -15,12 +15,14 @@ import {
 } from "../db/subscriptions";
 import {
   createToken,
+  deleteToken,
   hasPendingToken,
   FIRST_ACCESS_TTL_MS,
 } from "../db/authTokens";
 import { isDeleted, clearTombstone } from "../db/deletedAccounts";
 import { sendMagicLink } from "../lib/email";
 import { normalizeEmail, normalizeDocument, hmacHex } from "../lib/hmac";
+import { sanitizeName } from "../lib/text";
 
 /**
  * Schema tolerante: valida só os campos que consumimos e descarta o resto.
@@ -116,8 +118,9 @@ webhooks.post("/hotmart", async (c) => {
 /**
  * Fallback quando `date_next_charge` não vem no payload (o campo é opcional).
  * Curto de propósito: a periodicidade do plano não está no payload de compra,
- * só na API de dados. O cron corrige na primeira execução. O erro possível é
- * dar acesso de menos por até 24h a quem pagou — nunca acesso indefinido a
+ * só na API de dados. O fallback concede 7 dias de acesso; o cron noturno
+ * corrige para a data real dentro de até 24h. O erro possível é o valor ficar
+ * errado (a mais ou a menos) por até essas 24h — nunca acesso indefinido a
  * quem não pagou.
  */
 export const NO_NEXT_CHARGE_FALLBACK_MS = 604_800_000; // 7 dias
@@ -159,9 +162,10 @@ async function handlePurchaseApproved(
     ? await hmacHex(normalizeDocument(rawDocument), env.DOCUMENT_HMAC_KEY)
     : null;
 
+  const rawName = event.data?.buyer?.name;
   const userId = await upsertUserFromPurchase(
     db,
-    { email, name: event.data?.buyer?.name ?? null, documentHash },
+    { email, name: rawName ? sanitizeName(rawName) : null, documentHash },
     getAdminEmails(env),
   );
 
@@ -181,31 +185,44 @@ async function handlePurchaseApproved(
   });
 
   // Quatro guardas antes de enviar: senha não definida, primeira recorrência,
-  // sem token válido pendente. O envio é awaited — se falhar, a exceção sobe,
-  // o evento fica em 'received' e a Hotmart retenta.
+  // sem token válido pendente. O envio é awaited — se falhar, apaga o token
+  // recém-criado e relança: sem isso, o retry acharia `hasPendingToken` true
+  // e nunca mais tentaria enviar (o evento vira 'processed' com a senha nula
+  // para sempre). A exceção sobe, o evento fica em 'received' e a Hotmart
+  // retenta com o slate limpo.
   const user = await findUserByEmail(db, email);
   const precisaDefinirSenha = user?.passwordHash == null;
   if (precisaDefinirSenha && recurrence === 1) {
     if (!(await hasPendingToken(db, userId))) {
       const token = await createToken(db, userId, FIRST_ACCESS_TTL_MS);
-      await sendMagicLink(env, {
-        to: email,
-        name: user?.name ?? null,
-        token,
-        kind: "first_access",
-      });
+      try {
+        await sendMagicLink(env, {
+          to: email,
+          name: user?.name ?? null,
+          token,
+          kind: "first_access",
+        });
+      } catch (err) {
+        await deleteToken(db, token);
+        throw err;
+      }
     }
   }
 
   return { kind: "processed" };
 }
 
-/** Eventos de compra que revogam acesso, e o status que cada um grava. */
-const REVOKING_EVENTS: Record<string, string> = {
-  PURCHASE_REFUNDED: "REFUNDED",
-  PURCHASE_CHARGEBACK: "CHARGEBACK",
-  PURCHASE_PROTEST: "PROTEST",
-};
+/**
+ * Eventos de compra que revogam acesso, e o status que cada um grava.
+ * `Map` (não objeto plano): `event.event` é string não validada vinda do
+ * payload, e um evento chamado "constructor" resolveria para `Object` num
+ * lookup por índice de objeto.
+ */
+const REVOKING_EVENTS: Map<string, string> = new Map([
+  ["PURCHASE_REFUNDED", "REFUNDED"],
+  ["PURCHASE_CHARGEBACK", "CHARGEBACK"],
+  ["PURCHASE_PROTEST", "PROTEST"],
+]);
 
 /**
  * O subscriber code de um evento de compra. Diferente do cancelamento, que o
@@ -304,7 +321,7 @@ async function handleCancellation(
 }
 
 async function dispatch(env: Env, event: HotmartEvent): Promise<Outcome> {
-  const revokingStatus = REVOKING_EVENTS[event.event];
+  const revokingStatus = REVOKING_EVENTS.get(event.event);
   if (revokingStatus) return handleRevocation(env, event, revokingStatus);
 
   switch (event.event) {

@@ -1,8 +1,10 @@
 # Mais Aprovação — API (Fundação)
 
 Backend em **Cloudflare Workers** (TypeScript + Hono) da plataforma Mais Aprovação
-Questões. Este módulo é a **Fundação**: login via Hotmart OAuth 2.0, sessão JWT,
-RBAC e base de dados (D1). Sem frontend.
+Questões. Este módulo é a **Fundação**: autenticação por senha + link mágico
+(sem self-signup — a conta só nasce da compra na Hotmart), sessão JWT, webhook
+de compra/cancelamento, reconciliação diária contra a API de dados da Hotmart
+e base de dados (D1). Sem frontend.
 
 ## Stack
 
@@ -24,23 +26,28 @@ npm install
 
 ### Segredos (`.dev.vars`)
 
-Crie `api/.dev.vars` (já no `.gitignore` — **nunca** commitar) com os valores do
-**sandbox da Hotmart**:
+Crie `api/.dev.vars` (já no `.gitignore` — **nunca** commitar) com os seis
+segredos abaixo, valores do **sandbox da Hotmart** onde aplicável:
 
 ```
-JWT_SECRET=<segredo forte p/ assinar o JWT>
-COOKIE_SIGNING_KEY=<segredo forte p/ assinar o cookie de state>
-ADMIN_EMAILS=seu-email-admin@dominio.com
-HOTMART_CLIENT_ID=<client_id do app OAuth>
-HOTMART_CLIENT_SECRET=<client_secret do app OAuth>
-HOTMART_REDIRECT_URI=http://localhost:8787/auth/callback
-HOTMART_AUTHORIZE_URL=<url de authorize do sandbox>
-HOTMART_TOKEN_URL=<url de token do sandbox>
-HOTMART_USERINFO_URL=<url de userinfo do sandbox>
+JWT_SECRET=<segredo forte para assinar o cookie de sessão>
+HOTMART_HOTTOK=<hottok do painel Hotmart → Ferramentas → Webhook, sandbox>
+HOTMART_CLIENT_ID=<client_id da API de dados do sandbox>
+HOTMART_CLIENT_SECRET=<client_secret da API de dados do sandbox>
+DOCUMENT_HMAC_KEY=<segredo forte — pepper do HMAC de CPF e do email da tombstone>
+TURNSTILE_SECRET_KEY=<secret key do Turnstile (par com a site key do frontend)>
 ```
 
-`ADMIN_EMAILS` é uma lista separada por vírgula; e-mails nela recebem `role=admin`
-no login. Em produção, os mesmos segredos vão via `wrangler secret put <NOME>`.
+As demais variáveis, não-secretas, já vêm de `wrangler.jsonc` (bloco `vars`):
+`HOTMART_SUBSCRIPTION_UCODES`, `HOTMART_API_BASE_URL`, `HOTMART_TOKEN_URL`,
+`HOTMART_CHECKOUT_URL`, `APP_BASE_URL`, `EMAIL_FROM`, `ADMIN_EMAILS`. Ajuste os
+placeholders (`REPLACE_ME`) ali antes de rodar contra o sandbox. Em produção,
+os seis segredos vão via `wrangler secret put <NOME>`; as vars continuam em
+`wrangler.jsonc`.
+
+`ADMIN_EMAILS` é uma lista separada por vírgula; e-mails nela recebem
+`role=admin` na compra (webhook) ou na reconciliação — nunca a partir do
+payload em si.
 
 ## Rodar
 
@@ -60,36 +67,41 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | Método | Rota | Descrição |
 |---|---|---|
 | GET | `/health` | Liveness → `{ ok: true }` |
-| GET | `/auth/login` | Gera `state`, seta cookie assinado, redireciona ao authorize da Hotmart |
-| GET | `/auth/callback` | Valida `state`, troca `code` por token (server-side), upsert do usuário, emite cookie de sessão |
-| GET | `/auth/me` | Protegido. Retorna `{ id, email, role, tier }` |
+| POST | `/auth/login` | `{ email, password, turnstileToken }` → valida credenciais e seta cookie de sessão |
+| POST | `/auth/set-password` | `{ token, password }` → consome o token do link mágico, define a senha e seta cookie de sessão |
+| POST | `/auth/recover` | `{ email, document, turnstileToken }` → sempre `200 { ok: true }`; só envia o link de recuperação se email+CPF baterem |
+| GET | `/auth/me` | Protegido. Retorna `{ id, email, name, role, tier }` |
 | POST | `/auth/logout` | Limpa o cookie de sessão |
+| POST | `/webhooks/hotmart` | Recebe eventos de compra/cancelamento da Hotmart (autenticado pelo header `x-hotmart-hottok`) |
 
 Sessão: JWT (HS256) em cookie `HttpOnly; Secure; SameSite=Lax; Path=/`. A
-identidade vai no `sub`; `role`/`tier` são relidos do D1 a cada request.
+identidade vai no `sub`; `role`/`tier` são relidos do D1 a cada request —
+`tier` é derivado só de `subscriptions.access_until > now`, nunca do JWT.
 
-## Verificação manual contra o sandbox
+Não há cadastro público: a conta só nasce pela compra na Hotmart (webhook) ou
+pela reconciliação diária quando o webhook se perde; o primeiro acesso e a
+recuperação de senha acontecem exclusivamente pelo link mágico enviado por
+email.
 
-Com o `.dev.vars` preenchido e o Worker rodando (`npm run dev`):
+## Webhook e reconciliação
 
-1. Acesse `http://localhost:8787/auth/login` no navegador.
-2. Faça login no **sandbox da Hotmart** e autorize.
-3. O callback deve retornar `{ ok: true }` e setar o cookie `session` (sem erro
-   de `invalid_state`).
-4. `GET http://localhost:8787/auth/me` deve retornar seu `{ id, email, role, tier }`
-   — `role: "admin"` se o e-mail estiver em `ADMIN_EMAILS`, senão `"user"`;
-   `tier: "gratuito"` (sem assinatura ativa nesta fase).
+`POST /webhooks/hotmart` (`src/webhooks/hotmart.ts`) processa `PURCHASE_APPROVED`,
+`PURCHASE_DELAYED`, `PURCHASE_CANCELED`/`PURCHASE_EXPIRED`,
+`PURCHASE_REFUNDED`/`PURCHASE_CHARGEBACK`/`PURCHASE_PROTEST` e
+`SUBSCRIPTION_CANCELLATION`; é idempotente por `id` do evento (reenvios com o
+mesmo `id` devolvem `{ ok: true, duplicate: true }` sem reprocessar).
 
-> **Ajuste de mapeamento:** se `/auth/me` vier com `email` vazio ou `id`
-> inesperado, a resposta real do `HOTMART_USERINFO_URL` difere do mapeamento em
-> `src/lib/hotmart.ts` (`data.id ?? data.user_id`, `data.email`). Inspecione a
-> resposta real e ajuste o mapeamento, depois rode `npm test`.
+O cron `0 3 * * *` (`wrangler.jsonc` → `triggers.crons`) roda `reconcile()`
+(`src/jobs/reconcile.ts`), que compara o D1 com a API de dados da Hotmart:
+cria assinaturas cujo webhook se perdeu e corrige/revoga acesso divergente.
+Regra dura: ausência na listagem da API **nunca** revoga — só status/data
+explícitos revogam.
 
-## Fora do escopo da Fundação
+## Bindings e triggers (`wrangler.jsonc`)
 
-Frontend, Turnstile, webhook/reconciliação de assinatura (status é placeholder
-`none`), KV, refresh token, demais tabelas do ERD e CI/CD. Entram nos
-sub-projetos seguintes.
+- `DB` — D1 (`mais-aprovacao-db`), migrações em `migrations/`.
+- `EMAIL` — `send_email`, usado para o link mágico (primeiro acesso e recuperação).
+- `triggers.crons` — `0 3 * * *`, dispara a reconciliação diária.
 
 ## Verificação manual
 

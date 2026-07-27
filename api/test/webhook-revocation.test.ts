@@ -107,6 +107,35 @@ describe("eventos de revogação", () => {
     expect((await findSubscriptionByCode(db(), code))?.status).toBe("EXPIRED");
   });
 
+  it("Finding 5: evento 'constructor' é tratado como não-manipulado, não como revogação", async () => {
+    const code = "SUB-CONSTRUCTOR";
+    await assinaturaAtiva("constructor@test.com", code);
+
+    const { env: e } = testEnv();
+    const res = await postWebhook(
+      app,
+      purchaseApproved({
+        id: "evt-constructor",
+        event: "constructor",
+        subscriberCode: code,
+      }),
+      e,
+    );
+    expect(res.status).toBe(200);
+
+    // não revogou: o acesso concedido por assinaturaAtiva continua de pé.
+    const sub = await findSubscriptionByCode(db(), code);
+    expect(sub!.accessUntil!.getTime()).toBeGreaterThan(Date.now());
+
+    const row = await db()
+      .select()
+      .from(webhookEvents)
+      .where(eq(webhookEvents.id, "evt-constructor"))
+      .get();
+    expect(row?.status).toBe("ignored");
+    expect(row?.note).toContain("não tratado");
+  });
+
   it("evento de revogação para código desconhecido é ignorado", async () => {
     const { env: e } = testEnv();
     await postWebhook(

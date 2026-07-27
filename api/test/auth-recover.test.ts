@@ -162,6 +162,25 @@ describe("POST /auth/recover", () => {
     expect(sent).toHaveLength(0);
   });
 
+  it("Finding 2: envio falha com email+CPF corretos ainda devolve 200 genérico (sem oráculo de CPF)", async () => {
+    stubCaptcha();
+    const failingSender = {
+      async send() {
+        throw new Error("smtp indisponível");
+      },
+    };
+    await alunoComDocumento("rec-falha@test.com", DOC);
+
+    const res = await recover(
+      envWith({ EMAIL: failingSender }),
+      "rec-falha@test.com",
+      DOC,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
   it("403 quando o Turnstile reprova", async () => {
     stubCaptcha(false);
     const { sent, sender } = fakeEmailSender();

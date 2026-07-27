@@ -8,6 +8,7 @@ import {
   findSubscriptionByCode,
 } from "../src/db/subscriptions";
 import { markDeleted } from "../src/db/deletedAccounts";
+import { hasPendingToken } from "../src/db/authTokens";
 import { hmacHex } from "../src/lib/hmac";
 import { fakeEmailSender, envWith } from "./helpers";
 
@@ -112,6 +113,32 @@ describe("reconcile — webhook de compra perdido", () => {
   });
 });
 
+describe("reconcile — Finding 1: envio falha durante o provisionamento", () => {
+  it("apaga o token recém-criado e propaga o erro (não engole)", async () => {
+    stubHotmart([
+      apiItem({
+        subscriber_code: "SUB-REC-FALHA-ENVIO",
+        subscriber: { name: "Aluno", email: "falha-provisao@test.com" },
+      }),
+    ]);
+    const failingEnv = envWith({
+      EMAIL: {
+        async send() {
+          throw new Error("smtp indisponível");
+        },
+      },
+    });
+
+    await expect(reconcile(failingEnv)).rejects.toThrow();
+
+    const user = await findUserByEmail(db(), "falha-provisao@test.com");
+    expect(user).toBeDefined();
+    // Sem o fix, este token ficaria pendente para sempre: hasPendingToken
+    // travaria qualquer reenvio futuro para um aluno que nunca recebeu nada.
+    expect(await hasPendingToken(db(), user!.id)).toBe(false);
+  });
+});
+
 describe("reconcile — correção de datas", () => {
   it("corrige access_until divergente", async () => {
     const correto = Date.now() + 45 * 86400000;
@@ -172,6 +199,9 @@ describe("reconcile — correção de datas", () => {
 
     const sub = await findSubscriptionByCode(db(), "SUB-REC-CANC");
     expect(sub?.accessUntil?.getTime()).toBe(fimDoCiclo);
+    // Finding 9: o status remoto (cancelado) precisa ficar gravado — é a
+    // coluna que alguém consultaria num incidente — mesmo mantendo acesso.
+    expect(sub?.status).toBe("CANCELLED_BY_CUSTOMER");
   });
 });
 

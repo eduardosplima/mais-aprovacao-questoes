@@ -62,6 +62,18 @@ export async function consumeToken(
   return row.userId;
 }
 
+/**
+ * Remove o token pelo valor em claro (hash e apaga por `tokenHash`). Usado
+ * quando o envio do email falha logo após a criação: sem isto, o retry
+ * encontraria `hasPendingToken` = true e pularia o envio para sempre.
+ */
+export async function deleteToken(db: Db, token: string): Promise<void> {
+  await db
+    .delete(authTokens)
+    .where(eq(authTokens.tokenHash, await hashToken(token)))
+    .run();
+}
+
 /** Guarda contra enviar um segundo link quando já existe um válido. */
 export async function hasPendingToken(
   db: Db,

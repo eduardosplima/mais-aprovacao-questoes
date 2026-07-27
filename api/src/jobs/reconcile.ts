@@ -6,17 +6,20 @@ import {
   findSubscriptionByCode,
   upsertSubscription,
   setAccessUntil,
+  setStatus,
   revokeAccess,
   listSubscriptionCodes,
 } from "../db/subscriptions";
 import {
   createToken,
+  deleteToken,
   hasPendingToken,
   FIRST_ACCESS_TTL_MS,
 } from "../db/authTokens";
 import { isDeleted } from "../db/deletedAccounts";
 import { sendMagicLink } from "../lib/email";
 import { normalizeEmail, hmacHex } from "../lib/hmac";
+import { sanitizeName } from "../lib/text";
 import {
   fetchAccessToken,
   listSubscriptions,
@@ -84,7 +87,10 @@ export async function reconcile(env: Env): Promise<ReconcileStats> {
       continue;
     }
 
-    const applied = await applyRemoteState(env, sub, existing.accessUntil);
+    const applied = await applyRemoteState(env, sub, {
+      accessUntil: existing.accessUntil,
+      status: existing.status,
+    });
     if (applied === "revoked") stats.revoked++;
     if (applied === "corrected") stats.corrected++;
   }
@@ -107,7 +113,7 @@ async function provision(
   // com documentHash nulo — o recover dele valida só o email.
   const userId = await upsertUserFromPurchase(
     db,
-    { email, name: sub.name, documentHash: null },
+    { email, name: sub.name ? sanitizeName(sub.name) : null, documentHash: null },
     getAdminEmails(env),
   );
 
@@ -124,12 +130,17 @@ async function provision(
   const user = await findUserByEmail(db, email);
   if (user?.passwordHash == null && !(await hasPendingToken(db, userId))) {
     const token = await createToken(db, userId, FIRST_ACCESS_TTL_MS);
-    await sendMagicLink(env, {
-      to: email,
-      name: sub.name,
-      token,
-      kind: "first_access",
-    });
+    try {
+      await sendMagicLink(env, {
+        to: email,
+        name: user?.name ?? null,
+        token,
+        kind: "first_access",
+      });
+    } catch (err) {
+      await deleteToken(db, token);
+      throw err;
+    }
   }
 }
 
@@ -139,29 +150,44 @@ type Applied = "revoked" | "corrected" | "unchanged";
  * `date_next_charge` é a verdade em qualquer status: numa assinatura cancelada
  * ele é a data do último acesso pago. Por isso a data manda, e o status só
  * decide o que fazer quando ela não vem.
+ *
+ * `status` é sincronizado aqui só para fins de auditoria — ele NUNCA entra na
+ * decisão de revogar/corrigir/manter, que é sempre função da data. Sem isto,
+ * uma assinatura cancelada na Hotmart mas ainda dentro do ciclo pago ficava
+ * com `status = 'ACTIVE'` no D1 para sempre (o acesso em si continua certo,
+ * só a coluna que alguém consultaria num incidente que ficava desatualizada).
  */
 async function applyRemoteState(
   env: Env,
   sub: HotmartSubscription,
-  currentAccessUntil: Date | null,
+  existing: { accessUntil: Date | null; status: string },
 ): Promise<Applied> {
   const db = getDb(env);
+  const statusDivergiu = existing.status !== sub.status;
 
   if (sub.dateNextCharge) {
     if (sub.dateNextCharge <= Date.now()) {
       await revokeAccess(db, sub.subscriberCode, sub.status);
       return "revoked";
     }
-    if (currentAccessUntil?.getTime() !== sub.dateNextCharge) {
+    const dataDivergiu = existing.accessUntil?.getTime() !== sub.dateNextCharge;
+    if (dataDivergiu) {
       await setAccessUntil(db, sub.subscriberCode, new Date(sub.dateNextCharge));
-      return "corrected";
     }
-    return "unchanged";
+    if (statusDivergiu) {
+      await setStatus(db, sub.subscriberCode, sub.status);
+    }
+    return dataDivergiu || statusDivergiu ? "corrected" : "unchanged";
   }
 
   if (!ACTIVE_STATUSES.has(sub.status)) {
     await revokeAccess(db, sub.subscriberCode, sub.status);
     return "revoked";
+  }
+
+  if (statusDivergiu) {
+    await setStatus(db, sub.subscriberCode, sub.status);
+    return "corrected";
   }
 
   return "unchanged";

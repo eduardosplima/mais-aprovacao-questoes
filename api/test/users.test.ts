@@ -90,6 +90,27 @@ describe("upsertUserFromPurchase", () => {
     expect(row?.documentHash).toBe("tem-doc");
   });
 
+  it("Finding 3B: documentHash já gravado nunca é sobrescrito por uma compra posterior", async () => {
+    await upsertUserFromPurchase(
+      db(),
+      { email: "doc-fixo@test.com", name: "Vítima", documentHash: "hash-da-vitima" },
+      ADMINS,
+    );
+
+    // compra posterior com o MESMO email mas um documento diferente (ex.: um
+    // atacante comprando com o email de outra pessoa) não deve substituir o
+    // documentHash já gravado — senão o /auth/recover passaria a aceitar o
+    // CPF do atacante.
+    await upsertUserFromPurchase(
+      db(),
+      { email: "doc-fixo@test.com", name: "Vítima", documentHash: "hash-do-atacante" },
+      ADMINS,
+    );
+
+    const row = await findUserByEmail(db(), "doc-fixo@test.com");
+    expect(row?.documentHash).toBe("hash-da-vitima");
+  });
+
   it("nunca reseta a senha já definida", async () => {
     const id = await upsertUserFromPurchase(
       db(),
