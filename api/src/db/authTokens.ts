@@ -39,9 +39,9 @@ export async function consumeToken(
   token: string,
 ): Promise<string | null> {
   const now = new Date();
-  const row = await db
-    .select()
-    .from(authTokens)
+  const [row] = await db
+    .update(authTokens)
+    .set({ usedAt: now })
     .where(
       and(
         eq(authTokens.tokenHash, await hashToken(token)),
@@ -49,14 +49,14 @@ export async function consumeToken(
         gt(authTokens.expiresAt, now),
       ),
     )
-    .get();
+    .returning({ userId: authTokens.userId });
 
   if (!row) return null;
 
   await db
     .update(authTokens)
     .set({ usedAt: now })
-    .where(eq(authTokens.userId, row.userId))
+    .where(and(eq(authTokens.userId, row.userId), isNull(authTokens.usedAt)))
     .run();
 
   return row.userId;

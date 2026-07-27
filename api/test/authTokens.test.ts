@@ -112,6 +112,20 @@ describe("consumeToken", () => {
     expect(await consumeToken(db(), tokenA)).toBe(a);
     expect(await consumeToken(db(), tokenB)).toBe(b);
   });
+
+  it("chamadas concorrentes com o mesmo token: só uma vence", async () => {
+    const userId = await aUser("tok13@test.com");
+    const token = await createToken(db(), userId, FIRST_ACCESS_TTL_MS);
+
+    const [first, second] = await Promise.all([
+      consumeToken(db(), token),
+      consumeToken(db(), token),
+    ]);
+
+    const results = [first, second];
+    expect(results.filter((r) => r === userId)).toHaveLength(1);
+    expect(results.filter((r) => r === null)).toHaveLength(1);
+  });
 });
 
 describe("hasPendingToken", () => {
