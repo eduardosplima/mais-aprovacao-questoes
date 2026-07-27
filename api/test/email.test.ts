@@ -79,18 +79,36 @@ describe("sendMagicLink", () => {
 
   it("escapa HTML no nome (vem de texto livre do checkout), mas não no texto puro", async () => {
     const { sent, sender } = fakeEmailSender();
+    const rawName = '<img src=x onerror=alert(1)>&"\'';
+    const escapedName =
+      "&lt;img src=x onerror=alert(1)&gt;&amp;&quot;&#39;";
+
     await sendMagicLink(envWith({ EMAIL: sender }), {
       to: "a@test.com",
-      name: '<img src=x onerror=alert(1)>',
+      name: rawName,
       token: "T",
       kind: "first_access",
     });
 
-    expect(sent[0].html).not.toContain("<img src=x onerror=alert(1)>");
-    expect(sent[0].html).toContain(
-      "&lt;img src=x onerror=alert(1)&gt;",
-    );
-    expect(sent[0].text).toContain('<img src=x onerror=alert(1)>');
+    // A forma crua inteira não pode sobreviver — cobre os 5 metacaracteres
+    // de uma vez (se qualquer um deles não fosse escapado, esta substring
+    // apareceria intacta).
+    expect(sent[0].html).not.toContain(rawName);
+
+    // A sequência escapada exata precisa aparecer como um todo. Checar o
+    // '&' cru isoladamente com `not.toContain("&")` seria um falso-positivo
+    // trivial, já que &lt;/&gt;/&amp;/&quot;/&#39; também contêm '&'.
+    expect(sent[0].html).toContain(escapedName);
+
+    // Confirma cada entidade individualmente.
+    expect(sent[0].html).toContain("&lt;");
+    expect(sent[0].html).toContain("&gt;");
+    expect(sent[0].html).toContain("&amp;");
+    expect(sent[0].html).toContain("&quot;");
+    expect(sent[0].html).toContain("&#39;");
+
+    // O texto puro permanece cru — escapar ali corromperia a mensagem.
+    expect(sent[0].text).toContain(rawName);
   });
 
   it("codifica tokens com caracteres especiais na URL", async () => {
