@@ -9,12 +9,12 @@ export const auth = new Hono<{
   Variables: { entitlement: Entitlement };
 }>();
 
-// `name` entra na resposta na Task 4, junto com o campo em `Entitlement`.
 auth.get("/me", requireSession, (c) => {
   const ent = c.get("entitlement");
   return c.json({
     id: ent.userId,
     email: ent.email,
+    name: ent.name,
     role: ent.role,
     tier: ent.tier,
   });
