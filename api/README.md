@@ -90,3 +90,14 @@ Com o `.dev.vars` preenchido e o Worker rodando (`npm run dev`):
 Frontend, Turnstile, webhook/reconciliação de assinatura (status é placeholder
 `none`), KV, refresh token, demais tabelas do ERD e CI/CD. Entram nos
 sub-projetos seguintes.
+
+## Verificação manual
+
+A suíte automatizada usa fixtures derivados da documentação da Hotmart, não de
+tráfego real. Antes de considerar a Fundação pronta, rodar
+[`docs/runbook-verificacao-hotmart.md`](../docs/runbook-verificacao-hotmart.md)
+contra o sandbox.
+
+Dois valores estão marcados como **não confirmados** e são o primeiro item do
+runbook: o caminho da API de dados (`src/lib/hotmartApi.ts`) e o
+`HOTMART_TOKEN_URL` (`wrangler.jsonc`).
