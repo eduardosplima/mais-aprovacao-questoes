@@ -1,10 +1,20 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../config/env";
-import { getSubscriptionUcodes } from "../config/env";
+import { getSubscriptionUcodes, getAdminEmails } from "../config/env";
 import { getDb } from "../db/client";
 import { claimEvent, markProcessed, markIgnored } from "../db/webhookEvents";
 import { equalStrings } from "../lib/constantTime";
+import { upsertUserFromPurchase, findUserByEmail } from "../db/users";
+import { upsertSubscription } from "../db/subscriptions";
+import {
+  createToken,
+  hasPendingToken,
+  FIRST_ACCESS_TTL_MS,
+} from "../db/authTokens";
+import { isDeleted, clearTombstone } from "../db/deletedAccounts";
+import { sendMagicLink } from "../lib/email";
+import { normalizeEmail, normalizeDocument, hmacHex } from "../lib/hmac";
 
 /**
  * Schema tolerante: valida só os campos que consumimos e descarta o resto.
@@ -97,13 +107,102 @@ webhooks.post("/hotmart", async (c) => {
   return c.json({ ok: true });
 });
 
-async function dispatch(env: Env, event: HotmartEvent): Promise<Outcome> {
-  if (event.event === "PURCHASE_COMPLETE") {
-    return { kind: "ignored", note: "fim da garantia — sem efeito no acesso" };
+/**
+ * Fallback quando `date_next_charge` não vem no payload (o campo é opcional).
+ * Curto de propósito: a periodicidade do plano não está no payload de compra,
+ * só na API de dados. O cron corrige na primeira execução. O erro possível é
+ * dar acesso de menos por até 24h a quem pagou — nunca acesso indefinido a
+ * quem não pagou.
+ */
+export const NO_NEXT_CHARGE_FALLBACK_MS = 604_800_000; // 7 dias
+
+async function handlePurchaseApproved(
+  env: Env,
+  event: HotmartEvent,
+): Promise<Outcome> {
+  if (!isSubscriptionProduct(env, event)) {
+    return { kind: "ignored", note: "ucode fora de HOTMART_SUBSCRIPTION_UCODES" };
   }
 
-  // Os demais eventos são despachados nas Tasks 10 e 11.
-  return { kind: "ignored", note: `evento não tratado: ${event.event}` };
+  const subscriberCode = event.data?.subscription?.subscriber?.code;
+  if (!subscriberCode) {
+    return { kind: "ignored", note: "compra sem subscriber.code" };
+  }
+
+  const rawEmail = event.data?.buyer?.email;
+  if (!rawEmail) {
+    return { kind: "ignored", note: "compra sem email do comprador" };
+  }
+
+  const db = getDb(env);
+  const email = normalizeEmail(rawEmail);
+  const emailHash = await hmacHex(email, env.DOCUMENT_HMAC_KEY);
+  const recurrence = event.data?.purchase?.recurrence_number ?? 1;
+
+  // Tombstone: renovação de conta excluída não ressuscita ninguém. Compra nova
+  // sim — a tombstone não é banimento perpétuo.
+  if (await isDeleted(db, emailHash)) {
+    if (recurrence > 1) {
+      return { kind: "ignored", note: "conta excluída pelo titular" };
+    }
+    await clearTombstone(db, emailHash);
+  }
+
+  const rawDocument = event.data?.buyer?.document;
+  const documentHash = rawDocument
+    ? await hmacHex(normalizeDocument(rawDocument), env.DOCUMENT_HMAC_KEY)
+    : null;
+
+  const userId = await upsertUserFromPurchase(
+    db,
+    { email, name: event.data?.buyer?.name ?? null, documentHash },
+    getAdminEmails(env),
+  );
+
+  const nextCharge = event.data?.purchase?.date_next_charge;
+  const accessUntil = nextCharge
+    ? new Date(nextCharge)
+    : new Date(Date.now() + NO_NEXT_CHARGE_FALLBACK_MS);
+
+  await upsertSubscription(db, {
+    subscriberCode,
+    userId,
+    productUcode: event.data!.product!.ucode!,
+    planName: event.data?.subscription?.plan?.name ?? null,
+    status: event.data?.subscription?.status ?? "ACTIVE",
+    accessUntil,
+    lastTransaction: event.data?.purchase?.transaction ?? null,
+  });
+
+  // Quatro guardas antes de enviar: senha não definida, primeira recorrência,
+  // sem token válido pendente. O envio é awaited — se falhar, a exceção sobe,
+  // o evento fica em 'received' e a Hotmart retenta.
+  const user = await findUserByEmail(db, email);
+  const precisaDefinirSenha = user?.passwordHash == null;
+  if (precisaDefinirSenha && recurrence === 1) {
+    if (!(await hasPendingToken(db, userId))) {
+      const token = await createToken(db, userId, FIRST_ACCESS_TTL_MS);
+      await sendMagicLink(env, {
+        to: email,
+        name: user?.name ?? null,
+        token,
+        kind: "first_access",
+      });
+    }
+  }
+
+  return { kind: "processed" };
+}
+
+async function dispatch(env: Env, event: HotmartEvent): Promise<Outcome> {
+  switch (event.event) {
+    case "PURCHASE_APPROVED":
+      return handlePurchaseApproved(env, event);
+    case "PURCHASE_COMPLETE":
+      return { kind: "ignored", note: "fim da garantia — sem efeito no acesso" };
+    default:
+      return { kind: "ignored", note: `evento não tratado: ${event.event}` };
+  }
 }
 
 /**

@@ -2,6 +2,20 @@ import type { Env } from "../config/env";
 
 export type MagicLinkKind = "first_access" | "recovery";
 
+/**
+ * `name` vem do checkout da Hotmart — texto livre digitado pelo comprador,
+ * não confiável. Sem isto, um comprador poderia injetar HTML no corpo do
+ * email enviado à vítima (o email do comprador não precisa ser o dele).
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 interface MagicLinkParams {
   to: string;
   name: string | null;
@@ -48,7 +62,7 @@ export async function sendMagicLink(
   ].join("\n");
 
   const html = [
-    `<p>${greeting}</p>`,
+    `<p>${escapeHtml(greeting)}</p>`,
     `<p>${copy.intro}</p>`,
     `<p><a href="${url}">Definir minha senha</a></p>`,
     `<p>Se o botão não funcionar, copie e cole este endereço no navegador:<br>${url}</p>`,

@@ -77,6 +77,22 @@ describe("sendMagicLink", () => {
     expect(sent[1].text).toContain("Olá");
   });
 
+  it("escapa HTML no nome (vem de texto livre do checkout), mas não no texto puro", async () => {
+    const { sent, sender } = fakeEmailSender();
+    await sendMagicLink(envWith({ EMAIL: sender }), {
+      to: "a@test.com",
+      name: '<img src=x onerror=alert(1)>',
+      token: "T",
+      kind: "first_access",
+    });
+
+    expect(sent[0].html).not.toContain("<img src=x onerror=alert(1)>");
+    expect(sent[0].html).toContain(
+      "&lt;img src=x onerror=alert(1)&gt;",
+    );
+    expect(sent[0].text).toContain('<img src=x onerror=alert(1)>');
+  });
+
   it("codifica tokens com caracteres especiais na URL", async () => {
     const { sent, sender } = fakeEmailSender();
     await sendMagicLink(envWith({ EMAIL: sender }), {
