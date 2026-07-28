@@ -9,5 +9,22 @@
       "database_id": "REPLACE_WITH_REAL_ID_BEFORE_DEPLOY",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  },
+  "vars": {
+    "HOTMART_SUBSCRIPTION_UCODES": "REPLACE_WITH_REAL_UCODES",
+    "HOTMART_API_BASE_URL": "https://sandbox.hotmart.com",
+    "HOTMART_TOKEN_URL": "https://sandbox.hotmart.com/security/oauth/token",
+    "HOTMART_CHECKOUT_URL": "https://pay.hotmart.com/REPLACE_ME",
+    "APP_BASE_URL": "http://localhost:3000",
+    "EMAIL_FROM": "nao-responda@REPLACE_ME",
+    "ADMIN_EMAILS": ""
+  }
 }

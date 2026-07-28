@@ -1,10 +1,13 @@
-import { Hono } from "hono";
+import app from "./app";
 import type { Env } from "./config/env";
-import { auth } from "./routes/auth";
+import { reconcile } from "./jobs/reconcile";
 
-const app = new Hono<{ Bindings: Env }>();
+export default {
+  fetch: app.fetch,
 
-app.get("/health", (c) => c.json({ ok: true }));
-app.route("/auth", auth);
-
-export default app;
+  /** Cron `0 3 * * *` (00:00 BRT) — ver wrangler.jsonc. */
+  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    const stats = await reconcile(env);
+    console.log("reconcile", stats);
+  },
+};

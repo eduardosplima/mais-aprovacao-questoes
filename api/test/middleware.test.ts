@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import type { Env } from "../src/config/env";
 import type { Entitlement } from "../src/db/users";
 import { getDb } from "../src/db/client";
-import { upsertUser, ensureSubscription } from "../src/db/users";
+import { upsertUserFromPurchase } from "../src/db/users";
 import { signSession } from "../src/lib/jwt";
 import { requireSession } from "../src/middleware/session";
 import { requireAdmin } from "../src/middleware/rbac";
@@ -21,11 +21,11 @@ function buildApp() {
 }
 
 async function sessionCookieFor(email: string): Promise<string> {
-  const db = getDb(env);
-  const id = await upsertUser(db, { hotmartUserId: `h-${email}`, email }, [
-    "admin@test.com",
-  ]);
-  await ensureSubscription(db, id);
+  const id = await upsertUserFromPurchase(
+    getDb(env),
+    { email, name: null, documentHash: null },
+    ["admin@test.com"],
+  );
   const token = await signSession(id, env.JWT_SECRET);
   return `session=${token}`;
 }
