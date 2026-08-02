@@ -57,6 +57,13 @@ describe("sanitizeHtml", () => {
     }
   });
 
+  it("neutraliza protocol-relative disfarçado com tab/newline embutidos no meio do caminho", async () => {
+    for (const href of ["/\t/evil.com", "/\n/evil.com", "/\t\\evil.com"]) {
+      const out = await sanitizeHtml(`<a href="${href}">x</a>`);
+      expect(out).toBe("<a>x</a>");
+    }
+  });
+
   it("neutraliza esquemas perigosos disfarçados (case, tab, newline) e outros esquemas não permitidos", async () => {
     const hrefs = [
       "JavaScript:alert(1)",

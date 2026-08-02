@@ -31,6 +31,14 @@ const ALLOWED_ATTRS: Record<string, Set<string>> = {
 const URL_ATTRS = new Set(["src", "href"]);
 
 /**
+ * Origem sentinela só para resolver caminhos relativos e comparar o host
+ * resultante — delega ao próprio parser WHATWG toda a remoção de
+ * tab/newline/C0 e a equivalência de "\" com "/", em vez de reimplementar
+ * essa normalização à mão (que fica sempre um passo atrás do parser real).
+ */
+const SENTINEL_ORIGIN = "http://sanitize-html.internal";
+
+/**
  * Permitir o atributo `href` não diz nada sobre o valor dele: uma allowlist de
  * nomes deixa `javascript:alert(1)` passar intacto. Só http, https, mailto e
  * caminhos relativos entram.
@@ -39,11 +47,15 @@ function isSafeUrl(value: string): boolean {
   const v = value.trim();
   if (v.startsWith("#")) return true;
   if (v.startsWith("/")) {
-    // Caminho relativo de verdade não pode virar protocol-relative: o parser
-    // WHATWG trata "\" como equivalente a "/" para esquemas especiais, então
-    // "//evil.com" e "/\evil.com" (em qualquer mistura de / e \) navegam para
-    // outro host. Normaliza antes de checar para pegar as duas formas.
-    return !v.replace(/\\/g, "/").startsWith("//");
+    // Um caminho relativo de verdade nunca sai do host da sentinela.
+    // "//evil.com", "/\evil.com" e variantes com tab/newline embutidos (que o
+    // parser remove de qualquer posição da string antes de montar o host)
+    // resolvem para outra origem e caem fora daqui.
+    try {
+      return new URL(v, `${SENTINEL_ORIGIN}/`).origin === SENTINEL_ORIGIN;
+    } catch {
+      return false;
+    }
   }
   try {
     const proto = new URL(v).protocol;
