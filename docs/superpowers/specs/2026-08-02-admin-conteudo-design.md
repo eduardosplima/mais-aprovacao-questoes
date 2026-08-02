@@ -217,13 +217,50 @@ que a máquina de estados que o evitaria.
 
 ### Frontend — Next.js com export estático
 
-Next.js em `web/`, App Router, Tailwind v4, TipTap mínimo. Deploy no Pages.
+Next.js, App Router, Tailwind v4, TipTap mínimo. Deploy no Pages.
 
 **`output: 'export'`.** Um painel atrás de Access não tem SEO nem visitante
 anônimo, então SSR não serve ali — e sem SSR não é preciso o adaptador
-`@opennextjs/cloudflare` nem a árvore que ele traz. O painel é uma SPA que
-conversa com o Worker. O sub-projeto 4, que precisa de SSR de verdade, decide
-por conta própria; o que ele herda daqui é o design system, não o modo de build.
+`@opennextjs/cloudflare`. O painel é uma SPA que conversa com o Worker.
+
+O adaptador não é um detalhe: **custa 405 pacotes.**
+
+```
+next + react + react-dom                          →  52
+next + react + react-dom + @opennextjs/cloudflare → 457
+```
+
+É o maior item de supply chain do projeto inteiro, maior que todo o resto
+somado — e é **all-or-nothing**: `output: 'export'` é configuração de projeto,
+não de rota, e basta uma rota fazer SSR para o adaptador voltar.
+
+### Estrutura — dois workspaces
+
+```
+web/
+  ui/      design system (tokens, componentes)
+  admin/   o painel — output: 'export'
+```
+
+O design system é **entrega declarada deste sub-projeto para o sub-projeto 4**
+(critério de pronto nº 5). Nascendo dentro de `web/admin/components`, ele
+acoplaria ao painel sem ninguém notar e a "entrega" viraria copiar e colar.
+Separado desde o primeiro commit, o critério fica verificável: se `web/ui`
+compila isolado, é reusável.
+
+O app do aluno entra como `web/aluno` no sub-projeto 4, com o `next.config`
+dele, consumindo o mesmo `web/ui`. **A escolha de build é de lá, e nada aqui a
+fecha** — inclusive a possibilidade de ele também dispensar o adaptador: export
+estático gera HTML no build, o que é SSG e serve bem a SEO; com
+`generateStaticParams`, mil questões viram mil páginas indexáveis. O que se
+perde é atualização instantânea — questão publicada só entra no HTML no próximo
+build. Se um rebuild disparado por webhook de publicação for aceitável, os 457
+pacotes nunca entram no repositório.
+
+**A API continua sendo um Worker só**, servindo `/auth/*` e `/webhooks/*` no
+hostname público e `/admin/*` no do painel. Ressalva para o sub-projeto 4: se
+ele adotar o OpenNext, o Next roda dentro de um **segundo** Worker — a API
+segue sendo uma, mas o repositório passa a deployar dois Workers.
 
 ### Um mesmo hostname para painel e API
 
@@ -407,7 +444,7 @@ cópia aninhada estava vulnerável, porque `@esbuild-kit/core-utils` — pacote
 deprecated, sucedido pelo `tsx` — fixa `~0.18.20`.
 
 Postcss e sharp são as mesmas vulnerabilidades que o Next.js arrasta, então
-esses dois overrides se repetem no `package.json` do `web/`.
+esses dois overrides se repetem na raiz dos workspaces do `web/`.
 
 **Um bug encontrado no próprio auditor, que vale como lição de método:** a
 primeira versão do `collect()` não descia em `node_modules` aninhados e por
