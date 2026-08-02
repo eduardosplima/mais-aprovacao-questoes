@@ -45,6 +45,10 @@ placeholders (`REPLACE_ME`) ali antes de rodar contra o sandbox. Em produção,
 os seis segredos vão via `wrangler secret put <NOME>`; as vars continuam em
 `wrangler.jsonc`.
 
+Opcional e só de desenvolvimento: `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula
+a verificação do Cloudflare Access em `/admin/*` (ver seção "Painel
+administrativo"). Nunca definir em produção.
+
 `ADMIN_EMAILS` é uma lista separada por vírgula; e-mails nela recebem
 `role=admin` na compra (webhook) ou na reconciliação — nunca a partir do
 payload em si.
@@ -73,6 +77,17 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | GET | `/auth/me` | Protegido. Retorna `{ id, email, name, role, tier }` |
 | POST | `/auth/logout` | Limpa o cookie de sessão |
 | POST | `/webhooks/hotmart` | Recebe eventos de compra/cancelamento da Hotmart (autenticado pelo header `x-hotmart-hottok`) |
+| GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia (`subject`, `banca`, `cargo`, `level`) |
+| POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 se já existir ativo |
+| PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia sem mudar o slug |
+| DELETE | `/admin/taxonomy/:id` | Soft delete |
+| GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `year`, `status`…) |
+| POST | `/admin/questions` | Cria a questão inteira. 422 com código quando viola invariante |
+| GET | `/admin/questions/:id` | Questão com alternativas e gabarito |
+| PATCH | `/admin/questions/:id` | Edita — publicada ou não, o id nunca muda |
+| POST | `/admin/questions/:id/publish` · `/unpublish` | Alterna o `status` |
+| DELETE | `/admin/questions/:id` | Soft delete |
+| POST | `/admin/media` | `multipart/form-data` com `file` → `{ url }` no R2 |
 
 Sessão: JWT (HS256) em cookie `HttpOnly; Secure; SameSite=Lax; Path=/`. A
 identidade vai no `sub`; `role`/`tier` são relidos do D1 a cada request —
@@ -117,6 +132,32 @@ executa o array inteiro numa transação implícita, então uma falha no meio n�
 deixa a tabela num estado parcial. Convenção adotada a partir da Task 4;
 módulos futuros (tentativas, comentários, anotações) devem seguir o mesmo
 padrão.
+
+## Painel administrativo
+
+`/admin/*` tem **duas camadas independentes**, e nenhuma confia na outra:
+
+1. **Cloudflare Access** na borda — identidade e MFA no IdP (Google/GitHub).
+   O Worker valida o header `Cf-Access-Jwt-Assertion` contra o JWKS público do
+   time (`src/middleware/access.ts`).
+2. **Sessão + RBAC** — `requireSession` e `requireAdmin`, lendo `role` do D1.
+
+O email do JWT do Access **não** identifica o usuário na aplicação: por isso
+são duas camadas e não uma. Consequência prática: o admin autentica duas vezes.
+
+Em desenvolvimento nada passa pela borda da Cloudflare, então o header não
+existe. `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula a camada 1 — e **só** a
+string exata `true` pula. A variável nunca vai para produção; o login com senha
+e o `role=admin` continuam valendo em dev.
+
+Conteúdo HTML (enunciado, alternativas, gabarito) é sanitizado **na escrita**
+por `src/lib/sanitizeHtml.ts`, com `HTMLRewriter` nativo. Allowlist de tags e
+atributos mais validação do esquema das URLs — permitir o atributo `href` não
+diz nada sobre o valor dele, e `javascript:` passaria sem essa checagem.
+
+Questões e taxonomias usam **soft delete**. O filtro de `deleted_at` vive
+exclusivamente em `src/db/questions.ts` e `src/db/taxonomy.ts`; nenhuma rota
+monta query direto.
 
 ## Verificação manual
 
