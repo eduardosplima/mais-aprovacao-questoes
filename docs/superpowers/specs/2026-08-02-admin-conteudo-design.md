@@ -381,6 +381,30 @@ no D1 recebe 403.
 O widget entra agora, na tela de login. A metade server-side
 (`src/lib/turnstile.ts`) já existe desde a Fundação e está sem par.
 
+### Indexadores
+
+**O Access já resolve isso**: o crawler bate no hostname, recebe a tela de
+login do IdP e não encontra conteúdo para indexar. O que segue é defesa em
+profundidade, e é barato:
+
+1. **`X-Robots-Tag: noindex, nofollow`** via `_headers` do Pages. É a camada
+   mais robusta — vale para qualquer resposta, inclusive as que não são HTML.
+2. **`robots: { index: false, follow: false }`** no metadata do layout raiz do
+   `web/admin` (App Router gera a meta tag).
+3. **`robots.txt` com `Disallow: /`** no hostname do painel.
+
+Duas armadilhas que justificam a ordem acima:
+
+- **`robots.txt` não esconde — ele publica.** O arquivo é público e lista
+  exatamente o que se quer ocultar. Aqui é inofensivo porque o painel vive num
+  hostname próprio, então `Disallow: /` não revela estrutura nenhuma. Se o
+  painel estivesse em `/admin` do site do aluno, o `robots.txt` estaria
+  anunciando sua existência — motivo adicional para o hostname separado.
+- **O hostname `admin.<domínio>` é público de qualquer forma.** Emitir o
+  certificado TLS o registra nos logs de *Certificate Transparency*, que
+  qualquer um consulta. Não existe esconder subdomínio; existe protegê-lo. Essa
+  é precisamente a razão de a proteção ser o Access, e não a obscuridade.
+
 ---
 
 ## 4. Supply chain
