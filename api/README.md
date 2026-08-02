@@ -103,6 +103,21 @@ explícitos revogam.
 - `EMAIL` — `send_email`, usado para o link mágico (primeiro acesso e recuperação).
 - `triggers.crons` — `0 3 * * *`, dispara a reconciliação diária.
 
+## Camada de dados (`src/db/`)
+
+Módulos de acesso a dados sem rotas HTTP próprias, consumidos pelas rotas do
+painel administrativo. `taxonomy.ts` cobre assunto/banca/cargo/nível (CRUD com
+soft delete); `questions.ts` cobre questões, alternativas e gabarito, com as
+invariantes que o SQLite não impõe (uma alternativa correta, contagem por
+tipo, FK de taxonomia no `kind` certo) validadas antes de qualquer escrita.
+
+Escritas que tocam várias linhas relacionadas (ex.: substituir as alternativas
+de uma questão) usam `db.batch()` em vez de `.run()` sequenciais — o D1
+executa o array inteiro numa transação implícita, então uma falha no meio não
+deixa a tabela num estado parcial. Convenção adotada a partir da Task 4;
+módulos futuros (tentativas, comentários, anotações) devem seguir o mesmo
+padrão.
+
 ## Verificação manual
 
 A suíte automatizada usa fixtures derivados da documentação da Hotmart, não de

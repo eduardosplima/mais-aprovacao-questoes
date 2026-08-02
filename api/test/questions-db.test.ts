@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { getDb } from "../src/db/client";
 import { createTerm } from "../src/db/taxonomy";
 import {
@@ -173,6 +173,43 @@ describe("questions", () => {
     const detail = await getQuestion(db(), id);
     expect(detail?.alternatives).toHaveLength(3);
     expect(detail?.alternatives[1].isCorrect).toBe(true);
+  });
+
+  // Prova da correção de atomicidade: a troca de alternativas+gabarito é um
+  // único db.batch(). Mockar essa chamada para falhar simula uma falha no
+  // meio do delete+inserts sem depender de violar uma constraint de verdade
+  // (os ids são gerados internamente, fora do alcance do teste). Se o delete
+  // e os inserts ainda fossem chamadas .run() separadas, este mock não
+  // provaria nada — o delete já teria sido aplicado antes da falha simulada.
+  it("falha na escrita das alternativas não deixa a questão sem elas (batch atômico)", async () => {
+    const created = await createQuestion(db(), await baseInput(), null);
+    const id = (created as { id: string }).id;
+    const before = await getQuestion(db(), id);
+    expect(before?.alternatives).toHaveLength(2);
+
+    const database = db();
+    const batchSpy = vi
+      .spyOn(database, "batch")
+      .mockRejectedValueOnce(new Error("boom"));
+
+    await expect(
+      updateQuestion(database, id, {
+        ...(await baseInput()),
+        alternatives: [
+          { body: "<p>X</p>", isCorrect: false },
+          { body: "<p>Y</p>", isCorrect: true },
+        ],
+      }),
+    ).rejects.toThrow("boom");
+
+    batchSpy.mockRestore();
+
+    const after = await getQuestion(db(), id);
+    expect(after?.alternatives).toHaveLength(2);
+    expect(after?.alternatives.map((a) => a.body)).toEqual(
+      before?.alternatives.map((a) => a.body),
+    );
+    expect(after?.explanation?.body).toBe(before?.explanation?.body);
   });
 
   it("questão soft-deletada some da listagem e do get", async () => {

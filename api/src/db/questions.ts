@@ -72,49 +72,59 @@ async function validate(db: Db, input: QuestionInput): Promise<string | null> {
 
   if (!(await assertKind(db, input.subjectId, "subject"))) return "invalid_subject";
   if (!(await assertKind(db, input.bancaId, "banca"))) return "invalid_banca";
-  if (input.cargoId && !(await assertKind(db, input.cargoId, "cargo"))) {
+  // Checagem explícita de null/undefined, não truthiness: "" é um cargoId
+  // inválido que não pode escapar da validação (a rota da Task 7 recebe JSON
+  // externo, onde uma string vazia é um valor plausível de vir do cliente).
+  if (input.cargoId != null && !(await assertKind(db, input.cargoId, "cargo"))) {
     return "invalid_cargo";
   }
-  if (input.levelId && !(await assertKind(db, input.levelId, "level"))) {
+  if (input.levelId != null && !(await assertKind(db, input.levelId, "level"))) {
     return "invalid_level";
   }
   return null;
 }
 
-/** Grava alternativas e gabarito já sanitizados. Substitui o que existir. */
+/**
+ * Grava alternativas e gabarito já sanitizados. Substitui o que existir.
+ *
+ * `delete` + N `insert`s + upsert executados via `db.batch()`: o D1 roda o
+ * array inteiro numa transação implícita, então uma falha no meio não deixa a
+ * questão com as alternativas apagadas e nenhuma nova — a mesma invariante de
+ * "tudo ou nada" que o resto do módulo protege na escrita. `sanitizeHtml` é
+ * async e não pode ser chamada dentro da montagem do array do batch (as
+ * queries do batch não são aguardadas individualmente), por isso todo HTML é
+ * resolvido antes, com `Promise.all`.
+ */
 async function writeChildren(
   db: Db,
   questionId: string,
   input: QuestionInput,
 ): Promise<void> {
-  await db.delete(alternatives).where(eq(alternatives.questionId, questionId)).run();
+  const altBodies = await Promise.all(
+    input.alternatives.map((alt) => sanitizeHtml(alt.body)),
+  );
+  const explanationBody = await sanitizeHtml(input.explanation.body);
+  const videoUrl = input.explanation.videoUrl ?? null;
 
-  for (const [position, alt] of input.alternatives.entries()) {
-    await db
-      .insert(alternatives)
-      .values({
+  await db.batch([
+    db.delete(alternatives).where(eq(alternatives.questionId, questionId)),
+    ...input.alternatives.map((alt, position) =>
+      db.insert(alternatives).values({
         id: crypto.randomUUID(),
         questionId,
         position,
-        body: await sanitizeHtml(alt.body),
+        body: altBodies[position],
         isCorrect: alt.isCorrect ? 1 : 0,
-      })
-      .run();
-  }
-
-  const body = await sanitizeHtml(input.explanation.body);
-  await db
-    .insert(explanations)
-    .values({
-      questionId,
-      body,
-      videoUrl: input.explanation.videoUrl ?? null,
-    })
-    .onConflictDoUpdate({
-      target: explanations.questionId,
-      set: { body, videoUrl: input.explanation.videoUrl ?? null },
-    })
-    .run();
+      }),
+    ),
+    db
+      .insert(explanations)
+      .values({ questionId, body: explanationBody, videoUrl })
+      .onConflictDoUpdate({
+        target: explanations.questionId,
+        set: { body: explanationBody, videoUrl },
+      }),
+  ]);
 }
 
 export async function createQuestion(
