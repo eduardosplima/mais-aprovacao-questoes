@@ -316,4 +316,72 @@ describe("parsing de limit e offset em GET /admin/questions", () => {
     expect(bodyNeg.rows.map((r) => r.id)).toEqual(bodyZero.rows.map((r) => r.id));
     expect(bodyNeg.rows).toHaveLength(2);
   });
+
+  // Valor fracionário (ex.: 1.5) não é NaN nem < 1, então sobrevivia ao
+  // parsing e chegava ao D1 como bind não-inteiro, causando
+  // SQLITE_MISMATCH (500). Precisa cair no default como qualquer outra
+  // entrada inválida.
+  it("limit=1.5 (fracionário) cai no default, sem truncar nem devolver 500", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Limit assunto fracionario");
+    const banca = await createTerm(db, "banca", "Limit banca fracionario");
+    await createInSubject(subject.id, banca.id, "<p>Q1</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q2</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q3</p>");
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${subject.id}&limit=1.5`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: unknown[]; total: number };
+    expect(body.total).toBe(3);
+    expect(body.rows).toHaveLength(3);
+  });
+
+  it("offset=1.5 (fracionário) cai no piso 0, sem devolver 500", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Offset assunto fracionario");
+    const banca = await createTerm(db, "banca", "Offset banca fracionario");
+    await createInSubject(subject.id, banca.id, "<p>Q1</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q2</p>");
+
+    const withFraction = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=1.5`,
+      {},
+      env,
+    );
+    const withZero = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=0`,
+      {},
+      env,
+    );
+    expect(withFraction.status).toBe(200);
+    const bodyFraction = (await withFraction.json()) as { rows: { id: string }[] };
+    const bodyZero = (await withZero.json()) as { rows: { id: string }[] };
+    expect(bodyFraction.rows.map((r) => r.id)).toEqual(bodyZero.rows.map((r) => r.id));
+    expect(bodyFraction.rows).toHaveLength(2);
+  });
+
+  // "25e-1" (notação científica) é 2.5: >= 1, então só o `Number.isInteger`
+  // pega esse caso — o `n < 1` sozinho não bastaria.
+  it("limit em notação científica fracionária (25e-1) cai no default", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Limit assunto notacao cientifica");
+    const banca = await createTerm(db, "banca", "Limit banca notacao cientifica");
+    await createInSubject(subject.id, banca.id, "<p>Q1</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q2</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q3</p>");
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${subject.id}&limit=25e-1`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: unknown[]; total: number };
+    expect(body.total).toBe(3);
+    expect(body.rows).toHaveLength(3);
+  });
 });

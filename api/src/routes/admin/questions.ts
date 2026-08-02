@@ -51,14 +51,14 @@ const statusFor = (error: string): 404 | 422 =>
 // default de 50.
 function parseLimit(raw: string | undefined): number {
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 1) return 50;
+  if (!Number.isInteger(n) || n < 1) return 50;
   return Math.min(n, 200);
 }
 
 // `offset` negativo não deve chegar ao SQLite; o piso é 0.
 function parseOffset(raw: string | undefined): number {
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) return 0;
+  if (!Number.isInteger(n) || n < 0) return 0;
   return n;
 }
 
