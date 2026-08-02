@@ -37,7 +37,14 @@ const URL_ATTRS = new Set(["src", "href"]);
  */
 function isSafeUrl(value: string): boolean {
   const v = value.trim();
-  if (v.startsWith("/") || v.startsWith("#")) return true;
+  if (v.startsWith("#")) return true;
+  if (v.startsWith("/")) {
+    // Caminho relativo de verdade não pode virar protocol-relative: o parser
+    // WHATWG trata "\" como equivalente a "/" para esquemas especiais, então
+    // "//evil.com" e "/\evil.com" (em qualquer mistura de / e \) navegam para
+    // outro host. Normaliza antes de checar para pegar as duas formas.
+    return !v.replace(/\\/g, "/").startsWith("//");
+  }
   try {
     const proto = new URL(v).protocol;
     return proto === "http:" || proto === "https:" || proto === "mailto:";

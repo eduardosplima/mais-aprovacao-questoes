@@ -50,6 +50,39 @@ describe("sanitizeHtml", () => {
     }
   });
 
+  it("neutraliza href protocol-relative (//) e o disfarce com barra invertida (/\\)", async () => {
+    for (const href of ["//evil.com/x", "/\\evil.com"]) {
+      const out = await sanitizeHtml(`<a href="${href}">x</a>`);
+      expect(out).toBe("<a>x</a>");
+    }
+  });
+
+  it("neutraliza esquemas perigosos disfarçados (case, tab, newline) e outros esquemas não permitidos", async () => {
+    const hrefs = [
+      "JavaScript:alert(1)",
+      "JAVASCRIPT:alert(1)",
+      "java\tscript:alert(1)",
+      "java\nscript:alert(1)",
+      "vbscript:msgbox(1)",
+      "data:text/html,<script>alert(1)</script>",
+    ];
+    for (const href of hrefs) {
+      const out = await sanitizeHtml(`<a href="${href}">x</a>`);
+      expect(out).toBe("<a>x</a>");
+    }
+  });
+
+  it("continua aceitando os esquemas e caminhos legítimos", async () => {
+    for (const href of [
+      "/interno",
+      "#ancora",
+      "https://a.test/x",
+      "mailto:a@test.com",
+    ]) {
+      expect(await sanitizeHtml(`<a href="${href}">x</a>`)).toContain(href);
+    }
+  });
+
   it("descarta svg com script", async () => {
     const out = await sanitizeHtml("<svg><script>alert(1)</script></svg>");
     expect(out).not.toContain("script");
