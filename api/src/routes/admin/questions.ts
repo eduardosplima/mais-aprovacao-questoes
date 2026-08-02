@@ -46,20 +46,35 @@ const questionSchema = z.object({
 const statusFor = (error: string): 404 | 422 =>
   error === "not_found" ? 404 : 422;
 
-// `limit` precisa ficar sempre em [1, 200]: negativo é "sem limite" no
-// SQLite, então qualquer valor fora da faixa (ou não-numérico) cai no
-// default de 50.
-function parseLimit(raw: string | undefined): number {
+// Só é um valor válido de paginação o inteiro dentro de [min, max]; qualquer
+// outra coisa (negativo, fracionário, NaN, texto, ou grande demais a ponto
+// do JS serializar em notação científica e quebrar o bind do D1) cai no
+// default. É uma checagem de pertencimento ao intervalo, não uma lista de
+// exceções — não precisa crescer a cada novo formato inválido descoberto.
+function parseInRange(
+  raw: string | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1) return 50;
-  return Math.min(n, 200);
+  return Number.isInteger(n) && n >= min && n <= max ? n : fallback;
 }
 
-// `offset` negativo não deve chegar ao SQLite; o piso é 0.
+const MAX_LIMIT = 200;
+// Teto de offset para paginação do acervo de questões: mesmo num cenário
+// improvável de milhões de questões cadastradas, um offset além de 1 milhão
+// não faz sentido para uma listagem administrativa paginada — e fica bem
+// abaixo da ordem de grandeza (~1e21) em que o JS passa a serializar números
+// em notação científica (`"1e+21"`), formato que o bind do D1 recusa.
+const MAX_OFFSET = 1_000_000;
+
+function parseLimit(raw: string | undefined): number {
+  return parseInRange(raw, 1, MAX_LIMIT, 50);
+}
+
 function parseOffset(raw: string | undefined): number {
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 0) return 0;
-  return n;
+  return parseInRange(raw, 0, MAX_OFFSET, 0);
 }
 
 adminQuestions.get("/", async (c) => {

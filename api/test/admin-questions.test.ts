@@ -384,4 +384,77 @@ describe("parsing de limit e offset em GET /admin/questions", () => {
     expect(body.total).toBe(3);
     expect(body.rows).toHaveLength(3);
   });
+
+  // Fronteira do teto de offset (1_000_000): ainda é um inteiro válido no
+  // intervalo, então precisa ser aplicado de verdade — não cair no default.
+  it("offset=1000000 (no teto) ainda é aplicado como offset válido", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Offset assunto teto");
+    const banca = await createTerm(db, "banca", "Offset banca teto");
+    await createInSubject(subject.id, banca.id, "<p>Q1</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q2</p>");
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=1000000`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: unknown[]; total: number };
+    // Só há 2 linhas; um offset de 1 milhão as ultrapassa por completo — se
+    // o valor tivesse caído no default (0), as 2 linhas apareceriam aqui.
+    expect(body.total).toBe(2);
+    expect(body.rows).toHaveLength(0);
+  });
+
+  it("offset=1000001 (um acima do teto) cai no default 0", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Offset assunto acima teto");
+    const banca = await createTerm(db, "banca", "Offset banca acima teto");
+    await createInSubject(subject.id, banca.id, "<p>Q1</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q2</p>");
+
+    const withAboveMax = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=1000001`,
+      {},
+      env,
+    );
+    const withZero = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=0`,
+      {},
+      env,
+    );
+    expect(withAboveMax.status).toBe(200);
+    const bodyAboveMax = (await withAboveMax.json()) as { rows: { id: string }[] };
+    const bodyZero = (await withZero.json()) as { rows: { id: string }[] };
+    expect(bodyAboveMax.rows.map((r) => r.id)).toEqual(bodyZero.rows.map((r) => r.id));
+    expect(bodyAboveMax.rows).toHaveLength(2);
+  });
+
+  // 1e21: acima do teto de offset e também o ponto em que `String(n)` do JS
+  // vira notação científica ("1e+21"), que quebrava o bind do D1 com 500
+  // antes deste round.
+  it("offset=1e21 cai no default 0, sem devolver 500", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Offset assunto extremo");
+    const banca = await createTerm(db, "banca", "Offset banca extremo");
+    await createInSubject(subject.id, banca.id, "<p>Q1</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q2</p>");
+
+    const withHuge = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=1e21`,
+      {},
+      env,
+    );
+    const withZero = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=0`,
+      {},
+      env,
+    );
+    expect(withHuge.status).toBe(200);
+    const bodyHuge = (await withHuge.json()) as { rows: { id: string }[] };
+    const bodyZero = (await withZero.json()) as { rows: { id: string }[] };
+    expect(bodyHuge.rows.map((r) => r.id)).toEqual(bodyZero.rows.map((r) => r.id));
+    expect(bodyHuge.rows).toHaveLength(2);
+  });
 });
