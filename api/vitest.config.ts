@@ -9,6 +9,7 @@ export default defineConfig({
       wrangler: { configPath: "./wrangler.jsonc" },
       miniflare: {
         d1Databases: ["DB"],
+        r2Buckets: ["MEDIA"],
         bindings: {
           TEST_MIGRATIONS: migrations,
           JWT_SECRET: "test-jwt-secret",
@@ -27,6 +28,7 @@ export default defineConfig({
           ACCESS_TEAM_DOMAIN: "equipe-test.cloudflareaccess.com",
           ACCESS_AUD: "aud-de-teste",
           ACCESS_DEV_BYPASS: "",
+          MEDIA_PUBLIC_BASE: "https://media.test",
         },
       },
     }),

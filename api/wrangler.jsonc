@@ -10,6 +10,12 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "mais-aprovacao-media"
+    }
+  ],
   "send_email": [
     {
       "name": "EMAIL"
@@ -25,6 +31,9 @@
     "HOTMART_CHECKOUT_URL": "https://pay.hotmart.com/REPLACE_ME",
     "APP_BASE_URL": "http://localhost:3000",
     "EMAIL_FROM": "nao-responda@REPLACE_ME",
-    "ADMIN_EMAILS": ""
+    "ADMIN_EMAILS": "",
+    "MEDIA_PUBLIC_BASE": "https://REPLACE_ME_MEDIA_HOST",
+    "ACCESS_TEAM_DOMAIN": "REPLACE_ME.cloudflareaccess.com",
+    "ACCESS_AUD": "REPLACE_ME_AUD"
   }
 }

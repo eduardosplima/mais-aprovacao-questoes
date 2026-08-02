@@ -1,4 +1,4 @@
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 
 /** Uma mensagem para o Cloudflare Email Sending. */
 export interface EmailMessage {
@@ -43,6 +43,10 @@ export interface Env {
    * — inclusive ausência — significa exigir o JWT do Access.
    */
   ACCESS_DEV_BYPASS?: string;
+  /** Bucket das imagens de questão. Servido por um hostname sem cookies. */
+  MEDIA: R2Bucket;
+  /** Base pública do bucket, ex.: "https://media.exemplo.com". Sem barra final. */
+  MEDIA_PUBLIC_BASE: string;
 }
 
 function csv(raw: string): string[] {
