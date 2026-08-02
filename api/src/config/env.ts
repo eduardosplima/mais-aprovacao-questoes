@@ -34,6 +34,15 @@ export interface Env {
   APP_BASE_URL: string;
   EMAIL_FROM: string;
   ADMIN_EMAILS: string;
+  /** Domínio do time no Zero Trust, ex.: "minhaequipe.cloudflareaccess.com". */
+  ACCESS_TEAM_DOMAIN: string;
+  /** Tag `aud` da aplicação Access. Dashboard → Access → Applications. */
+  ACCESS_AUD: string;
+  /**
+   * Só existe em `.dev.vars`. Fail-closed: qualquer valor diferente de "true"
+   * — inclusive ausência — significa exigir o JWT do Access.
+   */
+  ACCESS_DEV_BYPASS?: string;
 }
 
 function csv(raw: string): string[] {
