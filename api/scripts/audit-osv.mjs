@@ -14,7 +14,12 @@ import { join } from "node:path";
 
 const ROOT = new URL("../node_modules", import.meta.url).pathname;
 
-/** Percorre node_modules, incluindo escopos (@org/pkg), sem descer em aninhados. */
+/**
+ * Percorre node_modules, incluindo escopos (@org/pkg) e **node_modules
+ * aninhados** — é neles que o npm coloca a cópia divergente quando duas deps
+ * pedem versões incompatíveis do mesmo pacote, e é exatamente onde uma versão
+ * vulnerável se esconde enquanto a do topo aparece limpa.
+ */
 function collect(dir) {
   const found = [];
   for (const entry of readdirSync(dir)) {
@@ -30,6 +35,11 @@ function collect(dir) {
       if (pkg.name && pkg.version) found.push({ name: pkg.name, version: pkg.version });
     } catch {
       // diretório sem package.json legível — não é um pacote
+    }
+    try {
+      found.push(...collect(join(path, "node_modules")));
+    } catch {
+      // sem node_modules aninhado — caso comum
     }
   }
   return found;

@@ -385,22 +385,37 @@ quem digita é a operação, não um desenvolvedor, e prova de concurso tem tabe
 ### Achados da auditoria
 
 `scripts/audit-osv.mjs` (zero dependências, `fetch` nativo, API pública da
-OSV.dev) contra os 97 pacotes instalados:
+OSV.dev) contra os 103 pacotes instalados. Três achados, **todos
+devDependency transitiva**, todos já corrigidos por `overrides`:
 
 | Pacote | Vem de | Problema | Corrigido em |
 |---|---|---|---|
 | `postcss@8.5.16` | `vitest → vite` | Path traversal no auto-load de source map | 8.5.20 |
 | `sharp@0.34.5` | `vitest-pool-workers → miniflare` | 4 CVEs herdados do libvips | 0.35.3 |
+| `esbuild@0.18.20` | `drizzle-kit → @esbuild-kit/esm-loader → core-utils` | dev server aceita requisição de qualquer origem e devolve a resposta | 0.25.12 |
 
-Exposição prática ≈ zero — o primeiro exige CSS malicioso passando pelo
-postcss, o segundo uma imagem maliciosa entrando no libvips, e nenhum ocorre
-rodando os testes. Mas ficam na máquina de desenvolvimento.
+Exposição prática ≈ zero — exigiriam, respectivamente, CSS malicioso passando
+pelo postcss, imagem maliciosa entrando no libvips e o dev server do esbuild
+exposto (que não usamos). Mas os três ficam na máquina de desenvolvimento.
 
-**A política já mudou a resposta:** o reflexo seria pegar `postcss@8.5.25`,
-publicada há 4 dias — reprovada no cooldown. O alvo é `8.5.20` (14 dias) e
-`sharp@0.35.3` (32 dias). Entram como `overrides` nos dois `package.json` do
-repositório; são as mesmas duas vulnerabilidades que o Next.js arrasta, então
-um par de overrides cobre os dois lados.
+**A política mudou a resposta em dois pontos.** O reflexo para o postcss seria
+pegar `8.5.25`, publicada há 4 dias — reprovada no cooldown; o alvo é `8.5.20`,
+com 14 dias. E o esbuild exigiu **override escopado**
+(`"@esbuild-kit/core-utils": { "esbuild": "0.25.12" }`) em vez de global: o
+esbuild do topo já estava em 0.28.1, e um override global o rebaixaria. Só a
+cópia aninhada estava vulnerável, porque `@esbuild-kit/core-utils` — pacote
+deprecated, sucedido pelo `tsx` — fixa `~0.18.20`.
+
+Postcss e sharp são as mesmas vulnerabilidades que o Next.js arrasta, então
+esses dois overrides se repetem no `package.json` do `web/`.
+
+**Um bug encontrado no próprio auditor, que vale como lição de método:** a
+primeira versão do `collect()` não descia em `node_modules` aninhados e por
+isso deu "nenhuma vulnerabilidade" com o esbuild vulnerável instalado. É
+exatamente ali que o npm guarda a cópia divergente quando duas dependências
+pedem versões incompatíveis — e portanto exatamente onde uma versão vulnerável
+se esconde enquanto a do topo aparece limpa. Corrigido; a contagem subiu de 98
+para 103 pacotes.
 
 **`npm audit` não é evidência de segurança aqui.** Ele compara versões contra
 CVEs publicados; um pacote comprometido ontem não tem CVE, tem malware. Contra
