@@ -193,3 +193,127 @@ describe("rotas de questões", () => {
     expect(body.question.statement).toBe("<p>E</p>");
   });
 });
+
+// `limit`/`offset` vêm da querystring como string; valores negativos de
+// `limit` viram "sem limite" no SQLite, então o parsing precisa validar
+// antes de repassar para `listQuestions`.
+describe("parsing de limit e offset em GET /admin/questions", () => {
+  async function createInSubject(
+    subjectId: string,
+    bancaId: string,
+    statement: string,
+  ): Promise<string> {
+    const res = await app().request(
+      "/admin/questions",
+      post({
+        type: "multiple_choice",
+        statement,
+        subjectId,
+        bancaId,
+        year: 2024,
+        alternatives: [
+          { body: "<p>A</p>", isCorrect: true },
+          { body: "<p>B</p>", isCorrect: false },
+        ],
+        explanation: { body: "<p>Comentário</p>" },
+      }),
+      env,
+    );
+    const body = (await res.json()) as { id: string };
+    return body.id;
+  }
+
+  it(
+    "limit=-5 cai no default de 50 em vez de devolver a tabela inteira",
+    async () => {
+      const db = getDb(env);
+      const subject = await createTerm(db, "subject", "Limit assunto bulk");
+      const banca = await createTerm(db, "banca", "Limit banca bulk");
+      for (let i = 0; i < 55; i++) {
+        await createInSubject(subject.id, banca.id, `<p>Q${i}</p>`);
+      }
+
+      const res = await app().request(
+        `/admin/questions?subjectId=${subject.id}&limit=-5`,
+        {},
+        env,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { rows: unknown[]; total: number };
+      expect(body.total).toBe(55);
+      expect(body.rows).toHaveLength(50);
+    },
+    20000,
+  );
+
+  it("limit=0 cai no default, não devolve lista vazia", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Limit assunto zero");
+    const banca = await createTerm(db, "banca", "Limit banca zero");
+    const id = await createInSubject(subject.id, banca.id, "<p>Q</p>");
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${subject.id}&limit=0`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: { id: string }[] };
+    expect(body.rows.some((r) => r.id === id)).toBe(true);
+  });
+
+  it("limit=99999 é aceito sem estourar (teto aplicado antes da query)", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Limit assunto teto");
+    const banca = await createTerm(db, "banca", "Limit banca teto");
+    const id = await createInSubject(subject.id, banca.id, "<p>Q</p>");
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${subject.id}&limit=99999`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: { id: string }[] };
+    expect(body.rows.some((r) => r.id === id)).toBe(true);
+  });
+
+  it("limit=abc (não numérico) cai no default", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Limit assunto abc");
+    const banca = await createTerm(db, "banca", "Limit banca abc");
+    const id = await createInSubject(subject.id, banca.id, "<p>Q</p>");
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${subject.id}&limit=abc`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { rows: { id: string }[] };
+    expect(body.rows.some((r) => r.id === id)).toBe(true);
+  });
+
+  it("offset=-5 cai no piso 0, não altera a paginação", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Offset assunto");
+    const banca = await createTerm(db, "banca", "Offset banca");
+    await createInSubject(subject.id, banca.id, "<p>Q1</p>");
+    await createInSubject(subject.id, banca.id, "<p>Q2</p>");
+
+    const withNegative = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=-5`,
+      {},
+      env,
+    );
+    const withZero = await app().request(
+      `/admin/questions?subjectId=${subject.id}&offset=0`,
+      {},
+      env,
+    );
+    const bodyNeg = (await withNegative.json()) as { rows: { id: string }[] };
+    const bodyZero = (await withZero.json()) as { rows: { id: string }[] };
+    expect(bodyNeg.rows.map((r) => r.id)).toEqual(bodyZero.rows.map((r) => r.id));
+    expect(bodyNeg.rows).toHaveLength(2);
+  });
+});

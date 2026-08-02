@@ -46,6 +46,22 @@ const questionSchema = z.object({
 const statusFor = (error: string): 404 | 422 =>
   error === "not_found" ? 404 : 422;
 
+// `limit` precisa ficar sempre em [1, 200]: negativo é "sem limite" no
+// SQLite, então qualquer valor fora da faixa (ou não-numérico) cai no
+// default de 50.
+function parseLimit(raw: string | undefined): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return 50;
+  return Math.min(n, 200);
+}
+
+// `offset` negativo não deve chegar ao SQLite; o piso é 0.
+function parseOffset(raw: string | undefined): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
 adminQuestions.get("/", async (c) => {
   const q = c.req.query();
   const year = q.year ? Number(q.year) : undefined;
@@ -56,8 +72,8 @@ adminQuestions.get("/", async (c) => {
     levelId: q.levelId,
     year: Number.isFinite(year) ? year : undefined,
     status: q.status === "published" || q.status === "draft" ? q.status : undefined,
-    limit: q.limit ? Math.min(Number(q.limit) || 50, 200) : 50,
-    offset: q.offset ? Number(q.offset) || 0 : 0,
+    limit: parseLimit(q.limit),
+    offset: parseOffset(q.offset),
   });
   return c.json(result);
 });
