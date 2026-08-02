@@ -114,6 +114,21 @@ describe("guardas de /admin", () => {
     }
   });
 
+  // /admin/media é a rota mais nova, a mais fácil de esquecer num mount
+  // futuro fora do bloco `app.use("/admin/*", ...)`. Sessão de admin válida
+  // mas sem Access precisa continuar barrando aqui, do mesmo jeito que barra
+  // em /admin/taxonomy — senão a proteção que existe hoje deixaria de ser
+  // pega por regressão.
+  it("401 em /admin/media com sessão de admin mas sem Access", async () => {
+    const cookie = await sessionCookie("admin@test.com");
+    const res = await app.request(
+      "/admin/media",
+      { method: "POST", headers: { cookie }, body: new FormData() },
+      prod(),
+    );
+    expect(res.status).toBe(401);
+  });
+
   // O webhook vem da Hotmart e não pode ficar atrás de identidade. Envia o
   // hottok válido para que um eventual 401 só possa vir do Access — o próprio
   // webhook já barra por hottok ausente/errado, o que não é o que este teste
