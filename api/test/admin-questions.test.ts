@@ -303,40 +303,16 @@ describe("rotas de questões", () => {
   });
 
   it("filtro válido de year continua filtrando", async () => {
-    const db = getDb(env);
-    const subject = await createTerm(db, "subject", "Year assunto");
-    const banca = await createTerm(db, "banca", "Year banca");
-    await app().request(
-      "/admin/questions",
-      post({
-        type: "multiple_choice",
-        statement: "<p>Q</p>",
-        subjectId: subject.id,
-        bancaId: banca.id,
-        year: 2024,
-        alternatives: [
-          { body: "<p>A</p>", isCorrect: true },
-          { body: "<p>B</p>", isCorrect: false },
-        ],
-        explanation: { body: "<p>C</p>" },
-      }),
-      env,
-    );
+    const body = await payload();
+    await app().request("/admin/questions", post(body), env);
 
     const res = await app().request(
-      `/admin/questions?subjectId=${subject.id}&year=2024`,
+      `/admin/questions?subjectId=${body.subjectId}&year=2024`,
       {},
       env,
     );
     expect(res.status).toBe(200);
     expect(((await res.json()) as { total: number }).total).toBe(1);
-  });
-
-  // A outra metade da convenção: paginação inválida NÃO vira 400. Clampar o
-  // limit não mente sobre o conteúdo, então segue caindo no default.
-  it("limit inválido continua caindo no default, sem virar 400", async () => {
-    const res = await app().request("/admin/questions?limit=99999", {}, env);
-    expect(res.status).toBe(200);
   });
 
   // Id opaco de filtro passa cru: "malformado" e "não existe" são
@@ -345,6 +321,60 @@ describe("rotas de questões", () => {
     const res = await app().request("/admin/questions?subjectId=nao-existe", {}, env);
     expect(res.status).toBe(200);
     expect(((await res.json()) as { total: number }).total).toBe(0);
+  });
+
+  // Ruling: valor vazio de filtro é "sem filtro" em todo campo, não um valor
+  // a ser validado — é o que o <select><option value=""> do painel manda
+  // quando o operador limpa o filtro.
+  describe("valor vazio de filtro é tratado como ausente", () => {
+    it("status= vazio não filtra (traz rascunho e publicada)", async () => {
+      const draftId = await create();
+      const publishedId = await create();
+      await app().request(`/admin/questions/${publishedId}/publish`, { method: "POST" }, env);
+
+      const res = await app().request("/admin/questions?status=", {}, env);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { rows: { id: string }[] };
+      const ids = body.rows.map((r) => r.id);
+      expect(ids).toContain(draftId);
+      expect(ids).toContain(publishedId);
+    });
+
+    it("year= vazio não filtra por ano", async () => {
+      const base = await payload({ year: 2020 });
+      await app().request("/admin/questions", post(base), env);
+      await app().request("/admin/questions", post({ ...base, year: 1999 }), env);
+
+      const res = await app().request(
+        `/admin/questions?subjectId=${base.subjectId}&year=`,
+        {},
+        env,
+      );
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { total: number }).total).toBe(2);
+    });
+
+    it("year=%20 (só espaço) não filtra por ano", async () => {
+      const base = await payload({ year: 2020 });
+      await app().request("/admin/questions", post(base), env);
+      await app().request("/admin/questions", post({ ...base, year: 1999 }), env);
+
+      const res = await app().request(
+        `/admin/questions?subjectId=${base.subjectId}&year=%20`,
+        {},
+        env,
+      );
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { total: number }).total).toBe(2);
+    });
+
+    it("subjectId= vazio não filtra por assunto", async () => {
+      const id = await create();
+      const res = await app().request("/admin/questions?subjectId=", {}, env);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { rows: { id: string }[] };
+      expect(body.rows.some((r) => r.id === id)).toBe(true);
+    });
   });
 
   it.each([
@@ -444,6 +474,9 @@ describe("parsing de limit e offset em GET /admin/questions", () => {
     expect(body.rows.some((r) => r.id === id)).toBe(true);
   });
 
+  // A outra metade da convenção: paginação inválida NÃO vira 400. Clampar o
+  // limit não mente sobre o conteúdo, então segue caindo no default.
+  //
   // Acima do teto de 200, o valor não é clampado: cai no default de 50, o
   // mesmo destino de qualquer outro limit fora de [1, 200].
   it(

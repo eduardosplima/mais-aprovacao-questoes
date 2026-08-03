@@ -46,6 +46,12 @@ const alternativeSchema = z.object({
   isCorrect: z.boolean(),
 });
 
+// Intervalo de ano aceito, compartilhado entre a validação de escrita
+// (schema Zod) e o filtro de listagem — duas checagens diferentes, um só
+// intervalo, para uma não poder divergir da outra ao ser ajustado.
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2200;
+
 const questionSchema = z.object({
   type: z.enum(["multiple_choice", "true_false"]),
   statement: z.string().min(1),
@@ -53,7 +59,7 @@ const questionSchema = z.object({
   bancaId: z.string().min(1),
   cargoId: z.string().nullish(),
   levelId: z.string().nullish(),
-  year: z.number().int().min(1900).max(2200).nullish(),
+  year: z.number().int().min(MIN_YEAR).max(MAX_YEAR).nullish(),
   alternatives: z.array(alternativeSchema).min(1).max(10),
   explanation: z.object({
     body: z.string().min(1),
@@ -116,10 +122,19 @@ function parseOffset(raw: string | undefined): number {
   return parseInRange(raw, 0, MAX_OFFSET, 0);
 }
 
-// Filtro inválido responde 400; paginação inválida cai no default. O critério
-// não é "validado ou não", é se descartar em silêncio muda o que o operador
-// acredita estar vendo: um filtro descartado faz a tela mostrar o acervo
-// inteiro dizendo que filtrou, um `limit` clampado não mente sobre o conteúdo.
+// Valor vazio (ou só espaço) de filtro é "sem filtro", em todo campo — é o
+// que um <select><option value=""> manda quando o operador limpa o filtro.
+// Sem essa normalização, um filtro limpo do jeito que o painel manda seria
+// indistinguível de um filtro malformado.
+function emptyToUndefined(raw: string | undefined): string | undefined {
+  return raw === undefined || raw.trim() === "" ? undefined : raw;
+}
+
+// Filtro inválido (não vazio, mas errado) responde 400; paginação inválida
+// cai no default. O critério não é "validado ou não", é se descartar em
+// silêncio muda o que o operador acredita estar vendo: um filtro descartado
+// faz a tela mostrar o acervo inteiro dizendo que filtrou, um `limit`
+// clampado não mente sobre o conteúdo.
 //
 // Os ids de taxonomia ficam de fora dos dois lados: são opacos, e um id
 // inexistente já devolve lista vazia — a resposta honesta tanto para
@@ -127,30 +142,32 @@ function parseOffset(raw: string | undefined): number {
 adminQuestions.get("/", async (c) => {
   const q = c.req.query();
 
+  const statusRaw = emptyToUndefined(q.status);
   let status: QuestionStatus | undefined;
-  if (q.status !== undefined) {
-    if (q.status !== "draft" && q.status !== "published") {
+  if (statusRaw !== undefined) {
+    if (statusRaw !== "draft" && statusRaw !== "published") {
       return c.json({ error: "invalid_status" }, 400);
     }
-    status = q.status;
+    status = statusRaw;
   }
 
+  const yearRaw = emptyToUndefined(q.year);
   let year: number | undefined;
-  if (q.year !== undefined) {
+  if (yearRaw !== undefined) {
     // Mesmo teste de pertencimento a intervalo que `parseInRange` usa, com os
-    // limites do schema de escrita. `Number("")` é 0 e cai fora, como deve.
-    const n = Number(q.year);
-    if (!Number.isInteger(n) || n < 1900 || n > 2200) {
+    // limites do schema de escrita.
+    const n = Number(yearRaw);
+    if (!Number.isInteger(n) || n < MIN_YEAR || n > MAX_YEAR) {
       return c.json({ error: "invalid_year" }, 400);
     }
     year = n;
   }
 
   const result = await listQuestions(getDb(c.env), {
-    subjectId: q.subjectId,
-    bancaId: q.bancaId,
-    cargoId: q.cargoId,
-    levelId: q.levelId,
+    subjectId: emptyToUndefined(q.subjectId),
+    bancaId: emptyToUndefined(q.bancaId),
+    cargoId: emptyToUndefined(q.cargoId),
+    levelId: emptyToUndefined(q.levelId),
     year,
     status,
     limit: parseLimit(q.limit),
