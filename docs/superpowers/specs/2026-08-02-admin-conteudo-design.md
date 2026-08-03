@@ -529,7 +529,29 @@ dados e o `HOTMART_TOKEN_URL` seguem **não confirmados**.
 
 ---
 
-## 7. Riscos
+## 7. Débito técnico conhecido (API)
+
+Levantado durante a implementação e a revisão final da branch `feat/admin-api`.
+Nada aqui bloqueou o merge; a lista existe para que o plano do painel decida o
+que encarar. Ordenado por quanto incomoda.
+
+| Item | Onde | Por quê ficou |
+|---|---|---|
+| `catch` genérico traduz **qualquer** exceção em 409 | `routes/admin/taxonomy.ts` | Uma indisponibilidade do D1 faz o painel dizer "esse nome já existe", escondendo incidente de infra atrás de mensagem de validação. Fix: inspecionar `SQLITE_CONSTRAINT` e re-lançar o resto |
+| `videoUrl` aceita caminho relativo e `mailto:` | `routes/admin/questions.ts` | Reuso de `isSafeUrl`, que foi escrita para `href` de conteúdo. Esquemas perigosos são recusados; o frouxo é semântico, não de segurança |
+| Sem teste de corpo JSON malformado | rotas de taxonomia **e** de questões | As duas usam `c.req.json().catch(() => null)`. Verificado manualmente que respondem 400; falta a regressão |
+| `PATCH /admin/taxonomy/:id` permite dois termos ativos com o mesmo nome | `db/taxonomy.ts` | O UNIQUE é sobre `slug`, e renomear não toca o slug (decisão correta). Efeito: o dropdown pode mostrar dois nomes iguais |
+| Camada 1 não exige o claim `email` | `middleware/access.ts` | Um *service token* do Access satisfaz a borda sem MFA humano. A camada 2 continua exigindo sessão + `role=admin`, então não é bypass — é defesa em profundidade degradada. Relevante quando o e2e criar um service token |
+| `limit` fora do teto cai no default, não clampa | `routes/admin/questions.ts` | Coerente com todo o resto (`0`, `abc`, `1.5`, offset gigante caem no default). Trocar só o teto superior quebraria a regra única |
+| Query param inválido: 400 na taxonomia, ignorado silenciosamente nas questões | os dois módulos de rota | Implementadores diferentes, nada no plano fixando a convenção |
+| `POST /admin/questions` não aceita `status` | `routes/admin/questions.ts` | Publicar exige dois round-trips. A spec §2 fala em "cadastro em um step" |
+| FKs de `questions` → `taxonomy_terms` sem `onDelete` | `db/schema.ts` | `NO ACTION` é fail-safe e o hard delete de termo não existe no código. Intencional; falta o comentário declarando isso |
+| `slugify` usa caracteres combinantes crus no regex | `db/taxonomy.ts` | Funciona e tem teste, mas é invisível na revisão. `/[\u0300-\u036f]/g` é equivalente e legível |
+| README não lista as vars e o binding novos | `api/README.md` | Faltam `MEDIA_PUBLIC_BASE`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD` e o binding `MEDIA` |
+
+---
+
+## 8. Riscos
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
