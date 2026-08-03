@@ -192,6 +192,32 @@ describe("rotas de questões", () => {
     const body = (await res.json()) as { question: { statement: string } };
     expect(body.question.statement).toBe("<p>E</p>");
   });
+
+  // `videoUrl` é gravado cru em writeChildren, sem sanitização de HTML — a
+  // única barreira contra esquema perigoso é a validação de schema aqui.
+  it.each(["javascript:alert(document.cookie)", "data:text/html,x", "vbscript:msgbox(1)"])(
+    "recusa videoUrl com esquema inseguro (%s)",
+    async (videoUrl) => {
+      const res = await app().request(
+        "/admin/questions",
+        post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
+        env,
+      );
+      expect(res.status).toBe(400);
+    },
+  );
+
+  it.each(["https://youtu.be/x", "mailto:a@test.com"])(
+    "aceita videoUrl com esquema seguro (%s)",
+    async (videoUrl) => {
+      const res = await app().request(
+        "/admin/questions",
+        post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
+        env,
+      );
+      expect(res.status).toBe(201);
+    },
+  );
 });
 
 // `limit`/`offset` vêm da querystring como string; valores negativos de

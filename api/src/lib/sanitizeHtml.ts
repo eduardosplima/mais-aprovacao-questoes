@@ -43,7 +43,7 @@ const SENTINEL_ORIGIN = "http://sanitize-html.internal";
  * nomes deixa `javascript:alert(1)` passar intacto. Só http, https, mailto e
  * caminhos relativos entram.
  */
-function isSafeUrl(value: string): boolean {
+export function isSafeUrl(value: string): boolean {
   const v = value.trim();
   if (v.startsWith("#")) return true;
   if (v.startsWith("/")) {

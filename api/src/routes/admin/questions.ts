@@ -12,6 +12,7 @@ import {
   updateQuestion,
   type QuestionInput,
 } from "../../db/questions";
+import { isSafeUrl } from "../../lib/sanitizeHtml";
 
 export const adminQuestions = new Hono<{
   Bindings: Env;
@@ -34,7 +35,13 @@ const questionSchema = z.object({
   alternatives: z.array(alternativeSchema).min(1).max(10),
   explanation: z.object({
     body: z.string().min(1),
-    videoUrl: z.string().url().nullish(),
+    // `.url()` sozinho aceita `javascript:`, `data:` e `vbscript:` (são URLs
+    // válidas para o parser); `isSafeUrl` restringe a http, https e mailto.
+    videoUrl: z
+      .string()
+      .url()
+      .refine(isSafeUrl, { message: "esquema de URL não permitido" })
+      .nullish(),
   }),
 });
 
