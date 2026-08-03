@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect, vi } from "vitest";
 import { getDb } from "../src/db/client";
-import { createTerm } from "../src/db/taxonomy";
+import { createTerm, softDeleteTerm } from "../src/db/taxonomy";
 import {
   createQuestion,
   updateQuestion,
@@ -219,6 +219,51 @@ describe("questions", () => {
     expect(await getQuestion(db(), id)).toBeNull();
     const { rows } = await listQuestions(db(), {});
     expect(rows.some((r) => r.id === id)).toBe(false);
+  });
+
+  // Apagar (soft) uma taxonomia em uso não pode tornar as questões que a
+  // referenciam permanentemente ineditáveis — só a FK que MUDA é revalidada.
+  it("PATCH mantendo um bancaId soft-deletado funciona (FK que não mudou)", async () => {
+    const input = await baseInput();
+    const res = await createQuestion(db(), input, null);
+    const id = (res as { id: string }).id;
+
+    expect(await softDeleteTerm(db(), input.bancaId)).toBe(true);
+
+    const upd = await updateQuestion(db(), id, {
+      ...input,
+      statement: "<p>Corrigido</p>",
+    });
+    expect(upd).toEqual({ ok: true });
+  });
+
+  it("PATCH trocando para um bancaId soft-deletado é recusado com invalid_banca", async () => {
+    const input = await baseInput();
+    const res = await createQuestion(db(), input, null);
+    const id = (res as { id: string }).id;
+
+    const outraBanca = await createTerm(db(), "banca", `Banca morta ${++seq}`);
+    expect(await softDeleteTerm(db(), outraBanca.id)).toBe(true);
+
+    const upd = await updateQuestion(db(), id, {
+      ...input,
+      bancaId: outraBanca.id,
+    });
+    expect(upd).toEqual({ error: "invalid_banca" });
+  });
+
+  it("PATCH trocando para termo de kind errado continua recusado", async () => {
+    const input = await baseInput();
+    const res = await createQuestion(db(), input, null);
+    const id = (res as { id: string }).id;
+
+    const cargo = await createTerm(db(), "cargo", `Cargo cruzado ${++seq}`);
+
+    const upd = await updateQuestion(db(), id, {
+      ...input,
+      bancaId: cargo.id,
+    });
+    expect(upd).toEqual({ error: "invalid_banca" });
   });
 
   it("filtra por status e por banca", async () => {

@@ -53,13 +53,8 @@ const alive = isNull(questions.deletedAt);
 
 type Failure = { error: string };
 
-/**
- * Valida o que o banco não consegue. Três famílias:
- * - contagem e unicidade da alternativa correta;
- * - `true_false` com exatamente duas;
- * - cada FK de taxonomia apontando para o `kind` certo (o preço da tabela única).
- */
-async function validate(db: Db, input: QuestionInput): Promise<string | null> {
+/** Contagem e unicidade da alternativa correta; `true_false` com exatamente duas. */
+function validateAlternatives(input: QuestionInput): string | null {
   if (input.type === "true_false") {
     if (input.alternatives.length !== 2) return "true_false_needs_two";
   } else if (input.alternatives.length < 2) {
@@ -69,7 +64,11 @@ async function validate(db: Db, input: QuestionInput): Promise<string | null> {
   if (input.alternatives.filter((a) => a.isCorrect).length !== 1) {
     return "exactly_one_correct";
   }
+  return null;
+}
 
+/** Cada FK de taxonomia apontando para o `kind` certo (o preço da tabela única). */
+async function validateTaxonomy(db: Db, input: QuestionInput): Promise<string | null> {
   if (!(await assertKind(db, input.subjectId, "subject"))) return "invalid_subject";
   if (!(await assertKind(db, input.bancaId, "banca"))) return "invalid_banca";
   // Checagem explícita de null/undefined, não truthiness: "" é um cargoId
@@ -82,6 +81,11 @@ async function validate(db: Db, input: QuestionInput): Promise<string | null> {
     return "invalid_level";
   }
   return null;
+}
+
+/** Valida o que o banco não consegue: alternativas e todas as FKs de taxonomia. */
+async function validate(db: Db, input: QuestionInput): Promise<string | null> {
+  return validateAlternatives(input) ?? (await validateTaxonomy(db, input));
 }
 
 /**
@@ -163,6 +167,16 @@ export async function createQuestion(
  * Edição é livre, publicada ou não, e o id nunca muda — é o que mantém as
  * attempts, comentários e anotações do sub-projeto 3 apontando para a mesma
  * questão depois de uma correção de gabarito.
+ *
+ * As FKs de taxonomia só são revalidadas contra `assertKind` quando mudam em
+ * relação à linha existente. Sem isso, apagar (soft) uma banca em uso trava
+ * para sempre a edição de toda questão que aponta para ela: `assertKind`
+ * filtra termos soft-deletados de propósito (para uma questão nova não poder
+ * escolher um termo morto), mas revalidar a FK que **não mudou** a cada PATCH
+ * aplica essa mesma regra a uma referência legada — que a spec (seção 1)
+ * exige continuar exibindo e editável. A FK que muda ainda passa por
+ * `assertKind` normalmente: não se pode apontar de novo para um termo morto
+ * ou de `kind` errado.
  */
 export async function updateQuestion(
   db: Db,
@@ -170,14 +184,43 @@ export async function updateQuestion(
   input: QuestionInput,
 ): Promise<{ ok: true } | Failure> {
   const existing = await db
-    .select({ id: questions.id })
+    .select({
+      subjectId: questions.subjectId,
+      bancaId: questions.bancaId,
+      cargoId: questions.cargoId,
+      levelId: questions.levelId,
+    })
     .from(questions)
     .where(and(eq(questions.id, id), alive))
     .get();
   if (!existing) return { error: "not_found" };
 
-  const problem = await validate(db, input);
-  if (problem) return { error: problem };
+  const altProblem = validateAlternatives(input);
+  if (altProblem) return { error: altProblem };
+
+  const newCargoId = input.cargoId ?? null;
+  const newLevelId = input.levelId ?? null;
+
+  if (input.subjectId !== existing.subjectId) {
+    if (!(await assertKind(db, input.subjectId, "subject"))) {
+      return { error: "invalid_subject" };
+    }
+  }
+  if (input.bancaId !== existing.bancaId) {
+    if (!(await assertKind(db, input.bancaId, "banca"))) {
+      return { error: "invalid_banca" };
+    }
+  }
+  if (newCargoId !== existing.cargoId) {
+    if (newCargoId != null && !(await assertKind(db, newCargoId, "cargo"))) {
+      return { error: "invalid_cargo" };
+    }
+  }
+  if (newLevelId !== existing.levelId) {
+    if (newLevelId != null && !(await assertKind(db, newLevelId, "level"))) {
+      return { error: "invalid_level" };
+    }
+  }
 
   await db
     .update(questions)
