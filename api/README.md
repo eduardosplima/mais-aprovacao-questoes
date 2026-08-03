@@ -40,10 +40,16 @@ TURNSTILE_SECRET_KEY=<secret key do Turnstile (par com a site key do frontend)>
 
 As demais variáveis, não-secretas, já vêm de `wrangler.jsonc` (bloco `vars`):
 `HOTMART_SUBSCRIPTION_UCODES`, `HOTMART_API_BASE_URL`, `HOTMART_TOKEN_URL`,
-`HOTMART_CHECKOUT_URL`, `APP_BASE_URL`, `EMAIL_FROM`, `ADMIN_EMAILS`. Ajuste os
+`HOTMART_CHECKOUT_URL`, `APP_BASE_URL`, `EMAIL_FROM`, `ADMIN_EMAILS`,
+`MEDIA_PUBLIC_BASE`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`. Ajuste os
 placeholders (`REPLACE_ME`) ali antes de rodar contra o sandbox. Em produção,
 os seis segredos vão via `wrangler secret put <NOME>`; as vars continuam em
 `wrangler.jsonc`.
+
+Das três últimas: `MEDIA_PUBLIC_BASE` é o hostname **sem cookies** que serve o
+bucket R2 (um SVG malicioso não pode executar com a sessão do admin);
+`ACCESS_TEAM_DOMAIN` e `ACCESS_AUD` são o domínio do time no Zero Trust e a tag
+`aud` da aplicação Access, usados para validar o JWT da borda.
 
 Opcional e só de desenvolvimento: `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula
 a verificação do Cloudflare Access em `/admin/*` (ver seção "Painel
@@ -116,6 +122,9 @@ explícitos revogam.
 
 - `DB` — D1 (`mais-aprovacao-db`), migrações em `migrations/`.
 - `EMAIL` — `send_email`, usado para o link mágico (primeiro acesso e recuperação).
+- `MEDIA` — R2, bucket das imagens de questão (`POST /admin/media`). A chave é
+  plana (`media/{uuid}.{ext}`): questão não sofre hard delete, então prefixo por
+  questão não serviria para apagar nada.
 - `triggers.crons` — `0 3 * * *`, dispara a reconciliação diária.
 
 ## Camada de dados (`src/db/`)

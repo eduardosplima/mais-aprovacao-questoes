@@ -346,6 +346,34 @@ describe("rotas de questões", () => {
     expect(res.status).toBe(200);
     expect(((await res.json()) as { total: number }).total).toBe(0);
   });
+
+  it.each([
+    ["corpo que não é JSON", "isso nao e json"],
+    ["JSON truncado", '{"type":"multiple_choice",'],
+    ["corpo vazio", ""],
+    ["JSON que não é objeto", "[]"],
+  ])("400 para %s no POST", async (_label, body) => {
+    const res = await app().request(
+      "/admin/questions",
+      { method: "POST", headers: { "content-type": "application/json" }, body },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 para corpo malformado no PATCH", async () => {
+    const id = await create();
+    const res = await app().request(
+      `/admin/questions/${id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "{{{",
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
 });
 
 // `limit`/`offset` vêm da querystring como string; valores negativos de

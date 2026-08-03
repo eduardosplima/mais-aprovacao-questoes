@@ -17,7 +17,10 @@ export type TermRow = typeof taxonomyTerms.$inferSelect;
 export function slugify(text: string): string {
   return text
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    // Faixa dos diacríticos combinantes que o NFD separou da letra base.
+    // Escrita escapada porque a forma literal são caracteres invisíveis, que
+    // ninguém consegue conferir numa revisão.
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")

@@ -165,4 +165,38 @@ describe("rotas de taxonomia", () => {
     );
     expect(recriado.status).toBe(201);
   });
+
+  it.each([
+    ["corpo que não é JSON", "isso nao e json"],
+    ["JSON truncado", '{"kind":"banca","name":'],
+    ["corpo vazio", ""],
+    ["JSON que não é objeto", '"texto"'],
+  ])("400 para %s no POST", async (_label, body) => {
+    const res = await app().request(
+      "/admin/taxonomy",
+      { method: "POST", headers: { "content-type": "application/json" }, body },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 para corpo malformado no PATCH", async () => {
+    const created = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "subject", name: "Malformado" }),
+      env,
+    );
+    const { term } = (await created.json()) as { term: { id: string } };
+
+    const res = await app().request(
+      `/admin/taxonomy/${term.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "{{{",
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
 });
