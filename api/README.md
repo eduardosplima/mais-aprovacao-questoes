@@ -83,17 +83,37 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | GET | `/auth/me` | Protegido. Retorna `{ id, email, name, role, tier }` |
 | POST | `/auth/logout` | Limpa o cookie de sessão |
 | POST | `/webhooks/hotmart` | Recebe eventos de compra/cancelamento da Hotmart (autenticado pelo header `x-hotmart-hottok`) |
-| GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia (`subject`, `banca`, `cargo`, `level`) |
-| POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 se já existir ativo |
-| PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia recalculando o slug. 409 se colidir com outro termo ativo do mesmo kind |
+| GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia. `kind` é obrigatório (`subject`, `banca`, `cargo`, `level`); ausente ou desconhecido → 400 `invalid_kind` |
+| POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 `duplicate` se já existir ativo no mesmo kind |
+| PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia recalculando o slug. 409 `duplicate` se colidir com outro termo ativo do mesmo kind |
 | DELETE | `/admin/taxonomy/:id` | Soft delete |
-| GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `year`, `status`…). Filtro inválido → 400 com o código do campo; `limit`/`offset` inválidos caem no default |
+| GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `cargoId`, `levelId`, `year`, `status`). Valor vazio (ou só espaço) em qualquer filtro é tratado como ausente. Só `status` e `year` são validados — não vazio e inválido → 400 `invalid_status`/`invalid_year`; os ids de taxonomia passam crus, e um id inexistente devolve lista vazia, não 400. `limit`/`offset` inválidos caem no default |
 | POST | `/admin/questions` | Cria a questão inteira; `status` opcional (`draft` por default) publica no mesmo envio. 422 com código quando viola invariante |
 | GET | `/admin/questions/:id` | Questão com alternativas e gabarito |
 | PATCH | `/admin/questions/:id` | Edita — publicada ou não, o id nunca muda |
 | POST | `/admin/questions/:id/publish` · `/unpublish` | Alterna o `status` |
 | DELETE | `/admin/questions/:id` | Soft delete |
 | POST | `/admin/media` | `multipart/form-data` com `file` → `{ url }` no R2 |
+
+### Códigos de erro
+
+| Código | Status | Quando |
+|---|---|---|
+| `invalid_request` | 400 | Corpo da requisição malformado ou fora do schema Zod |
+| `invalid_kind` | 400 | `kind` de taxonomia ausente ou desconhecido (query) |
+| `invalid_status` | 400 | `status` de filtro não vazio e diferente de `draft`/`published` (query) |
+| `invalid_year` | 400 | `year` de filtro não vazio e fora de `[1900, 2200]`, ou não numérico (query) |
+| `duplicate` | 409 | Nome de taxonomia já ativo no mesmo `kind` (criação ou rename) |
+| `not_found` | 404 | Id inexistente (questão ou termo de taxonomia) |
+| `exactly_one_correct` | 422 | Questão sem exatamente uma alternativa marcada correta |
+| `true_false_needs_two` | 422 | Questão `true_false` sem exatamente duas alternativas |
+| `needs_two_alternatives` | 422 | Questão `multiple_choice` com menos de duas alternativas |
+| `invalid_subject` / `invalid_banca` / `invalid_cargo` / `invalid_level` | 422 | FK de taxonomia inexistente, soft-deletada ou de `kind` errado |
+
+Parâmetro de query inválido tem um código por campo (`invalid_kind`,
+`invalid_status`, `invalid_year`); corpo de requisição inválido sempre cai no
+único `invalid_request` — a distinção deixa o tratamento de erro de
+formulário do painel resolvido de um jeito só.
 
 Sessão: JWT (HS256) em cookie `HttpOnly; Secure; SameSite=Lax; Path=/`. A
 identidade vai no `sub`; `role`/`tier` são relidos do D1 a cada request —
