@@ -15,7 +15,12 @@ export function isUniqueViolation(err: unknown): boolean {
   const seen = new Set<unknown>();
   for (let e: unknown = err; e instanceof Error && !seen.has(e); e = e.cause) {
     seen.add(e);
-    if (e.message.includes("UNIQUE constraint failed")) return true;
+    // O frame de topo do Drizzle ecoa os params da query, e `name` vem do
+    // usuário: sem cortar a seção de params, um termo chamado literalmente
+    // "UNIQUE constraint failed" faria qualquer falha de infra casar aqui e
+    // virar 409 em vez do 500 que de fato é.
+    const semParams = e.message.split("\nparams:")[0];
+    if (semParams.includes("UNIQUE constraint failed")) return true;
   }
   return false;
 }

@@ -19,7 +19,16 @@ describe("isUniqueViolation", () => {
     expect(isUniqueViolation(drizzleWrapped())).toBe(true);
   });
 
-  it("reconhece quando a constraint está no erro de topo", () => {
+  it("não casa com constraint vinda dos params ecoados", () => {
+    const err = new Error(
+      'Failed query: insert into "taxonomy_terms" ("id", "kind", "name") values (?, ?, ?)\n' +
+        "params: abc,banca,UNIQUE constraint failed,x",
+    );
+    err.cause = new Error("D1_ERROR: Network connection lost");
+    expect(isUniqueViolation(err)).toBe(false);
+  });
+
+  it("ainda reconhece a constraint num erro não embrulhado, sem params", () => {
     expect(
       isUniqueViolation(new Error("UNIQUE constraint failed: taxonomy_terms.slug")),
     ).toBe(true);
