@@ -33,13 +33,9 @@ adminTaxonomy.post("/", async (c) => {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
 
-  try {
-    const term = await createTerm(getDb(c.env), parsed.data.kind, parsed.data.name);
-    return c.json({ term }, 201);
-  } catch {
-    // Violação do índice parcial: já existe um termo ativo com este kind+slug.
-    return c.json({ error: "duplicate" }, 409);
-  }
+  const result = await createTerm(getDb(c.env), parsed.data.kind, parsed.data.name);
+  if ("error" in result) return c.json(result, 409);
+  return c.json({ term: result }, 201);
 });
 
 const renameSchema = z.object({ name: nameSchema });
@@ -49,9 +45,10 @@ adminTaxonomy.patch("/:id", async (c) => {
   const parsed = renameSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
 
-  const term = await renameTerm(getDb(c.env), c.req.param("id"), parsed.data.name);
-  if (!term) return c.json({ error: "not_found" }, 404);
-  return c.json({ term });
+  const result = await renameTerm(getDb(c.env), c.req.param("id"), parsed.data.name);
+  if (result === null) return c.json({ error: "not_found" }, 404);
+  if ("error" in result) return c.json(result, 409);
+  return c.json({ term: result });
 });
 
 adminTaxonomy.delete("/:id", async (c) => {

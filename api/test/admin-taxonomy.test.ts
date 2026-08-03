@@ -117,4 +117,86 @@ describe("rotas de taxonomia", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  it("409 ao renomear para o nome de outro termo ativo", async () => {
+    await app().request("/admin/taxonomy", json({ kind: "level", name: "Fundamental" }), env);
+    const created = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "level", name: "Medio" }),
+      env,
+    );
+    const { term } = (await created.json()) as { term: { id: string } };
+
+    const res = await app().request(
+      `/admin/taxonomy/${term.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Fundamental" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()) as { error: string }).toEqual({ error: "duplicate" });
+  });
+
+  it("renomear atualiza o slug e libera o nome antigo", async () => {
+    const created = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "banca", name: "Instituto AOCP" }),
+      env,
+    );
+    const { term } = (await created.json()) as { term: { id: string } };
+
+    await app().request(
+      `/admin/taxonomy/${term.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "AOCP" }),
+      },
+      env,
+    );
+
+    const recriado = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "banca", name: "Instituto AOCP" }),
+      env,
+    );
+    expect(recriado.status).toBe(201);
+  });
+
+  it.each([
+    ["corpo que não é JSON", "isso nao e json"],
+    ["JSON truncado", '{"kind":"banca","name":'],
+    ["corpo vazio", ""],
+    ["JSON que não é objeto", '"texto"'],
+  ])("400 para %s no POST", async (_label, body) => {
+    const res = await app().request(
+      "/admin/taxonomy",
+      { method: "POST", headers: { "content-type": "application/json" }, body },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 para corpo malformado no PATCH", async () => {
+    const created = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "subject", name: "Malformado" }),
+      env,
+    );
+    const { term } = (await created.json()) as { term: { id: string } };
+
+    const res = await app().request(
+      `/admin/taxonomy/${term.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "{{{",
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
 });

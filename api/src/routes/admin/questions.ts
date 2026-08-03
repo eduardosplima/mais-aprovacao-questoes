@@ -11,18 +11,46 @@ import {
   softDeleteQuestion,
   updateQuestion,
   type QuestionInput,
+  type QuestionStatus,
 } from "../../db/questions";
-import { isSafeUrl } from "../../lib/sanitizeHtml";
 
 export const adminQuestions = new Hono<{
   Bindings: Env;
   Variables: { entitlement: Entitlement };
 }>();
 
+/**
+ * Um link de vídeo é http ou https e nada mais.
+ *
+ * Não reusa `isSafeUrl`: aquela função existe para `href` de conteúdo, onde
+ * `mailto:` e caminho relativo são legítimos — num campo de vídeo não são.
+ *
+ * Cloudflare Stream (spec técnica §7.2) é o que o campo significa, não o que
+ * ele verifica: a allowlist de hostname precisaria do código da conta
+ * (`customer-<código>.cloudflarestream.com`), e o Stream ainda não foi
+ * provisionado. Quando for, aperta-se aqui.
+ */
+function isHttpUrl(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    // Não é URL absoluta — caminho relativo, âncora, texto solto.
+    return false;
+  }
+  return parsed.protocol === "http:" || parsed.protocol === "https:";
+}
+
 const alternativeSchema = z.object({
   body: z.string().min(1),
   isCorrect: z.boolean(),
 });
+
+// Intervalo de ano aceito, compartilhado entre a validação de escrita
+// (schema Zod) e o filtro de listagem — duas checagens diferentes, um só
+// intervalo, para uma não poder divergir da outra ao ser ajustado.
+const MIN_YEAR = 1900;
+const MAX_YEAR = 2200;
 
 const questionSchema = z.object({
   type: z.enum(["multiple_choice", "true_false"]),
@@ -31,18 +59,28 @@ const questionSchema = z.object({
   bancaId: z.string().min(1),
   cargoId: z.string().nullish(),
   levelId: z.string().nullish(),
-  year: z.number().int().min(1900).max(2200).nullish(),
+  year: z.number().int().min(MIN_YEAR).max(MAX_YEAR).nullish(),
   alternatives: z.array(alternativeSchema).min(1).max(10),
   explanation: z.object({
     body: z.string().min(1),
-    // `.url()` sozinho aceita `javascript:`, `data:` e `vbscript:` (são URLs
-    // válidas para o parser); `isSafeUrl` restringe a http, https e mailto.
     videoUrl: z
       .string()
-      .url()
-      .refine(isSafeUrl, { message: "esquema de URL não permitido" })
+      .refine(isHttpUrl, { message: "videoUrl precisa ser http ou https" })
       .nullish(),
   }),
+});
+
+/**
+ * Só na criação. "Salvar rascunho" e "Publicar" são a mesma chamada — é o
+ * "cadastro em um step" da spec §2.
+ *
+ * Deliberadamente um schema separado, não um campo em `questionSchema`: as duas
+ * rotas compartilham aquele objeto, e um `status` com default nele faria todo
+ * PATCH carregar `status: "draft"` e despublicar em silêncio a questão que
+ * alguém só quis corrigir. O PATCH fica com o schema base, que não tem o campo.
+ */
+const createSchema = questionSchema.extend({
+  status: z.enum(["draft", "published"]).default("draft"),
 });
 
 /**
@@ -84,16 +122,54 @@ function parseOffset(raw: string | undefined): number {
   return parseInRange(raw, 0, MAX_OFFSET, 0);
 }
 
+// Valor vazio (ou só espaço) de filtro é "sem filtro", em todo campo — é o
+// que um <select><option value=""> manda quando o operador limpa o filtro.
+// Sem essa normalização, um filtro limpo do jeito que o painel manda seria
+// indistinguível de um filtro malformado.
+function emptyToUndefined(raw: string | undefined): string | undefined {
+  return raw === undefined || raw.trim() === "" ? undefined : raw;
+}
+
+// Filtro inválido (não vazio, mas errado) responde 400; paginação inválida
+// cai no default. O critério não é "validado ou não", é se descartar em
+// silêncio muda o que o operador acredita estar vendo: um filtro descartado
+// faz a tela mostrar o acervo inteiro dizendo que filtrou, um `limit`
+// clampado não mente sobre o conteúdo.
+//
+// Os ids de taxonomia ficam de fora dos dois lados: são opacos, e um id
+// inexistente já devolve lista vazia — a resposta honesta tanto para
+// "malformado" quanto para "não existe".
 adminQuestions.get("/", async (c) => {
   const q = c.req.query();
-  const year = q.year ? Number(q.year) : undefined;
+
+  const statusRaw = emptyToUndefined(q.status);
+  let status: QuestionStatus | undefined;
+  if (statusRaw !== undefined) {
+    if (statusRaw !== "draft" && statusRaw !== "published") {
+      return c.json({ error: "invalid_status" }, 400);
+    }
+    status = statusRaw;
+  }
+
+  const yearRaw = emptyToUndefined(q.year);
+  let year: number | undefined;
+  if (yearRaw !== undefined) {
+    // Mesmo teste de pertencimento a intervalo que `parseInRange` usa, com os
+    // limites do schema de escrita.
+    const n = Number(yearRaw);
+    if (!Number.isInteger(n) || n < MIN_YEAR || n > MAX_YEAR) {
+      return c.json({ error: "invalid_year" }, 400);
+    }
+    year = n;
+  }
+
   const result = await listQuestions(getDb(c.env), {
-    subjectId: q.subjectId,
-    bancaId: q.bancaId,
-    cargoId: q.cargoId,
-    levelId: q.levelId,
-    year: Number.isFinite(year) ? year : undefined,
-    status: q.status === "published" || q.status === "draft" ? q.status : undefined,
+    subjectId: emptyToUndefined(q.subjectId),
+    bancaId: emptyToUndefined(q.bancaId),
+    cargoId: emptyToUndefined(q.cargoId),
+    levelId: emptyToUndefined(q.levelId),
+    year,
+    status,
     limit: parseLimit(q.limit),
     offset: parseOffset(q.offset),
   });
@@ -102,13 +178,14 @@ adminQuestions.get("/", async (c) => {
 
 adminQuestions.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
-  const parsed = questionSchema.safeParse(body);
+  const parsed = createSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
 
   const res = await createQuestion(
     getDb(c.env),
     parsed.data as QuestionInput,
     c.get("entitlement")?.userId ?? null,
+    parsed.data.status,
   );
   if ("error" in res) return c.json({ error: res.error }, statusFor(res.error));
   return c.json({ id: res.id }, 201);

@@ -4,11 +4,21 @@ import { Hono } from "hono";
 import type { Env } from "../src/config/env";
 import type { Entitlement } from "../src/db/users";
 import { getDb } from "../src/db/client";
-import { createTerm } from "../src/db/taxonomy";
+import { createTerm as createTermRaw } from "../src/db/taxonomy";
 import { upsertUserFromPurchase } from "../src/db/users";
 import { adminQuestions } from "../src/routes/admin/questions";
 
 type App = { Bindings: Env; Variables: { entitlement: Entitlement } };
+
+// Fixture: os nomes usados neste arquivo são únicos por chamada, então nunca
+// colidem de verdade — `createTerm` devolvendo `Failure` numa duplicata é
+// comportamento de outro módulo (testado em taxonomy.test.ts), não algo que
+// os testes de rota de questão precisem lidar por linha.
+async function createTerm(...args: Parameters<typeof createTermRaw>) {
+  const row = await createTermRaw(...args);
+  if ("error" in row) throw new Error(`termo duplicado inesperado no fixture: ${args[2]}`);
+  return row;
+}
 
 // `created_by` referencia users.id (Task 1), então o entitlement injetado
 // precisa apontar para um usuário real — um id inventado quebra a FK.
@@ -194,30 +204,216 @@ describe("rotas de questões", () => {
   });
 
   // `videoUrl` é gravado cru em writeChildren, sem sanitização de HTML — a
-  // única barreira contra esquema perigoso é a validação de schema aqui.
-  it.each(["javascript:alert(document.cookie)", "data:text/html,x", "vbscript:msgbox(1)"])(
-    "recusa videoUrl com esquema inseguro (%s)",
-    async (videoUrl) => {
-      const res = await app().request(
-        "/admin/questions",
-        post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
-        env,
-      );
-      expect(res.status).toBe(400);
-    },
-  );
+  // única barreira é a validação de schema aqui. `mailto:` não era brecha de
+  // segurança, e sim de significado: um campo de vídeo aceitando endereço de
+  // email, herdado de `isSafeUrl`, que existe para `href` de conteúdo.
+  it.each([
+    "javascript:alert(document.cookie)",
+    "data:text/html,x",
+    "vbscript:msgbox(1)",
+    "mailto:a@test.com",
+    "/videos/aula.mp4",
+    "#ancora",
+  ])("recusa videoUrl que não seja http/https (%s)", async (videoUrl) => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
 
-  it.each(["https://youtu.be/x", "mailto:a@test.com"])(
-    "aceita videoUrl com esquema seguro (%s)",
-    async (videoUrl) => {
+  it.each([
+    "https://youtu.be/x",
+    "https://customer-abc123.cloudflarestream.com/deadbeef/watch",
+    "http://localhost:8787/video",
+  ])("aceita videoUrl http/https (%s)", async (videoUrl) => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
+      env,
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it("POST com status=published já cria publicada, num round-trip só", async () => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ status: "published" })),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+
+    const get = await app().request(`/admin/questions/${id}`, {}, env);
+    const body = (await get.json()) as { question: { status: string } };
+    expect(body.question.status).toBe("published");
+  });
+
+  it("POST sem status continua criando rascunho", async () => {
+    const id = await create();
+    const res = await app().request(`/admin/questions/${id}`, {}, env);
+    const body = (await res.json()) as { question: { status: string } };
+    expect(body.question.status).toBe("draft");
+  });
+
+  it("400 para status desconhecido no POST", async () => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ status: "publicado" })),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  // A armadilha que motivou schemas separados: PATCH e POST compartilhavam o
+  // mesmo objeto Zod, e um `status` com default nele faria toda edição gravar
+  // "draft" — despublicando em silêncio a questão que alguém só quis corrigir.
+  it("status no corpo do PATCH é ignorado e não despublica a questão", async () => {
+    const id = await create();
+    await app().request(`/admin/questions/${id}/publish`, { method: "POST" }, env);
+
+    const res = await app().request(
+      `/admin/questions/${id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(await payload({ status: "draft" })),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+
+    const get = await app().request(`/admin/questions/${id}`, {}, env);
+    const body = (await get.json()) as { question: { status: string } };
+    expect(body.question.status).toBe("published");
+  });
+
+  // Filtro descartado em silêncio faz a tela mostrar o acervo inteiro — com
+  // rascunhos — dizendo que está filtrada. Por isso 400 e não default.
+  it("400 com o código do campo para status de filtro desconhecido", async () => {
+    const res = await app().request("/admin/questions?status=publicado", {}, env);
+    expect(res.status).toBe(400);
+    expect((await res.json()) as { error: string }).toEqual({
+      error: "invalid_status",
+    });
+  });
+
+  it("400 com o código do campo para year não numérico", async () => {
+    const res = await app().request("/admin/questions?year=ontem", {}, env);
+    expect(res.status).toBe(400);
+    expect((await res.json()) as { error: string }).toEqual({
+      error: "invalid_year",
+    });
+  });
+
+  it("400 para year fora do intervalo aceito", async () => {
+    const res = await app().request("/admin/questions?year=1500", {}, env);
+    expect(res.status).toBe(400);
+  });
+
+  it("filtro válido de year continua filtrando", async () => {
+    const body = await payload();
+    await app().request("/admin/questions", post(body), env);
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${body.subjectId}&year=2024`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { total: number }).total).toBe(1);
+  });
+
+  // Id opaco de filtro passa cru: "malformado" e "não existe" são
+  // indistinguíveis, e lista vazia é a resposta honesta para os dois.
+  it("subjectId inexistente devolve lista vazia, não 400", async () => {
+    const res = await app().request("/admin/questions?subjectId=nao-existe", {}, env);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { total: number }).total).toBe(0);
+  });
+
+  // Ruling: valor vazio de filtro é "sem filtro" em todo campo, não um valor
+  // a ser validado — é o que o <select><option value=""> do painel manda
+  // quando o operador limpa o filtro.
+  describe("valor vazio de filtro é tratado como ausente", () => {
+    it("status= vazio não filtra (traz rascunho e publicada)", async () => {
+      const draftId = await create();
+      const publishedId = await create();
+      await app().request(`/admin/questions/${publishedId}/publish`, { method: "POST" }, env);
+
+      const res = await app().request("/admin/questions?status=", {}, env);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { rows: { id: string }[] };
+      const ids = body.rows.map((r) => r.id);
+      expect(ids).toContain(draftId);
+      expect(ids).toContain(publishedId);
+    });
+
+    it("year= vazio não filtra por ano", async () => {
+      const base = await payload({ year: 2020 });
+      await app().request("/admin/questions", post(base), env);
+      await app().request("/admin/questions", post({ ...base, year: 1999 }), env);
+
       const res = await app().request(
-        "/admin/questions",
-        post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
+        `/admin/questions?subjectId=${base.subjectId}&year=`,
+        {},
         env,
       );
-      expect(res.status).toBe(201);
-    },
-  );
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { total: number }).total).toBe(2);
+    });
+
+    it("year=%20 (só espaço) não filtra por ano", async () => {
+      const base = await payload({ year: 2020 });
+      await app().request("/admin/questions", post(base), env);
+      await app().request("/admin/questions", post({ ...base, year: 1999 }), env);
+
+      const res = await app().request(
+        `/admin/questions?subjectId=${base.subjectId}&year=%20`,
+        {},
+        env,
+      );
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { total: number }).total).toBe(2);
+    });
+
+    it("subjectId= vazio não filtra por assunto", async () => {
+      const id = await create();
+      const res = await app().request("/admin/questions?subjectId=", {}, env);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { rows: { id: string }[] };
+      expect(body.rows.some((r) => r.id === id)).toBe(true);
+    });
+  });
+
+  it.each([
+    ["corpo que não é JSON", "isso nao e json"],
+    ["JSON truncado", '{"type":"multiple_choice",'],
+    ["corpo vazio", ""],
+    ["JSON que não é objeto", "[]"],
+  ])("400 para %s no POST", async (_label, body) => {
+    const res = await app().request(
+      "/admin/questions",
+      { method: "POST", headers: { "content-type": "application/json" }, body },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 para corpo malformado no PATCH", async () => {
+    const id = await create();
+    const res = await app().request(
+      `/admin/questions/${id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "{{{",
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
 });
 
 // `limit`/`offset` vêm da querystring como string; valores negativos de
@@ -288,6 +484,9 @@ describe("parsing de limit e offset em GET /admin/questions", () => {
     expect(body.rows.some((r) => r.id === id)).toBe(true);
   });
 
+  // A outra metade da convenção: paginação inválida NÃO vira 400. Clampar o
+  // limit não mente sobre o conteúdo, então segue caindo no default.
+  //
   // Acima do teto de 200, o valor não é clampado: cai no default de 50, o
   // mesmo destino de qualquer outro limit fora de [1, 200].
   it(

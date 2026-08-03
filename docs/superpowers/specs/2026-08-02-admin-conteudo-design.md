@@ -532,23 +532,99 @@ dados e o `HOTMART_TOKEN_URL` seguem **não confirmados**.
 ## 7. Débito técnico conhecido (API)
 
 Levantado durante a implementação e a revisão final da branch `feat/admin-api`.
-Nada aqui bloqueou o merge; a lista existe para que o plano do painel decida o
-que encarar. Ordenado por quanto incomoda.
+Nada aqui bloqueou o merge. A lista original era ordenada por quanto incomodava;
+foi triada em 2026-08-03, e o que segue são as decisões, não os sintomas.
 
-| Item | Onde | Por quê ficou |
+### 7.1 Bloco de limpeza — antes do painel
+
+Cinco commits, todos em `api/`. **Concluído na branch `chore/api-limpeza-debito`.**
+Os dois primeiros itens da tabela não eram opcionais: o painel é construído
+contra a forma do `POST` e contra a convenção de query param.
+
+| Mudança | Onde | Verificação |
 |---|---|---|
-| `catch` genérico traduz **qualquer** exceção em 409 | `routes/admin/taxonomy.ts` | Uma indisponibilidade do D1 faz o painel dizer "esse nome já existe", escondendo incidente de infra atrás de mensagem de validação. Fix: inspecionar `SQLITE_CONSTRAINT` e re-lançar o resto |
-| `videoUrl` aceita caminho relativo e `mailto:` | `routes/admin/questions.ts` | Reuso de `isSafeUrl`, que foi escrita para `href` de conteúdo. Esquemas perigosos são recusados; o frouxo é semântico, não de segurança |
-| Sem teste de corpo JSON malformado | rotas de taxonomia **e** de questões | As duas usam `c.req.json().catch(() => null)`. Verificado manualmente que respondem 400; falta a regressão |
-| `PATCH /admin/taxonomy/:id` permite dois termos ativos com o mesmo nome | `db/taxonomy.ts` | O UNIQUE é sobre `slug`, e renomear não toca o slug (decisão correta). Efeito: o dropdown pode mostrar dois nomes iguais |
-| Camada 1 não exige o claim `email` | `middleware/access.ts` | Um *service token* do Access satisfaz a borda sem MFA humano. A camada 2 continua exigindo sessão + `role=admin`, então não é bypass — é defesa em profundidade degradada. Relevante quando o e2e criar um service token |
-| `limit` fora do teto cai no default, não clampa | `routes/admin/questions.ts` | Coerente com todo o resto (`0`, `abc`, `1.5`, offset gigante caem no default). Trocar só o teto superior quebraria a regra única |
-| Query param inválido: 400 na taxonomia, ignorado silenciosamente nas questões | os dois módulos de rota | Implementadores diferentes, nada no plano fixando a convenção |
-| `POST /admin/questions` não aceita `status` | `routes/admin/questions.ts` | Publicar exige dois round-trips. A spec §2 fala em "cadastro em um step" |
-| FKs de `questions` → `taxonomy_terms` sem `onDelete` | `db/schema.ts` | `NO ACTION` é fail-safe e o hard delete de termo não existe no código. Intencional; falta o comentário declarando isso |
-| `slugify` usa caracteres combinantes crus no regex | `db/taxonomy.ts` | Funciona e tem teste, mas é invisível na revisão. `/[\u0300-\u036f]/g` é equivalente e legível |
-| README não lista as vars e o binding novos | `api/README.md` | Faltam `MEDIA_PUBLIC_BASE`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD` e o binding `MEDIA` |
+| `POST /admin/questions` aceita `status`. `createSchema = questionSchema.extend({ status })`, opcional com default `draft`, **usado só no POST** | `routes/admin/questions.ts` | POST com `published` cria publicada; POST sem `status` cria rascunho; `status` no corpo do PATCH não altera nada |
+| Convenção de query param: **filtro** inválido responde 400 com o código do campo; **paginação** inválida cai no default | os dois módulos de rota | `status=publicado` → 400; `limit=999` → 200 com 50 |
+| Helper que separa violação de UNIQUE de exceção genérica — `POST` e `PATCH` de taxonomia traduzem para 409, o resto re-lança. `renameTerm` passa a recalcular o slug | `routes/admin/taxonomy.ts`, `db/taxonomy.ts` | rename para nome existente → 409; exceção não-constraint **não** vira 409; renomear e recadastrar o nome antigo funciona |
+| `videoUrl` com `refine` próprio, aceitando só `http` e `https` | `routes/admin/questions.ts` | `mailto:` → 400; `javascript:` → 400; https válido passa |
+| Higiene: teste de corpo JSON malformado nos dois módulos; comentário declarando o `NO ACTION` das FKs de taxonomia; `/[\u0300-\u036f]/g` no `slugify`; README com `MEDIA_PUBLIC_BASE`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD` e o binding `MEDIA` | `routes/*`, `db/schema.ts`, `db/taxonomy.ts`, `api/README.md` | `npm test` verde |
 
+**Por que o rename recalcula o slug.** A leitura óbvia do problema — dois termos
+ativos com o mesmo nome — pedia congelar o slug e checar o nome no rename. Isso
+criaria uma segunda regra de unicidade em código de aplicação, ao lado da que o
+índice parcial já impõe, e as duas divergiriam: renomear "Cespe" para "Fundação
+Carlos Chagas" deixa o slug em `cespe`, e o nome antigo fica reservado para
+sempre por uma linha que não o usa mais.
+
+A busca por quem lê `slug` no repositório devolveu dois lugares: o `slugify` da
+criação e a coluna do índice. **Nenhuma FK aponta para ele** — as questões
+referenciam `id` —, e nenhuma rota o recebe como filtro. O comentário que dizia
+"ele é a identidade estável do termo" e o teste chamado "renomeia sem mudar o
+slug já referenciado" afirmavam uma identidade sem consumidor; os dois saem
+junto com a mudança. Recalculando, o índice que já existe impõe a unicidade no
+rename exatamente como impõe na criação — mesma regra, um lugar só, nenhum
+código de validação novo.
+
+O custo aceito: se o sub-projeto 4 puser o slug numa URL pública
+(`/questoes/banca/cespe`), renomear quebra o link. Isso vale para qualquer
+desenho em que o slug segue o nome, e nada hoje aponta para lá.
+
+**O critério que decidiu a convenção de query param.** Não é "validado ou não",
+é **se descartar em silêncio muda o que o operador acredita estar vendo**. Um
+filtro descartado muda: quem digita `status=publicado` — typo plausível, é a
+palavra em português — recebe o acervo inteiro, rascunhos incluídos, com a tela
+dizendo que está filtrada. Um `limit` que cai no default não muda: mostrar 50 em
+vez de 999 não mente sobre o conteúdo. Fora de escopo nos dois casos: nome de
+param desconhecido (`?statuss=draft`), que nenhuma das duas regras alcança.
+
+**A armadilha do `status` no POST.** Hoje as duas rotas compartilham o mesmo
+`questionSchema`. Adicionar `status` com default nele faria o PATCH carregar
+`status: "draft"` em toda edição — inerte hoje, porque `updateQuestion` ignora o
+campo, mas a um refactor de distância de despublicar em silêncio toda questão
+salva. Por isso o schema de criação é separado, e o PATCH fica com o base, que
+estruturalmente não consegue carregar status. `/publish` e `/unpublish`
+continuam: a tela de lista precisa publicar sem abrir o editor. Segue custando
+dois round-trips "editar e despublicar numa tacada" — operação rara, ao
+contrário de "cadastrar e publicar", que é o caminho normal do editor e o que a
+§2 chama de cadastro em um step.
+
+**Correção da entrada original sobre `videoUrl`.** A lista dizia que o campo
+aceitava caminho relativo e `mailto:`. Só o segundo é verdade: o
+`z.string().url()` roda antes do `isSafeUrl` e já barra caminho relativo e
+âncora. O frouxo é um campo chamado "vídeo" que aceita um endereço de email —
+herança de `isSafeUrl` ter sido escrita para `href` de conteúdo, onde `mailto:`
+faz sentido.
+
+Cloudflare Stream (`especificacao-tecnica.md` §7.2) segue sendo o que o campo
+**significa**, não o que ele **verifica**. Apertar para uma allowlist de hostname
+exigiria o código da conta (`customer-<código>.cloudflarestream.com`), e o Stream
+ainda não está provisionado — a spec técnica o lista como opcional e com custo à
+parte. Quando entrar, apertar é trocar o `refine`.
+
+### 7.2 Adiado com gatilho declarado
+
+**Camada 1 não exige o claim `email`** (`middleware/access.ts`). Um *service
+token* do Access satisfaz a borda sem MFA humano. A camada 2 continua exigindo
+sessão + `role=admin`, então não é bypass — é defesa em profundidade degradada.
+
+Gatilho: o e2e precisar de um service token. Como a §5 prevê o e2e rodando
+contra o bypass de desenvolvimento, o gatilho pode nunca disparar — e nesse caso
+o item morre em vez de ser feito.
+
+### 7.3 Descartado
+
+**`limit` fora do teto cai no default, não clampa.** A decisão da §7.1 sobre
+query param reforça em vez de contradizer: paginação ficou explicitamente do
+lado do default, agora por um critério declarado. Não é dívida, é a regra.
+
+### 7.4 O que a triagem revelou
+
+A pergunta que a abriu era quais itens precisariam de definição de negócio.
+**Nenhum dos onze precisou.** O `videoUrl` parecia precisar — "o que esse campo
+significa?" —, mas a `especificacao-tecnica.md` já respondia, e o que faltava era
+decidir não codificar a resposta ainda. Os dois termos com o mesmo nome pareciam
+problema de operação e viraram consequência de um invariante que o banco já
+impunha, aplicado num caminho a menos.
 ---
 
 ## 8. Riscos

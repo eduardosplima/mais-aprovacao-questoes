@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect, vi } from "vitest";
 import { getDb } from "../src/db/client";
-import { createTerm, softDeleteTerm } from "../src/db/taxonomy";
+import { createTerm as createTermRaw, softDeleteTerm } from "../src/db/taxonomy";
 import {
   createQuestion,
   updateQuestion,
@@ -14,6 +14,15 @@ import {
 
 const db = () => getDb(env);
 let seq = 0;
+
+// Fixture: os nomes usados neste arquivo são únicos por chamada (via `seq`),
+// então nunca colidem de verdade — `createTerm` devolvendo `Failure` numa
+// duplicata é comportamento de outro módulo (testado em taxonomy.test.ts).
+async function createTerm(...args: Parameters<typeof createTermRaw>) {
+  const row = await createTermRaw(...args);
+  if ("error" in row) throw new Error(`termo duplicado inesperado no fixture: ${args[2]}`);
+  return row;
+}
 
 async function baseInput(
   over: Partial<QuestionInput> = {},

@@ -51,7 +51,7 @@ export interface QuestionListRow {
 /** Único ponto onde o filtro de soft delete é escrito para questões. */
 const alive = isNull(questions.deletedAt);
 
-type Failure = { error: string };
+export type Failure = { error: string };
 
 /** Contagem e unicidade da alternativa correta; `true_false` com exatamente duas. */
 function validateAlternatives(input: QuestionInput): string | null {
@@ -135,6 +135,7 @@ export async function createQuestion(
   db: Db,
   input: QuestionInput,
   createdBy: string | null,
+  status: QuestionStatus = "draft",
 ): Promise<{ id: string } | Failure> {
   const problem = await validate(db, input);
   if (problem) return { error: problem };
@@ -152,7 +153,7 @@ export async function createQuestion(
       cargoId: input.cargoId ?? null,
       levelId: input.levelId ?? null,
       year: input.year ?? null,
-      status: "draft",
+      status,
       createdBy,
       createdAt: now,
       updatedAt: now,

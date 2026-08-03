@@ -106,6 +106,14 @@ export const questions = sqliteTable(
     type: text("type").notNull(),
     /** HTML já sanitizado por lib/sanitizeHtml. Nunca gravar HTML cru. */
     statement: text("statement").notNull(),
+    /**
+     * Sem `onDelete` de propósito: `NO ACTION` é o padrão do SQLite e é o
+     * fail-safe certo aqui. Termo de taxonomia nunca sofre hard delete — o
+     * módulo só faz soft delete (`db/taxonomy.ts`) —, então a ação nunca
+     * dispara. Se um DELETE cru aparecer um dia, `NO ACTION` recusa apagar um
+     * termo em uso, em vez de levar as questões junto (CASCADE) ou deixar a
+     * questão sem assunto (SET NULL).
+     */
     subjectId: text("subject_id")
       .notNull()
       .references(() => taxonomyTerms.id),

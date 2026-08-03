@@ -40,10 +40,16 @@ TURNSTILE_SECRET_KEY=<secret key do Turnstile (par com a site key do frontend)>
 
 As demais variáveis, não-secretas, já vêm de `wrangler.jsonc` (bloco `vars`):
 `HOTMART_SUBSCRIPTION_UCODES`, `HOTMART_API_BASE_URL`, `HOTMART_TOKEN_URL`,
-`HOTMART_CHECKOUT_URL`, `APP_BASE_URL`, `EMAIL_FROM`, `ADMIN_EMAILS`. Ajuste os
+`HOTMART_CHECKOUT_URL`, `APP_BASE_URL`, `EMAIL_FROM`, `ADMIN_EMAILS`,
+`MEDIA_PUBLIC_BASE`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`. Ajuste os
 placeholders (`REPLACE_ME`) ali antes de rodar contra o sandbox. Em produção,
 os seis segredos vão via `wrangler secret put <NOME>`; as vars continuam em
 `wrangler.jsonc`.
+
+Das três últimas: `MEDIA_PUBLIC_BASE` é o hostname **sem cookies** que serve o
+bucket R2 (um SVG malicioso não pode executar com a sessão do admin);
+`ACCESS_TEAM_DOMAIN` e `ACCESS_AUD` são o domínio do time no Zero Trust e a tag
+`aud` da aplicação Access, usados para validar o JWT da borda.
 
 Opcional e só de desenvolvimento: `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula
 a verificação do Cloudflare Access em `/admin/*` (ver seção "Painel
@@ -77,17 +83,37 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | GET | `/auth/me` | Protegido. Retorna `{ id, email, name, role, tier }` |
 | POST | `/auth/logout` | Limpa o cookie de sessão |
 | POST | `/webhooks/hotmart` | Recebe eventos de compra/cancelamento da Hotmart (autenticado pelo header `x-hotmart-hottok`) |
-| GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia (`subject`, `banca`, `cargo`, `level`) |
-| POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 se já existir ativo |
-| PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia sem mudar o slug |
+| GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia. `kind` é obrigatório (`subject`, `banca`, `cargo`, `level`); ausente ou desconhecido → 400 `invalid_kind` |
+| POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 `duplicate` se já existir ativo no mesmo kind |
+| PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia recalculando o slug. 409 `duplicate` se colidir com outro termo ativo do mesmo kind |
 | DELETE | `/admin/taxonomy/:id` | Soft delete |
-| GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `year`, `status`…) |
-| POST | `/admin/questions` | Cria a questão inteira. 422 com código quando viola invariante |
+| GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `cargoId`, `levelId`, `year`, `status`). Valor vazio (ou só espaço) em qualquer filtro é tratado como ausente. Só `status` e `year` são validados — não vazio e inválido → 400 `invalid_status`/`invalid_year`; os ids de taxonomia passam crus, e um id inexistente devolve lista vazia, não 400. `limit`/`offset` inválidos caem no default |
+| POST | `/admin/questions` | Cria a questão inteira; `status` opcional (`draft` por default) publica no mesmo envio. 422 com código quando viola invariante |
 | GET | `/admin/questions/:id` | Questão com alternativas e gabarito |
 | PATCH | `/admin/questions/:id` | Edita — publicada ou não, o id nunca muda |
 | POST | `/admin/questions/:id/publish` · `/unpublish` | Alterna o `status` |
 | DELETE | `/admin/questions/:id` | Soft delete |
 | POST | `/admin/media` | `multipart/form-data` com `file` → `{ url }` no R2 |
+
+### Códigos de erro
+
+| Código | Status | Quando |
+|---|---|---|
+| `invalid_request` | 400 | Corpo da requisição malformado ou fora do schema Zod |
+| `invalid_kind` | 400 | `kind` de taxonomia ausente ou desconhecido (query) |
+| `invalid_status` | 400 | `status` de filtro não vazio e diferente de `draft`/`published` (query) |
+| `invalid_year` | 400 | `year` de filtro não vazio e fora de `[1900, 2200]`, ou não numérico (query) |
+| `duplicate` | 409 | Nome de taxonomia já ativo no mesmo `kind` (criação ou rename) |
+| `not_found` | 404 | Id inexistente (questão ou termo de taxonomia) |
+| `exactly_one_correct` | 422 | Questão sem exatamente uma alternativa marcada correta |
+| `true_false_needs_two` | 422 | Questão `true_false` sem exatamente duas alternativas |
+| `needs_two_alternatives` | 422 | Questão `multiple_choice` com menos de duas alternativas |
+| `invalid_subject` / `invalid_banca` / `invalid_cargo` / `invalid_level` | 422 | FK de taxonomia inexistente, soft-deletada ou de `kind` errado |
+
+Parâmetro de query inválido tem um código por campo (`invalid_kind`,
+`invalid_status`, `invalid_year`); corpo de requisição inválido sempre cai no
+único `invalid_request` — a distinção deixa o tratamento de erro de
+formulário do painel resolvido de um jeito só.
 
 Sessão: JWT (HS256) em cookie `HttpOnly; Secure; SameSite=Lax; Path=/`. A
 identidade vai no `sub`; `role`/`tier` são relidos do D1 a cada request —
@@ -116,6 +142,9 @@ explícitos revogam.
 
 - `DB` — D1 (`mais-aprovacao-db`), migrações em `migrations/`.
 - `EMAIL` — `send_email`, usado para o link mágico (primeiro acesso e recuperação).
+- `MEDIA` — R2, bucket das imagens de questão (`POST /admin/media`). A chave é
+  plana (`media/{uuid}.{ext}`): questão não sofre hard delete, então prefixo por
+  questão não serviria para apagar nada.
 - `triggers.crons` — `0 3 * * *`, dispara a reconciliação diária.
 
 ## Camada de dados (`src/db/`)
