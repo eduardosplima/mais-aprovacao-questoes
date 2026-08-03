@@ -288,21 +288,30 @@ describe("parsing de limit e offset em GET /admin/questions", () => {
     expect(body.rows.some((r) => r.id === id)).toBe(true);
   });
 
-  it("limit=99999 é aceito sem estourar (teto aplicado antes da query)", async () => {
-    const db = getDb(env);
-    const subject = await createTerm(db, "subject", "Limit assunto teto");
-    const banca = await createTerm(db, "banca", "Limit banca teto");
-    const id = await createInSubject(subject.id, banca.id, "<p>Q</p>");
+  // Acima do teto de 200, o valor não é clampado: cai no default de 50, o
+  // mesmo destino de qualquer outro limit fora de [1, 200].
+  it(
+    "limit=99999 (acima do teto) cai no default de 50, não devolve a tabela inteira",
+    async () => {
+      const db = getDb(env);
+      const subject = await createTerm(db, "subject", "Limit assunto acima teto");
+      const banca = await createTerm(db, "banca", "Limit banca acima teto");
+      for (let i = 0; i < 55; i++) {
+        await createInSubject(subject.id, banca.id, `<p>Q${i}</p>`);
+      }
 
-    const res = await app().request(
-      `/admin/questions?subjectId=${subject.id}&limit=99999`,
-      {},
-      env,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { rows: { id: string }[] };
-    expect(body.rows.some((r) => r.id === id)).toBe(true);
-  });
+      const res = await app().request(
+        `/admin/questions?subjectId=${subject.id}&limit=99999`,
+        {},
+        env,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { rows: unknown[]; total: number };
+      expect(body.total).toBe(55);
+      expect(body.rows).toHaveLength(50);
+    },
+    20000,
+  );
 
   it("limit=abc (não numérico) cai no default", async () => {
     const db = getDb(env);

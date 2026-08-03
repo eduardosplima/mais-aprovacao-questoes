@@ -159,7 +159,10 @@ describe("guardas de /admin", () => {
     expect(res.status).toBe(200);
   });
 
-  it("as três rotas de admin estão montadas", async () => {
+  // /admin/media tem teste dedicado logo abaixo, porque a rota espera POST
+  // com FormData em vez de GET — não dá para cobrir as três no mesmo loop
+  // sem perder a asserção de 200 nas outras duas.
+  it("as rotas de taxonomy e questions estão montadas", async () => {
     const token = await accessToken();
     const cookie = await sessionCookie("admin@test.com");
     const headers = { "cf-access-jwt-assertion": token, cookie };
