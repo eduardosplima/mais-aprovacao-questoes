@@ -1,6 +1,8 @@
 import { and, eq, isNull, asc } from "drizzle-orm";
 import type { Db } from "./client";
 import { taxonomyTerms } from "./schema";
+import { isUniqueViolation } from "./errors";
+import type { Failure } from "./questions";
 
 export type TermKind = "subject" | "banca" | "cargo" | "level";
 
@@ -43,7 +45,7 @@ export async function createTerm(
   db: Db,
   kind: TermKind,
   name: string,
-): Promise<TermRow> {
+): Promise<TermRow | Failure> {
   const row = {
     id: crypto.randomUUID(),
     kind,
@@ -52,16 +54,25 @@ export async function createTerm(
     createdAt: new Date(),
     deletedAt: null,
   };
-  // Duplicata ativa viola o índice parcial e estoura aqui — é o comportamento
-  // desejado, a rota traduz para 409.
-  await db.insert(taxonomyTerms).values(row).run();
+  try {
+    // Duplicata ativa viola o índice parcial — é o comportamento desejado,
+    // capturado aqui e devolvido como `Failure` para a rota traduzir a 409.
+    await db.insert(taxonomyTerms).values(row).run();
+  } catch (e) {
+    // Só a violação do índice parcial vira `duplicate`. Qualquer outra
+    // exceção sobe: indisponibilidade de infra não pode chegar ao painel
+    // como "esse nome já existe", que é um erro de validação e manda a
+    // pessoa tentar outro nome.
+    if (isUniqueViolation(e)) return { error: "duplicate" };
+    throw e;
+  }
   return row;
 }
 
 /**
  * Renomeia recalculando o slug, que é o que faz o índice parcial recusar dois
  * termos ativos com o mesmo nome também no rename — a mesma regra da criação,
- * escrita num lugar só. A violação estoura daqui; a rota traduz para 409.
+ * escrita num lugar só. A violação vira `Failure`; a rota traduz para 409.
  *
  * O slug não tem consumidor fora do índice: nenhuma FK aponta para ele (as
  * questões referenciam `id`) e nenhuma rota o recebe como filtro. Congelá-lo
@@ -73,12 +84,18 @@ export async function renameTerm(
   db: Db,
   id: string,
   name: string,
-): Promise<TermRow | null> {
-  await db
-    .update(taxonomyTerms)
-    .set({ name: name.trim(), slug: slugify(name) })
-    .where(and(eq(taxonomyTerms.id, id), alive))
-    .run();
+): Promise<TermRow | Failure | null> {
+  try {
+    // O rename recalcula o slug, então também esbarra no índice parcial.
+    await db
+      .update(taxonomyTerms)
+      .set({ name: name.trim(), slug: slugify(name) })
+      .where(and(eq(taxonomyTerms.id, id), alive))
+      .run();
+  } catch (e) {
+    if (isUniqueViolation(e)) return { error: "duplicate" };
+    throw e;
+  }
   const row = await db
     .select()
     .from(taxonomyTerms)

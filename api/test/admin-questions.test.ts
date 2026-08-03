@@ -4,11 +4,21 @@ import { Hono } from "hono";
 import type { Env } from "../src/config/env";
 import type { Entitlement } from "../src/db/users";
 import { getDb } from "../src/db/client";
-import { createTerm } from "../src/db/taxonomy";
+import { createTerm as createTermRaw } from "../src/db/taxonomy";
 import { upsertUserFromPurchase } from "../src/db/users";
 import { adminQuestions } from "../src/routes/admin/questions";
 
 type App = { Bindings: Env; Variables: { entitlement: Entitlement } };
+
+// Fixture: os nomes usados neste arquivo são únicos por chamada, então nunca
+// colidem de verdade — `createTerm` devolvendo `Failure` numa duplicata é
+// comportamento de outro módulo (testado em taxonomy.test.ts), não algo que
+// os testes de rota de questão precisem lidar por linha.
+async function createTerm(...args: Parameters<typeof createTermRaw>) {
+  const row = await createTermRaw(...args);
+  if ("error" in row) throw new Error(`termo duplicado inesperado no fixture: ${args[2]}`);
+  return row;
+}
 
 // `created_by` referencia users.id (Task 1), então o entitlement injetado
 // precisa apontar para um usuário real — um id inventado quebra a FK.

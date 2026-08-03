@@ -51,7 +51,7 @@ export interface QuestionListRow {
 /** Único ponto onde o filtro de soft delete é escrito para questões. */
 const alive = isNull(questions.deletedAt);
 
-type Failure = { error: string };
+export type Failure = { error: string };
 
 /** Contagem e unicidade da alternativa correta; `true_false` com exatamente duas. */
 function validateAlternatives(input: QuestionInput): string | null {
