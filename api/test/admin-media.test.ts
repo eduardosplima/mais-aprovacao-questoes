@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import type { Env } from "../src/config/env";
 import { detectImageType } from "../src/lib/magicBytes";
 import { adminMedia } from "../src/routes/admin/media";
+import { envWith } from "./helpers";
 
 function app() {
   const a = new Hono<{ Bindings: Env }>();
@@ -81,6 +82,20 @@ describe("rota de upload", () => {
     const { url } = (await res.json()) as { url: string };
     expect(url).not.toContain("..");
     expect(url).not.toContain("passwd");
+  });
+
+  // A URL é persistida no statement da questão pelo editor — uma barra
+  // duplicada quebra o link já salvo, mesmo que a var seja corrigida depois.
+  it("normaliza a barra final de MEDIA_PUBLIC_BASE, sem gerar // na URL", async () => {
+    const res = await app().request(
+      "/admin/media",
+      upload(PNG, "foto.png", "image/png"),
+      envWith({ MEDIA_PUBLIC_BASE: "https://media.test/" }),
+    );
+    expect(res.status).toBe(201);
+    const { url } = (await res.json()) as { url: string };
+    expect(url.startsWith("https://media.test/media/")).toBe(true);
+    expect(url).not.toContain("//media/");
   });
 
   it("400 sem arquivo no formulário", async () => {

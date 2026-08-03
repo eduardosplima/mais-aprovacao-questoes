@@ -34,5 +34,9 @@ adminMedia.post("/", async (c) => {
     httpMetadata: { contentType: type },
   });
 
-  return c.json({ url: `${c.env.MEDIA_PUBLIC_BASE}/${key}` }, 201);
+  // Essa URL é persistida (o painel grava no `statement` da questão): uma
+  // barra final na var de ambiente não pode virar "//" no meio da URL, ou o
+  // R2 responde 404 para um link que já foi salvo.
+  const base = c.env.MEDIA_PUBLIC_BASE.replace(/\/+$/, "");
+  return c.json({ url: `${base}/${key}` }, 201);
 });
