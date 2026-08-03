@@ -1,4 +1,11 @@
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -62,4 +69,91 @@ export const deletedAccounts = sqliteTable("deleted_accounts", {
   /** HMAC-SHA256 do email normalizado. Nenhum dado legível. */
   emailHash: text("email_hash").primaryKey(),
   deletedAt: integer("deleted_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+/**
+ * Uma tabela para as quatro taxonomias (assunto, banca, cargo, nível), porque
+ * o CRUD das quatro é idêntico. O preço é que nada aqui impede `banca_id`
+ * apontar para um termo de `kind='cargo'` — SQLite não faz CHECK com subquery.
+ * A invariante vive em `db/taxonomy.ts` e num teste dedicado.
+ */
+export const taxonomyTerms = sqliteTable(
+  "taxonomy_terms",
+  {
+    id: text("id").primaryKey(),
+    /** 'subject' | 'banca' | 'cargo' | 'level' */
+    kind: text("kind").notNull(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    /** NULL = ativo. Soft delete: termo apagado some da escolha mas as
+     *  questões antigas continuam exibindo o nome dele. */
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [
+    // Parcial: sem o WHERE, apagar "Cespe" e recriá-la colidiria com a linha morta.
+    uniqueIndex("taxonomy_terms_kind_slug_idx")
+      .on(t.kind, t.slug)
+      .where(sql`${t.deletedAt} is null`),
+  ],
+);
+
+export const questions = sqliteTable(
+  "questions",
+  {
+    id: text("id").primaryKey(),
+    /** 'multiple_choice' | 'true_false' */
+    type: text("type").notNull(),
+    /** HTML já sanitizado por lib/sanitizeHtml. Nunca gravar HTML cru. */
+    statement: text("statement").notNull(),
+    subjectId: text("subject_id")
+      .notNull()
+      .references(() => taxonomyTerms.id),
+    bancaId: text("banca_id")
+      .notNull()
+      .references(() => taxonomyTerms.id),
+    cargoId: text("cargo_id").references(() => taxonomyTerms.id),
+    levelId: text("level_id").references(() => taxonomyTerms.id),
+    year: integer("year"),
+    /** 'draft' | 'published' — o aluno só enxerga 'published'. */
+    status: text("status").notNull().default("draft"),
+    /** SET NULL: a questão é conteúdo da plataforma, não dado pessoal de quem
+     *  a cadastrou. Se o admin excluir a conta, a questão fica sem autoria. */
+    createdBy: text("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [
+    index("questions_subject_idx").on(t.subjectId),
+    index("questions_banca_idx").on(t.bancaId),
+    index("questions_status_idx").on(t.status),
+  ],
+);
+
+export const alternatives = sqliteTable(
+  "alternatives",
+  {
+    id: text("id").primaryKey(),
+    questionId: text("question_id")
+      .notNull()
+      .references(() => questions.id, { onDelete: "cascade" }),
+    /** 0-based. Define a letra exibida (0=A, 1=B…). */
+    position: integer("position").notNull(),
+    body: text("body").notNull(),
+    /** Exatamente uma por questão vale 1 — invariante validada na escrita. */
+    isCorrect: integer("is_correct").notNull().default(0),
+  },
+  (t) => [index("alternatives_question_idx").on(t.questionId)],
+);
+
+export const explanations = sqliteTable("explanations", {
+  questionId: text("question_id")
+    .primaryKey()
+    .references(() => questions.id, { onDelete: "cascade" }),
+  body: text("body").notNull(),
+  /** URL do Cloudflare Stream. Só a URL — desacopla o vídeo do resto. */
+  videoUrl: text("video_url"),
 });

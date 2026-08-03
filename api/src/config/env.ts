@@ -1,4 +1,4 @@
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 
 /** Uma mensagem para o Cloudflare Email Sending. */
 export interface EmailMessage {
@@ -34,6 +34,19 @@ export interface Env {
   APP_BASE_URL: string;
   EMAIL_FROM: string;
   ADMIN_EMAILS: string;
+  /** Domínio do time no Zero Trust, ex.: "minhaequipe.cloudflareaccess.com". */
+  ACCESS_TEAM_DOMAIN: string;
+  /** Tag `aud` da aplicação Access. Dashboard → Access → Applications. */
+  ACCESS_AUD: string;
+  /**
+   * Só existe em `.dev.vars`. Fail-closed: qualquer valor diferente de "true"
+   * — inclusive ausência — significa exigir o JWT do Access.
+   */
+  ACCESS_DEV_BYPASS?: string;
+  /** Bucket das imagens de questão. Servido por um hostname sem cookies. */
+  MEDIA: R2Bucket;
+  /** Base pública do bucket, ex.: "https://media.exemplo.com". Sem barra final. */
+  MEDIA_PUBLIC_BASE: string;
 }
 
 function csv(raw: string): string[] {
