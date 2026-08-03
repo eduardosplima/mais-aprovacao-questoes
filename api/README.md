@@ -82,7 +82,7 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia sem mudar o slug |
 | DELETE | `/admin/taxonomy/:id` | Soft delete |
 | GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `year`, `status`…) |
-| POST | `/admin/questions` | Cria a questão inteira. 422 com código quando viola invariante |
+| POST | `/admin/questions` | Cria a questão inteira; `status` opcional (`draft` por default) publica no mesmo envio. 422 com código quando viola invariante |
 | GET | `/admin/questions/:id` | Questão com alternativas e gabarito |
 | PATCH | `/admin/questions/:id` | Edita — publicada ou não, o id nunca muda |
 | POST | `/admin/questions/:id/publish` · `/unpublish` | Alterna o `status` |

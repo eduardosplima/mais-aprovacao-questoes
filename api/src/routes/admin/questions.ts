@@ -46,6 +46,19 @@ const questionSchema = z.object({
 });
 
 /**
+ * Só na criação. "Salvar rascunho" e "Publicar" são a mesma chamada — é o
+ * "cadastro em um step" da spec §2.
+ *
+ * Deliberadamente um schema separado, não um campo em `questionSchema`: as duas
+ * rotas compartilham aquele objeto, e um `status` com default nele faria todo
+ * PATCH carregar `status: "draft"` e despublicar em silêncio a questão que
+ * alguém só quis corrigir. O PATCH fica com o schema base, que não tem o campo.
+ */
+const createSchema = questionSchema.extend({
+  status: z.enum(["draft", "published"]).default("draft"),
+});
+
+/**
  * `not_found` é 404; todo o resto é falha de regra de negócio (invariante de
  * alternativa correta, `kind` cruzado de taxonomia) e vira 422 com o código,
  * para o painel poder exibir a mensagem específica.
@@ -102,13 +115,14 @@ adminQuestions.get("/", async (c) => {
 
 adminQuestions.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
-  const parsed = questionSchema.safeParse(body);
+  const parsed = createSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
 
   const res = await createQuestion(
     getDb(c.env),
     parsed.data as QuestionInput,
     c.get("entitlement")?.userId ?? null,
+    parsed.data.status,
   );
   if ("error" in res) return c.json({ error: res.error }, statusFor(res.error));
   return c.json({ id: res.id }, 201);

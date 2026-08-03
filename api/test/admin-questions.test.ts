@@ -218,6 +218,59 @@ describe("rotas de questões", () => {
       expect(res.status).toBe(201);
     },
   );
+
+  it("POST com status=published já cria publicada, num round-trip só", async () => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ status: "published" })),
+      env,
+    );
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+
+    const get = await app().request(`/admin/questions/${id}`, {}, env);
+    const body = (await get.json()) as { question: { status: string } };
+    expect(body.question.status).toBe("published");
+  });
+
+  it("POST sem status continua criando rascunho", async () => {
+    const id = await create();
+    const res = await app().request(`/admin/questions/${id}`, {}, env);
+    const body = (await res.json()) as { question: { status: string } };
+    expect(body.question.status).toBe("draft");
+  });
+
+  it("400 para status desconhecido no POST", async () => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ status: "publicado" })),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  // A armadilha que motivou schemas separados: PATCH e POST compartilhavam o
+  // mesmo objeto Zod, e um `status` com default nele faria toda edição gravar
+  // "draft" — despublicando em silêncio a questão que alguém só quis corrigir.
+  it("status no corpo do PATCH é ignorado e não despublica a questão", async () => {
+    const id = await create();
+    await app().request(`/admin/questions/${id}/publish`, { method: "POST" }, env);
+
+    const res = await app().request(
+      `/admin/questions/${id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(await payload({ status: "draft" })),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+
+    const get = await app().request(`/admin/questions/${id}`, {}, env);
+    const body = (await get.json()) as { question: { status: string } };
+    expect(body.question.status).toBe("published");
+  });
 });
 
 // `limit`/`offset` vêm da querystring como string; valores negativos de
