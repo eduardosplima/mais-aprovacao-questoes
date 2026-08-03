@@ -537,10 +537,9 @@ foi triada em 2026-08-03, e o que segue são as decisões, não os sintomas.
 
 ### 7.1 Bloco de limpeza — antes do painel
 
-Cinco commits, todos em `api/`. **Os dois primeiros itens da tabela não são
-opcionais:** o painel é construído contra a forma do `POST` e contra a convenção
-de query param, então este bloco precisa estar mergeado antes de o plano do
-frontend rodar.
+Cinco commits, todos em `api/`. **Concluído na branch `chore/api-limpeza-debito`.**
+Os dois primeiros itens da tabela não eram opcionais: o painel é construído
+contra a forma do `POST` e contra a convenção de query param.
 
 | Mudança | Onde | Verificação |
 |---|---|---|
