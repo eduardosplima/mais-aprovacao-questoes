@@ -79,7 +79,7 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | POST | `/webhooks/hotmart` | Recebe eventos de compra/cancelamento da Hotmart (autenticado pelo header `x-hotmart-hottok`) |
 | GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia (`subject`, `banca`, `cargo`, `level`) |
 | POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 se já existir ativo |
-| PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia sem mudar o slug |
+| PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia recalculando o slug. 409 se colidir com outro termo ativo do mesmo kind |
 | DELETE | `/admin/taxonomy/:id` | Soft delete |
 | GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `year`, `status`…). Filtro inválido → 400 com o código do campo; `limit`/`offset` inválidos caem no default |
 | POST | `/admin/questions` | Cria a questão inteira; `status` opcional (`draft` por default) publica no mesmo envio. 422 com código quando viola invariante |

@@ -117,4 +117,52 @@ describe("rotas de taxonomia", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  it("409 ao renomear para o nome de outro termo ativo", async () => {
+    await app().request("/admin/taxonomy", json({ kind: "level", name: "Fundamental" }), env);
+    const created = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "level", name: "Medio" }),
+      env,
+    );
+    const { term } = (await created.json()) as { term: { id: string } };
+
+    const res = await app().request(
+      `/admin/taxonomy/${term.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Fundamental" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()) as { error: string }).toEqual({ error: "duplicate" });
+  });
+
+  it("renomear atualiza o slug e libera o nome antigo", async () => {
+    const created = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "banca", name: "Instituto AOCP" }),
+      env,
+    );
+    const { term } = (await created.json()) as { term: { id: string } };
+
+    await app().request(
+      `/admin/taxonomy/${term.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "AOCP" }),
+      },
+      env,
+    );
+
+    const recriado = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "banca", name: "Instituto AOCP" }),
+      env,
+    );
+    expect(recriado.status).toBe(201);
+  });
 });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Env } from "../../config/env";
 import type { Entitlement } from "../../db/users";
 import { getDb } from "../../db/client";
+import { isUniqueViolation } from "../../db/errors";
 import {
   TERM_KINDS,
   createTerm,
@@ -36,9 +37,12 @@ adminTaxonomy.post("/", async (c) => {
   try {
     const term = await createTerm(getDb(c.env), parsed.data.kind, parsed.data.name);
     return c.json({ term }, 201);
-  } catch {
-    // Violação do índice parcial: já existe um termo ativo com este kind+slug.
-    return c.json({ error: "duplicate" }, 409);
+  } catch (e) {
+    // Só a violação do índice parcial vira 409. Qualquer outra exceção sobe:
+    // indisponibilidade de infra não pode chegar ao painel como "esse nome já
+    // existe", que é um erro de validação e manda a pessoa tentar outro nome.
+    if (isUniqueViolation(e)) return c.json({ error: "duplicate" }, 409);
+    throw e;
   }
 });
 
@@ -49,9 +53,15 @@ adminTaxonomy.patch("/:id", async (c) => {
   const parsed = renameSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: "invalid_request" }, 400);
 
-  const term = await renameTerm(getDb(c.env), c.req.param("id"), parsed.data.name);
-  if (!term) return c.json({ error: "not_found" }, 404);
-  return c.json({ term });
+  try {
+    const term = await renameTerm(getDb(c.env), c.req.param("id"), parsed.data.name);
+    if (!term) return c.json({ error: "not_found" }, 404);
+    return c.json({ term });
+  } catch (e) {
+    // O rename recalcula o slug, então também esbarra no índice parcial.
+    if (isUniqueViolation(e)) return c.json({ error: "duplicate" }, 409);
+    throw e;
+  }
 });
 
 adminTaxonomy.delete("/:id", async (c) => {

@@ -55,7 +55,17 @@ export async function createTerm(
   return row;
 }
 
-/** Renomeia sem tocar no slug: ele é a identidade estável do termo. */
+/**
+ * Renomeia recalculando o slug, que é o que faz o índice parcial recusar dois
+ * termos ativos com o mesmo nome também no rename — a mesma regra da criação,
+ * escrita num lugar só. A violação estoura daqui; a rota traduz para 409.
+ *
+ * O slug não tem consumidor fora do índice: nenhuma FK aponta para ele (as
+ * questões referenciam `id`) e nenhuma rota o recebe como filtro. Congelá-lo
+ * custaria uma segunda regra de unicidade em código de aplicação, que ainda
+ * divergiria da primeira — renomear "Cespe" para outra coisa deixaria o slug
+ * em `cespe`, reservando o nome antigo para uma linha que não o usa mais.
+ */
 export async function renameTerm(
   db: Db,
   id: string,
@@ -63,7 +73,7 @@ export async function renameTerm(
 ): Promise<TermRow | null> {
   await db
     .update(taxonomyTerms)
-    .set({ name: name.trim() })
+    .set({ name: name.trim(), slug: slugify(name) })
     .where(and(eq(taxonomyTerms.id, id), alive))
     .run();
   const row = await db

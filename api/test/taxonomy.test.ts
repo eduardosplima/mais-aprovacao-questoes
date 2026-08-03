@@ -52,11 +52,42 @@ describe("taxonomy", () => {
     ).resolves.toBeTruthy();
   });
 
-  it("renomeia sem mudar o slug já referenciado", async () => {
+  // O slug segue o nome. Ele não tem consumidor fora do índice parcial — nenhuma
+  // FK aponta para ele, nenhuma rota o recebe como filtro —, então congelá-lo
+  // exigiria uma segunda regra de unicidade em código de aplicação, ao lado da
+  // que o índice já impõe. Recalculando, o índice cobre criação e rename com a
+  // mesma regra.
+  it("renomear recalcula o slug", async () => {
     const term = await createTerm(db(), "banca", "Vunesp");
-    const renamed = await renameTerm(db(), term.id, "VUNESP");
-    expect(renamed?.name).toBe("VUNESP");
+    const renamed = await renameTerm(db(), term.id, "Fundação Vunesp");
+    expect(renamed?.name).toBe("Fundação Vunesp");
+    expect(renamed?.slug).toBe("fundacao-vunesp");
+  });
+
+  it("renomear para um nome que só muda em acento e caixa mantém o slug", async () => {
+    const term = await createTerm(db(), "banca", "Cebraspe");
+    const renamed = await renameTerm(db(), term.id, "CEBRASPE");
     expect(renamed?.slug).toBe(term.slug);
+  });
+
+  it("renomear para o nome de outro termo ativo do mesmo kind é recusado", async () => {
+    await createTerm(db(), "subject", "Direito Civil");
+    const outro = await createTerm(db(), "subject", "Direito Penal");
+    await expect(renameTerm(db(), outro.id, "Direito Civil")).rejects.toThrow();
+  });
+
+  it("renomear para o nome de um termo apagado funciona", async () => {
+    const morto = await createTerm(db(), "cargo", "Analista Legado");
+    await softDeleteTerm(db(), morto.id);
+    const vivo = await createTerm(db(), "cargo", "Analista Novo");
+    const renamed = await renameTerm(db(), vivo.id, "Analista Legado");
+    expect(renamed?.slug).toBe("analista-legado");
+  });
+
+  it("o nome antigo fica livre depois do rename", async () => {
+    const term = await createTerm(db(), "level", "Fundamental");
+    await renameTerm(db(), term.id, "Ensino Fundamental");
+    await expect(createTerm(db(), "level", "Fundamental")).resolves.toBeTruthy();
   });
 
   // Esta é a invariante que paga o preço da tabela única.
