@@ -13,12 +13,33 @@ import {
   type QuestionInput,
   type QuestionStatus,
 } from "../../db/questions";
-import { isSafeUrl } from "../../lib/sanitizeHtml";
 
 export const adminQuestions = new Hono<{
   Bindings: Env;
   Variables: { entitlement: Entitlement };
 }>();
+
+/**
+ * Um link de vídeo é http ou https e nada mais.
+ *
+ * Não reusa `isSafeUrl`: aquela função existe para `href` de conteúdo, onde
+ * `mailto:` e caminho relativo são legítimos — num campo de vídeo não são.
+ *
+ * Cloudflare Stream (spec técnica §7.2) é o que o campo significa, não o que
+ * ele verifica: a allowlist de hostname precisaria do código da conta
+ * (`customer-<código>.cloudflarestream.com`), e o Stream ainda não foi
+ * provisionado. Quando for, aperta-se aqui.
+ */
+function isHttpUrl(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    // Não é URL absoluta — caminho relativo, âncora, texto solto.
+    return false;
+  }
+  return parsed.protocol === "http:" || parsed.protocol === "https:";
+}
 
 const alternativeSchema = z.object({
   body: z.string().min(1),
@@ -36,12 +57,9 @@ const questionSchema = z.object({
   alternatives: z.array(alternativeSchema).min(1).max(10),
   explanation: z.object({
     body: z.string().min(1),
-    // `.url()` sozinho aceita `javascript:`, `data:` e `vbscript:` (são URLs
-    // válidas para o parser); `isSafeUrl` restringe a http, https e mailto.
     videoUrl: z
       .string()
-      .url()
-      .refine(isSafeUrl, { message: "esquema de URL não permitido" })
+      .refine(isHttpUrl, { message: "videoUrl precisa ser http ou https" })
       .nullish(),
   }),
 });

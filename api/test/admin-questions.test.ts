@@ -194,30 +194,37 @@ describe("rotas de questões", () => {
   });
 
   // `videoUrl` é gravado cru em writeChildren, sem sanitização de HTML — a
-  // única barreira contra esquema perigoso é a validação de schema aqui.
-  it.each(["javascript:alert(document.cookie)", "data:text/html,x", "vbscript:msgbox(1)"])(
-    "recusa videoUrl com esquema inseguro (%s)",
-    async (videoUrl) => {
-      const res = await app().request(
-        "/admin/questions",
-        post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
-        env,
-      );
-      expect(res.status).toBe(400);
-    },
-  );
+  // única barreira é a validação de schema aqui. `mailto:` não era brecha de
+  // segurança, e sim de significado: um campo de vídeo aceitando endereço de
+  // email, herdado de `isSafeUrl`, que existe para `href` de conteúdo.
+  it.each([
+    "javascript:alert(document.cookie)",
+    "data:text/html,x",
+    "vbscript:msgbox(1)",
+    "mailto:a@test.com",
+    "/videos/aula.mp4",
+    "#ancora",
+  ])("recusa videoUrl que não seja http/https (%s)", async (videoUrl) => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
 
-  it.each(["https://youtu.be/x", "mailto:a@test.com"])(
-    "aceita videoUrl com esquema seguro (%s)",
-    async (videoUrl) => {
-      const res = await app().request(
-        "/admin/questions",
-        post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
-        env,
-      );
-      expect(res.status).toBe(201);
-    },
-  );
+  it.each([
+    "https://youtu.be/x",
+    "https://customer-abc123.cloudflarestream.com/deadbeef/watch",
+    "http://localhost:8787/video",
+  ])("aceita videoUrl http/https (%s)", async (videoUrl) => {
+    const res = await app().request(
+      "/admin/questions",
+      post(await payload({ explanation: { body: "<p>C</p>", videoUrl } })),
+      env,
+    );
+    expect(res.status).toBe(201);
+  });
 
   it("POST com status=published já cria publicada, num round-trip só", async () => {
     const res = await app().request(
