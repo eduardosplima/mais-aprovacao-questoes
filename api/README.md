@@ -81,7 +81,7 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 se já existir ativo |
 | PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia sem mudar o slug |
 | DELETE | `/admin/taxonomy/:id` | Soft delete |
-| GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `year`, `status`…) |
+| GET | `/admin/questions` | Lista paginada com filtros (`subjectId`, `bancaId`, `year`, `status`…). Filtro inválido → 400 com o código do campo; `limit`/`offset` inválidos caem no default |
 | POST | `/admin/questions` | Cria a questão inteira; `status` opcional (`draft` por default) publica no mesmo envio. 422 com código quando viola invariante |
 | GET | `/admin/questions/:id` | Questão com alternativas e gabarito |
 | PATCH | `/admin/questions/:id` | Edita — publicada ou não, o id nunca muda |

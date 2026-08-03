@@ -11,6 +11,7 @@ import {
   softDeleteQuestion,
   updateQuestion,
   type QuestionInput,
+  type QuestionStatus,
 } from "../../db/questions";
 import { isSafeUrl } from "../../lib/sanitizeHtml";
 
@@ -97,16 +98,43 @@ function parseOffset(raw: string | undefined): number {
   return parseInRange(raw, 0, MAX_OFFSET, 0);
 }
 
+// Filtro inválido responde 400; paginação inválida cai no default. O critério
+// não é "validado ou não", é se descartar em silêncio muda o que o operador
+// acredita estar vendo: um filtro descartado faz a tela mostrar o acervo
+// inteiro dizendo que filtrou, um `limit` clampado não mente sobre o conteúdo.
+//
+// Os ids de taxonomia ficam de fora dos dois lados: são opacos, e um id
+// inexistente já devolve lista vazia — a resposta honesta tanto para
+// "malformado" quanto para "não existe".
 adminQuestions.get("/", async (c) => {
   const q = c.req.query();
-  const year = q.year ? Number(q.year) : undefined;
+
+  let status: QuestionStatus | undefined;
+  if (q.status !== undefined) {
+    if (q.status !== "draft" && q.status !== "published") {
+      return c.json({ error: "invalid_status" }, 400);
+    }
+    status = q.status;
+  }
+
+  let year: number | undefined;
+  if (q.year !== undefined) {
+    // Mesmo teste de pertencimento a intervalo que `parseInRange` usa, com os
+    // limites do schema de escrita. `Number("")` é 0 e cai fora, como deve.
+    const n = Number(q.year);
+    if (!Number.isInteger(n) || n < 1900 || n > 2200) {
+      return c.json({ error: "invalid_year" }, 400);
+    }
+    year = n;
+  }
+
   const result = await listQuestions(getDb(c.env), {
     subjectId: q.subjectId,
     bancaId: q.bancaId,
     cargoId: q.cargoId,
     levelId: q.levelId,
-    year: Number.isFinite(year) ? year : undefined,
-    status: q.status === "published" || q.status === "draft" ? q.status : undefined,
+    year,
+    status,
     limit: parseLimit(q.limit),
     offset: parseOffset(q.offset),
   });

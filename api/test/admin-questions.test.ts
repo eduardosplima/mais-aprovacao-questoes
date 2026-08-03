@@ -271,6 +271,74 @@ describe("rotas de questões", () => {
     const body = (await get.json()) as { question: { status: string } };
     expect(body.question.status).toBe("published");
   });
+
+  // Filtro descartado em silêncio faz a tela mostrar o acervo inteiro — com
+  // rascunhos — dizendo que está filtrada. Por isso 400 e não default.
+  it("400 com o código do campo para status de filtro desconhecido", async () => {
+    const res = await app().request("/admin/questions?status=publicado", {}, env);
+    expect(res.status).toBe(400);
+    expect((await res.json()) as { error: string }).toEqual({
+      error: "invalid_status",
+    });
+  });
+
+  it("400 com o código do campo para year não numérico", async () => {
+    const res = await app().request("/admin/questions?year=ontem", {}, env);
+    expect(res.status).toBe(400);
+    expect((await res.json()) as { error: string }).toEqual({
+      error: "invalid_year",
+    });
+  });
+
+  it("400 para year fora do intervalo aceito", async () => {
+    const res = await app().request("/admin/questions?year=1500", {}, env);
+    expect(res.status).toBe(400);
+  });
+
+  it("filtro válido de year continua filtrando", async () => {
+    const db = getDb(env);
+    const subject = await createTerm(db, "subject", "Year assunto");
+    const banca = await createTerm(db, "banca", "Year banca");
+    await app().request(
+      "/admin/questions",
+      post({
+        type: "multiple_choice",
+        statement: "<p>Q</p>",
+        subjectId: subject.id,
+        bancaId: banca.id,
+        year: 2024,
+        alternatives: [
+          { body: "<p>A</p>", isCorrect: true },
+          { body: "<p>B</p>", isCorrect: false },
+        ],
+        explanation: { body: "<p>C</p>" },
+      }),
+      env,
+    );
+
+    const res = await app().request(
+      `/admin/questions?subjectId=${subject.id}&year=2024`,
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { total: number }).total).toBe(1);
+  });
+
+  // A outra metade da convenção: paginação inválida NÃO vira 400. Clampar o
+  // limit não mente sobre o conteúdo, então segue caindo no default.
+  it("limit inválido continua caindo no default, sem virar 400", async () => {
+    const res = await app().request("/admin/questions?limit=99999", {}, env);
+    expect(res.status).toBe(200);
+  });
+
+  // Id opaco de filtro passa cru: "malformado" e "não existe" são
+  // indistinguíveis, e lista vazia é a resposta honesta para os dois.
+  it("subjectId inexistente devolve lista vazia, não 400", async () => {
+    const res = await app().request("/admin/questions?subjectId=nao-existe", {}, env);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { total: number }).total).toBe(0);
+  });
 });
 
 // `limit`/`offset` vêm da querystring como string; valores negativos de
