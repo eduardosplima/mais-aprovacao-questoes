@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+import wranglerConfigRaw from "../wrangler.jsonc?raw";
 import { env } from "cloudflare:test";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
@@ -7,6 +9,59 @@ import { upsertUserFromPurchase } from "../src/db/users";
 import { signSession } from "../src/lib/jwt";
 import { envWith } from "./helpers";
 import { __resetJwksCache } from "../src/middleware/access";
+
+/**
+ * Remove comentários `//` e `/* *​/` de um JSONC, respeitando strings — uma
+ * troca ingênua por regex de linha cortaria `"https://…"` no meio, já que o
+ * `//` de dentro da string não é comentário nenhum.
+ */
+function stripJsonComments(text: string): string {
+  let out = "";
+  let inString = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (inLineComment) {
+      if (c === "\n") {
+        inLineComment = false;
+        out += c;
+      }
+      continue;
+    }
+    if (inBlockComment) {
+      if (c === "*" && next === "/") {
+        inBlockComment = false;
+        i++;
+      }
+      continue;
+    }
+    if (inString) {
+      out += c;
+      if (c === "\\") {
+        out += next;
+        i++;
+      } else if (c === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      out += c;
+    } else if (c === "/" && next === "/") {
+      inLineComment = true;
+      i++;
+    } else if (c === "/" && next === "*") {
+      inBlockComment = true;
+      i++;
+    } else {
+      out += c;
+    }
+  }
+  return out;
+}
 
 const TEAM = "equipe-test.cloudflareaccess.com";
 const AUD = "aud-de-teste";
@@ -149,5 +204,18 @@ describe("guardas de /admin", () => {
   it("/health segue público", async () => {
     const res = await app.request("/health", {}, prod());
     expect(res.status).toBe(200);
+  });
+});
+
+// A camada de bypass só existe para dev local (ver middleware/access.ts).
+// Nenhum teste de guarda pega uma regressão que a ligasse em produção de
+// verdade — todos injetam a var via envWith. Quem protege é este teste, lendo
+// a configuração que o Worker de produção de fato usa.
+describe("configuração de produção", () => {
+  it("a var de bypass não existe no bloco vars de wrangler.jsonc", () => {
+    const config = JSON.parse(stripJsonComments(wranglerConfigRaw)) as {
+      vars?: Record<string, unknown>;
+    };
+    expect(config.vars).not.toHaveProperty("ACCESS_DEV_BYPASS");
   });
 });
