@@ -118,6 +118,49 @@ describe("rotas de taxonomia", () => {
     expect(res.status).toBe(404);
   });
 
+  it("404 ao renomear id inexistente", async () => {
+    const res = await app().request(
+      "/admin/taxonomy/nao-existe",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Qualquer" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(404);
+    expect((await res.json()) as { error: string }).toEqual({ error: "not_found" });
+  });
+
+  // Mesmo caminho do caso acima, mas é o que prende a invariante de soft
+  // delete no rename: `renameTerm` filtra por `alive` no UPDATE e no SELECT,
+  // então um termo apagado tem que se comportar como inexistente — não pode
+  // ser renomeado nem voltar a aparecer.
+  it("404 ao renomear termo apagado, que não ressuscita", async () => {
+    const created = await app().request(
+      "/admin/taxonomy",
+      json({ kind: "banca", name: "Banca Extinta" }),
+      env,
+    );
+    const { term } = (await created.json()) as { term: { id: string } };
+    await app().request(`/admin/taxonomy/${term.id}`, { method: "DELETE" }, env);
+
+    const res = await app().request(
+      `/admin/taxonomy/${term.id}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Banca Ressuscitada" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(404);
+
+    const list = await app().request("/admin/taxonomy?kind=banca", {}, env);
+    const body = (await list.json()) as { terms: { id: string }[] };
+    expect(body.terms.some((t) => t.id === term.id)).toBe(false);
+  });
+
   it("409 ao renomear para o nome de outro termo ativo", async () => {
     await app().request("/admin/taxonomy", json({ kind: "level", name: "Fundamental" }), env);
     const created = await app().request(
