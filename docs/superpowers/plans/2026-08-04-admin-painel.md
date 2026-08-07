@@ -416,11 +416,13 @@ Ajustar o import de `node:path` na linha 12 para incluir `basename` e `resolve`,
 
 - [ ] **Step 6: Verificar que os binários nativos funcionam sob `ignore-scripts`**
 
+O `tailwindcss` v4 **não tem CLI** — ela mudou para o pacote `@tailwindcss/cli`, que não está aprovado e não é necessário, porque o painel consome o Tailwind via `@tailwindcss/postcss`. Então a verificação carrega os dois módulos nativos direto:
+
 ```bash
-cd web && npx tailwindcss --help
+cd web && node -e "require('@tailwindcss/oxide'); require('lightningcss'); console.log('bindings nativos ok')"
 ```
 
-Expected: imprime a ajuda do Tailwind. Se falhar com erro de módulo nativo (`@tailwindcss/oxide` ou `lightningcss`), rodar **por pacote**, nunca globalmente:
+Expected: `bindings nativos ok`. Se falhar com erro de módulo nativo (`@tailwindcss/oxide` ou `lightningcss`), rodar **por pacote**, nunca globalmente:
 
 ```bash
 npm rebuild @tailwindcss/oxide
