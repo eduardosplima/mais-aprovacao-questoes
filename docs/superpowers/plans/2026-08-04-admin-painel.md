@@ -3979,7 +3979,11 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await expect(page.getByRole("textbox", { name: "Alternativa C" })).toHaveValue(
     "Terceira",
   );
-  await expect(page.locator("table").getByText("Publicada")).toBeVisible();
+  // Aqui já estamos no EDITOR, que não tem <table> — escopar nela não
+  // acharia nada. E `getByText` solto casaria o toast "Questão publicada."
+  // ainda visível: o ProvedorToast é irmão do <main> e sobrevive à
+  // navegação do cliente.
+  await expect(page.locator("main").getByText("Publicada")).toBeVisible();
 });
 
 test("responde em viewport de celular", async ({ page }) => {
