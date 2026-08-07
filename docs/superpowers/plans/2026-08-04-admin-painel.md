@@ -65,7 +65,7 @@ O custo real do Tailwind é **+25 pacotes**, não +1. A diferença entre as duas
 - **Sem rota dinâmica de segmento.** `/questoes/[id]` exigiria `generateStaticParams` com os ids conhecidos no build, o que é impossível para um acervo vivo. O editor é uma página estática com o id em query param: `/questoes/editar?id=<uuid>`.
 - **Comentários, textos de interface e mensagens de erro em português**, como todo o código existente.
 - **Conteúdo de linha em teste sempre com escopo na `<table>`:** `page.locator("table").getByText(…)`. A `Tabela` do design system renderiza **cada linha duas vezes** — a versão desktop em `<table>` e a mobile em `<ul>`, alternadas só por CSS —, então as duas estão sempre no DOM e um `getByText` solto viola o strict mode do Playwright. Vale também para os botões de ação da linha. Descoberto na Task 4, e repetido na Task 5.
-- **`getByLabel` casa por substring, e isso morde em português:** `page.getByLabel("Nome")` também casa o `aria-label="Renomear Cespe"`, porque "Re**nome**ar" contém "nome". Use `{ exact: true }` sempre que o rótulo for uma palavra curta que possa aparecer dentro de outra. Descoberto na Task 5.
+- **`getByText` e `getByLabel` casam por substring, sem diferenciar maiúscula — e isso morde três vezes neste projeto.** `getByLabel("Nome")` casa o `aria-label="Renomear Cespe"` ("Re**nome**ar"); `getByText("Certo")` casa o `<option>"Certo/errado"` do select de Tipo, **mesmo com o select fechado**. A regra geral: quando o alvo for uma palavra curta que possa aparecer dentro de outra string da página, ou use `{ exact: true }`, ou — melhor — mire no papel acessível do elemento (`getByRole("radio", { name: … })`), que testa a semântica em vez da marcação de apresentação. Descoberto nas Tasks 5 e 7.
 - **Alerta em teste sempre com escopo no `<main>`:** `page.locator("main").getByRole("alert")`, nunca `page.getByRole("alert")` sozinho. O App Router monta um `AppRouterAnnouncer` com `role="alert"` no `document.body`, dentro de um shadow root aberto que o Playwright atravessa por padrão (`next/dist/client/components/app-router-announcer.js:25`). Sem o escopo, todo `getByRole("alert")` casa dois elementos e nenhuma asserção de contagem funciona. Descoberto na Task 3.
 - **Nunca logar conteúdo de questão nem dado pessoal.** Mesma regra da Fundação.
 - **Tema claro apenas.** O `docs/demo.html` é claro, e nenhum dos cinco critérios de pronto pede alternância de tema. Os tokens ficam em custom properties, então um bloco `@media (prefers-color-scheme: dark)` é adição futura barata — mas não entra agora (YAGNI).
@@ -3193,8 +3193,15 @@ test("certo/errado troca para duas alternativas fixas", async ({ page }) => {
   await page.goto("/questoes/editar");
 
   await page.getByLabel("Tipo").selectOption("true_false");
-  await expect(page.getByText("Certo")).toBeVisible();
-  await expect(page.getByText("Errado")).toBeVisible();
+  // Pelo nome acessível do radio, não pelo texto: `getByText("Certo")`
+  // casaria também o <option>"Certo/errado" do select de Tipo, mesmo com o
+  // select fechado.
+  await expect(
+    page.getByRole("radio", { name: "Certo é a resposta" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("radio", { name: "Errado é a resposta" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Adicionar alternativa" }),
   ).toHaveCount(0);
