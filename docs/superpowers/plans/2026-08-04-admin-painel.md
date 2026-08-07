@@ -3742,7 +3742,7 @@ Uma questão pode apontar para uma banca soft-deletada; `GET /admin/taxonomy` n�
 - [ ] **Step 7: Rodar os testes e confirmar que passam**
 
 Run: `cd web/admin && npm test`
-Expected: PASS em todos os specs, incluindo os cinco de `editor.spec.ts`.
+Expected: PASS em todos os specs, incluindo os quatro de `editor.spec.ts` — 16 no total (4 login + 5 lista + 3 taxonomias + 4 editor).
 
 - [ ] **Step 8: Commit**
 
