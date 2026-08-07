@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
+import { ProvedorToast } from "@mais/ui";
 import "./globals.css";
 
 // next/font baixa e auto-hospeda no build: nenhuma requisição a servidor de
@@ -32,7 +33,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${poppins.variable}`}>
-      <body>{children}</body>
+      <body>
+        <ProvedorToast>{children}</ProvedorToast>
+      </body>
     </html>
   );
 }
