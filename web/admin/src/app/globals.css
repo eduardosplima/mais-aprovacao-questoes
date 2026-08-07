@@ -1,0 +1,6 @@
+@import "@mais/ui/tokens.css";
+
+/* O Tailwind v4 descobre as classes varrendo os fontes. O painel é varrido
+   por padrão; `web/ui` precisa ser declarado, senão as classes usadas só lá
+   dentro somem do CSS gerado. */
+@source "../../../ui/src";

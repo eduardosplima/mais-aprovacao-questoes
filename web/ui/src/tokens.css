@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --color-roxo: #6d28d9;
+  --color-roxo-2: #7c3aed;
+  --color-roxo-bg: #f1ecfd;
+  --color-roxo-bg-2: #ede7fb;
+  --color-pagina: #f7f6fb;
+  --color-card: #ffffff;
+  --color-borda: #ececf2;
+  --color-borda-2: #e4e2ec;
+  --color-borda-3: #cfc7e6;
+  --color-txt: #221d3a;
+  --color-txt-2: #6b6780;
+  --color-txt-3: #9b97a8;
+  --color-erro: #e5484d;
+  --color-erro-bg: #fdecec;
+  --color-ok: #16a34a;
+  --color-ok-bg: #e9f7ee;
+
+  --radius-card: 18px;
+  --radius-row: 14px;
+  --radius-btn: 12px;
+
+  --shadow-card: 0 1px 2px rgb(34 29 58 / 0.04), 0 8px 24px rgb(34 29 58 / 0.05);
+  --shadow-card-2: 0 1px 3px rgb(34 29 58 / 0.06), 0 12px 32px rgb(34 29 58 / 0.08);
+  --shadow-btn: 0 6px 16px rgb(109 40 217 / 0.28);
+
+  --font-sans: var(--fonte-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--fonte-poppins), sans-serif;
+}
+
+@layer base {
+  body {
+    background: var(--color-pagina);
+    color: var(--color-txt);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Do demo.html: foco visível em tudo, e respeito a quem pediu menos movimento. */
+  :focus-visible {
+    outline: 3px solid #c4b5fd;
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
