@@ -851,7 +851,9 @@ export function Tabela<T>({
 Criar `web/ui/src/Modal.tsx`:
 
 ```tsx
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, type ReactNode } from "react";
 import { Botao } from "./Botao";
 
 export function Modal({
@@ -871,6 +873,33 @@ export function Modal({
   rotuloConfirmar?: string;
   perigo?: boolean;
 }) {
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  const focoAnteriorRef = useRef<HTMLElement | null>(null);
+  // Guarda a versão mais recente de aoCancelar sem entrar nas deps do efeito
+  // abaixo — assim ele não refaz o setup (e rouba o foco de novo) só porque
+  // o chamador passou uma nova função inline num re-render.
+  const aoCancelarRef = useRef(aoCancelar);
+  aoCancelarRef.current = aoCancelar;
+
+  useEffect(() => {
+    if (!aberto) return;
+
+    focoAnteriorRef.current = document.activeElement as HTMLElement | null;
+    // Cancelar é o primeiro botão do diálogo — a opção segura e não
+    // destrutiva para receber o foco inicial.
+    dialogoRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === "Escape") aoCancelarRef.current();
+    }
+    document.addEventListener("keydown", aoTeclar);
+
+    return () => {
+      document.removeEventListener("keydown", aoTeclar);
+      focoAnteriorRef.current?.focus();
+    };
+  }, [aberto]);
+
   if (!aberto) return null;
   return (
     <div
@@ -878,6 +907,7 @@ export function Modal({
       onClick={aoCancelar}
     >
       <div
+        ref={dialogoRef}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
@@ -909,7 +939,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -921,10 +953,20 @@ const Ctx = createContext<Avisar | null>(null);
 
 export function ProvedorToast({ children }: { children: ReactNode }) {
   const [aviso, setAviso] = useState<{ texto: string; tom: Tom } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const avisar = useCallback<Avisar>((texto, tom = "ok") => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setAviso({ texto, tom });
-    setTimeout(() => setAviso(null), 4000);
+    timerRef.current = setTimeout(() => setAviso(null), 4000);
+  }, []);
+
+  // Limpa o timer pendente se o provedor desmontar antes dos 4s — evita
+  // chamar setAviso depois que o componente já saiu de cena.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   const valor = useMemo(() => avisar, [avisar]);
@@ -953,7 +995,9 @@ export function useToast(): Avisar {
 }
 ```
 
-O `"use client"` aqui é o único do `web/ui` e existe porque este componente tem estado. Ele não cria dependência de Next: é uma diretiva que qualquer bundler com suporte a RSC entende, e o `tsc` do Step 6 a ignora.
+`Toast.tsx` e `Modal.tsx` são os dois únicos arquivos de `web/ui` com `"use client"`, e o motivo é o mesmo: ambos têm estado e hooks. A diretiva **não** cria dependência de Next — é entendida por qualquer bundler com suporte a RSC, e o `tsc` do Step 6 a ignora, então a regra de isolamento continua valendo.
+
+Dois detalhes do `Modal` que não são decoração. O `aoCancelarRef` mantém a versão mais recente do callback fora das dependências do efeito: sem ele, um chamador que passe uma função inline faria o efeito refazer o setup a cada re-render, roubando o foco de volta para o botão Cancelar enquanto a pessoa digita. E os hooks ficam todos **acima** do `if (!aberto) return null` — invertida, essa ordem viola as regras dos hooks.
 
 - [ ] **Step 5: Exportar tudo**
 
