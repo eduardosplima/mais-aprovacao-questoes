@@ -64,6 +64,8 @@ O custo real do Tailwind é **+25 pacotes**, não +1. A diferença entre as duas
 - **Sem SSR, sem Server Actions, sem Route Handlers.** `output: 'export'` é configuração de projeto, não de rota: basta uma rota exigir servidor para o adaptador `@opennextjs/cloudflare` (+405 pacotes) voltar. Todo componente que busca dados é `"use client"`.
 - **Sem rota dinâmica de segmento.** `/questoes/[id]` exigiria `generateStaticParams` com os ids conhecidos no build, o que é impossível para um acervo vivo. O editor é uma página estática com o id em query param: `/questoes/editar?id=<uuid>`.
 - **Comentários, textos de interface e mensagens de erro em português**, como todo o código existente.
+- **Conteúdo de linha em teste sempre com escopo na `<table>`:** `page.locator("table").getByText(…)`. A `Tabela` do design system renderiza **cada linha duas vezes** — a versão desktop em `<table>` e a mobile em `<ul>`, alternadas só por CSS —, então as duas estão sempre no DOM e um `getByText` solto viola o strict mode do Playwright. Vale também para os botões de ação da linha. Descoberto na Task 4, e repetido na Task 5.
+- **`getByLabel` casa por substring, e isso morde em português:** `page.getByLabel("Nome")` também casa o `aria-label="Renomear Cespe"`, porque "Re**nome**ar" contém "nome". Use `{ exact: true }` sempre que o rótulo for uma palavra curta que possa aparecer dentro de outra. Descoberto na Task 5.
 - **Alerta em teste sempre com escopo no `<main>`:** `page.locator("main").getByRole("alert")`, nunca `page.getByRole("alert")` sozinho. O App Router monta um `AppRouterAnnouncer` com `role="alert"` no `document.body`, dentro de um shadow root aberto que o Playwright atravessa por padrão (`next/dist/client/components/app-router-announcer.js:25`). Sem o escopo, todo `getByRole("alert")` casa dois elementos e nenhuma asserção de contagem funciona. Descoberto na Task 3.
 - **Nunca logar conteúdo de questão nem dado pessoal.** Mesma regra da Fundação.
 - **Tema claro apenas.** O `docs/demo.html` é claro, e nenhum dos cinco critérios de pronto pede alternância de tema. Os tokens ficam em custom properties, então um bloco `@media (prefers-color-scheme: dark)` é adição futura barata — mas não entra agora (YAGNI).
@@ -2388,29 +2390,29 @@ test("cria, renomeia e exclui um termo", async ({ page }) => {
   await entrar(page);
   await page.getByRole("link", { name: "Taxonomias" }).click();
 
-  await page.getByLabel("Nome").fill("Cespe");
+  await page.getByLabel("Nome", { exact: true }).fill("Cespe");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByText("Cespe")).toBeVisible();
+  await expect(page.locator("table").getByText("Cespe")).toBeVisible();
 
-  await page.getByRole("button", { name: "Renomear Cespe" }).click();
+  await page.locator("table").getByRole("button", { name: "Renomear Cespe" }).click();
   await page.getByLabel("Novo nome").fill("Cebraspe");
   await page.getByRole("button", { name: "Salvar" }).click();
-  await expect(page.getByText("Cebraspe")).toBeVisible();
+  await expect(page.locator("table").getByText("Cebraspe")).toBeVisible();
 
-  await page.getByRole("button", { name: "Excluir Cebraspe" }).click();
-  await page.getByRole("button", { name: "Excluir", exact: true }).click();
-  await expect(page.getByText("Cebraspe")).toHaveCount(0);
+  await page.locator("table").getByRole("button", { name: "Excluir Cebraspe" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Excluir", exact: true }).click();
+  await expect(page.locator("table").getByText("Cebraspe")).toHaveCount(0);
 });
 
 test("nome repetido no mesmo tipo mostra o 409 traduzido", async ({ page }) => {
   await entrar(page);
   await page.goto("/taxonomias");
 
-  await page.getByLabel("Nome").fill("FGV");
+  await page.getByLabel("Nome", { exact: true }).fill("FGV");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByText("FGV")).toBeVisible();
+  await expect(page.locator("table").getByText("FGV")).toBeVisible();
 
-  await page.getByLabel("Nome").fill("FGV");
+  await page.getByLabel("Nome", { exact: true }).fill("FGV");
   await page.getByRole("button", { name: "Adicionar" }).click();
   await expect(page.locator("main").getByRole("alert")).toHaveText(/já existe um termo ativo/i);
 });
@@ -2419,14 +2421,14 @@ test("o mesmo nome em tipos diferentes é permitido", async ({ page }) => {
   await entrar(page);
   await page.goto("/taxonomias");
 
-  await page.getByLabel("Nome").fill("Analista");
+  await page.getByLabel("Nome", { exact: true }).fill("Analista");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByText("Analista")).toBeVisible();
+  await expect(page.locator("table").getByText("Analista")).toBeVisible();
 
   await page.getByRole("tab", { name: "Cargo" }).click();
-  await page.getByLabel("Nome").fill("Analista");
+  await page.getByLabel("Nome", { exact: true }).fill("Analista");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByText("Analista")).toBeVisible();
+  await expect(page.locator("table").getByText("Analista")).toBeVisible();
   await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
 });
 ```
@@ -3145,9 +3147,9 @@ async function criarTaxonomias(page: Page) {
     ["Assunto", "Direito Administrativo"],
   ] as const) {
     await page.getByRole("tab", { name: aba }).click();
-    await page.getByLabel("Nome").fill(nome);
+    await page.getByLabel("Nome", { exact: true }).fill(nome);
     await page.getByRole("button", { name: "Adicionar" }).click();
-    await expect(page.getByText(nome)).toBeVisible();
+    await expect(page.locator("table").getByText(nome)).toBeVisible();
   }
 }
 
@@ -3906,14 +3908,14 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
 
   // 2. Taxonomias mínimas
   await page.getByRole("link", { name: "Taxonomias" }).click();
-  await page.getByLabel("Nome").fill("Cebraspe");
+  await page.getByLabel("Nome", { exact: true }).fill("Cebraspe");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByText("Cebraspe")).toBeVisible();
+  await expect(page.locator("table").getByText("Cebraspe")).toBeVisible();
 
   await page.getByRole("tab", { name: "Assunto" }).click();
-  await page.getByLabel("Nome").fill("Português");
+  await page.getByLabel("Nome", { exact: true }).fill("Português");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByText("Português")).toBeVisible();
+  await expect(page.locator("table").getByText("Português")).toBeVisible();
 
   // 3. Cadastrar e publicar num envio só (o "cadastro em um step" da §2)
   await page.getByRole("link", { name: "Questões" }).click();
@@ -3933,20 +3935,20 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
 
   // 4. Aparece na lista, já publicada
   await expect(page).toHaveURL("http://localhost:3000/");
-  await expect(page.getByText("Assinale a alternativa correta.")).toBeVisible();
-  await expect(page.getByText("Publicada")).toBeVisible();
+  await expect(page.locator("table").getByText("Assinale a alternativa correta.")).toBeVisible();
+  await expect(page.locator("table").getByText("Publicada")).toBeVisible();
 
   // 5. E o filtro de publicadas a encontra
   await page.getByLabel("Situação").selectOption("published");
-  await expect(page.getByText("Assinale a alternativa correta.")).toBeVisible();
+  await expect(page.locator("table").getByText("Assinale a alternativa correta.")).toBeVisible();
 
   // 6. Reabrir preserva tudo — o id não muda ao editar (spec §1)
-  await page.getByText("Assinale a alternativa correta.").click();
+  await page.locator("table").getByText("Assinale a alternativa correta.").click();
   await expect(page).toHaveURL(/\/questoes\/editar\?id=/);
   await expect(page.getByRole("textbox", { name: "Alternativa C" })).toHaveValue(
     "Terceira",
   );
-  await expect(page.getByText("Publicada")).toBeVisible();
+  await expect(page.locator("table").getByText("Publicada")).toBeVisible();
 });
 
 test("responde em viewport de celular", async ({ page }) => {
