@@ -52,6 +52,13 @@ export function SeletorTaxonomia({
         {/* Valor vazio = sem filtro. A API normaliza string vazia para
             ausente, mas o cliente nem chega a mandar (lib/api.ts). */}
         <option value="">{obrigatorio ? "Selecione…" : "Todos"}</option>
+        {/* A questão pode apontar para um termo já excluído: a API o mantém
+            na questão (updateQuestion só revalida a FK que mudou) mas não o
+            devolve na lista de escolha. Sem esta opção fantasma, o select
+            cairia no primeiro item e trocaria a taxonomia sem ninguém pedir. */}
+        {valor !== "" && !termos.some((t) => t.id === valor) && (
+          <option value={valor}>(termo excluído — mantido)</option>
+        )}
         {termos.map((t) => (
           <option key={t.id} value={t.id}>
             {t.name}
