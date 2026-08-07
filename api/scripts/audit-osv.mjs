@@ -7,12 +7,24 @@
  * proteção contra a metade desconhecida é o cooldown de 14 dias e o
  * ignore-scripts (ver ~/.claude/CLAUDE.md, seção 5).
  *
- * Uso: node scripts/audit-osv.mjs   (exit 1 se houver vulnerabilidade)
+ * Uso: node scripts/audit-osv.mjs [diretório]   (exit 1 se houver vulnerabilidade)
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join, resolve } from "node:path";
 
-const ROOT = new URL("../node_modules", import.meta.url).pathname;
+/**
+ * Sem argumento, audita a árvore do próprio `api/` — o comportamento que este
+ * script sempre teve. Com argumento, audita a árvore apontada, que é como o
+ * workspace `web/` reusa este mesmo auditor em vez de manter uma cópia
+ * divergente. Aceita tanto o diretório do pacote quanto o `node_modules` dele.
+ */
+function raizDe(arg) {
+  if (!arg) return new URL("../node_modules", import.meta.url).pathname;
+  const abs = resolve(arg);
+  return basename(abs) === "node_modules" ? abs : join(abs, "node_modules");
+}
+
+const ROOT = raizDe(process.argv[2]);
 
 /**
  * Percorre node_modules, incluindo escopos (@org/pkg) e **node_modules

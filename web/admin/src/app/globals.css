@@ -1,0 +1,37 @@
+@import "@mais/ui/tokens.css";
+
+/* O Tailwind v4 descobre as classes varrendo os fontes. O painel é varrido
+   por padrão; `web/ui` precisa ser declarado, senão as classes usadas só lá
+   dentro somem do CSS gerado. */
+@source "../../../ui/src";
+
+/* Aparência do HTML produzido pelo editor — usada tanto dentro do TipTap
+   quanto no preview, para que o que se digita seja o que se vê. */
+@layer components {
+  .prosa {
+    font-size: 15.5px;
+    color: var(--color-txt);
+    line-height: 1.6;
+  }
+  .prosa p { margin: 0 0 0.75em; }
+  .prosa p:last-child { margin-bottom: 0; }
+  .prosa h2 { font-size: 1.25em; font-weight: 700; margin: 1em 0 0.5em; }
+  .prosa h3 { font-size: 1.1em; font-weight: 700; margin: 1em 0 0.5em; }
+  .prosa ul, .prosa ol { margin: 0 0 0.75em 1.35em; }
+  .prosa ul { list-style: disc; }
+  .prosa ol { list-style: decimal; }
+  .prosa a { color: var(--color-roxo); text-decoration: underline; }
+  .prosa img { max-width: 100%; height: auto; border-radius: 10px; margin: 0.5em 0; }
+  .prosa table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0.75em 0;
+    font-size: 0.95em;
+  }
+  .prosa th, .prosa td {
+    border: 1px solid var(--color-borda-2);
+    padding: 8px 10px;
+    text-align: left;
+  }
+  .prosa th { background: var(--color-pagina); font-weight: 700; }
+}
