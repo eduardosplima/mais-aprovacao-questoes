@@ -2684,7 +2684,7 @@ git commit -m "feat(admin): CRUD das quatro taxonomias em abas"
   - `Editor({ valor: string, aoMudar: (html: string) => void, rotulo: string, comTabela?: boolean })` de `@/componentes/Editor`
   - `UploadImagem({ aoEnviar: (url: string) => void })` de `@/componentes/UploadImagem`
 
-**Pacotes aprovados nesta task** — TipTap 3.28.0, publicado 2026-07-15 (20 dias em 04/08 ✓). A linha 3.29.x é de 24/07 em diante e reprova no cooldown. **47 pacotes no total**, contra os 33 escritos na spec (ver "Correções à spec", item 3):
+**Pacotes aprovados nesta task** — TipTap 3.28.0, publicado 2026-07-15. A linha 3.29.x é de 24/07 em diante e reprova no cooldown. **47 pacotes no total**, contra os 33 escritos na spec (ver "Correções à spec", item 3):
 
 ```
 @tiptap/core @tiptap/pm @tiptap/react
@@ -2692,7 +2692,14 @@ git commit -m "feat(admin): CRUD das quatro taxonomias em abas"
 @tiptap/extension-bold @tiptap/extension-italic @tiptap/extension-underline
 @tiptap/extension-heading @tiptap/extension-list @tiptap/extension-link
 @tiptap/extension-image @tiptap/extension-table @tiptap/extension-history
+@tiptap/extension-bubble-menu @tiptap/extension-floating-menu
 ```
+
+**Por que os dois últimos aparecem sem serem usados.** O `@tiptap/react` declara `bubble-menu` e `floating-menu` como `optionalDependencies` com faixa `^3.28.0` — não fixa. Sem listá-los, o npm resolve a faixa para o mais novo, que é da linha 3.29.x proibida, e aí o `ERESOLVE` trava a instalação inteira contra o peer de `@tiptap/core@3.28.0`.
+
+Este erro esteve na primeira versão deste plano: a medição de 47 pacotes foi feita listando só quinze, e o `npm install --package-lock-only` resolveu esses dois em **3.29.2** sem reclamar — ou seja, o número aprovado escondia duas violações de cooldown. Fixá-los explicitamente resolve tudo em 3.28.0 e mantém o total em 47: mesma superfície, zero violação. Descoberto na execução da Task 6.
+
+**Nunca** contornar isso com `--legacy-peer-deps` (é o que traz o 3.29.2 em silêncio) nem com `--omit=optional` (desligaria dependências opcionais da árvore inteira, incluindo os binários por plataforma do Tailwind e do Next).
 
 - [ ] **Step 1: Conferir o cooldown e instalar**
 
@@ -2711,8 +2718,17 @@ npm install --save-exact -w admin \
   @tiptap/extension-italic@3.28.0 @tiptap/extension-underline@3.28.0 \
   @tiptap/extension-heading@3.28.0 @tiptap/extension-list@3.28.0 \
   @tiptap/extension-link@3.28.0 @tiptap/extension-image@3.28.0 \
-  @tiptap/extension-table@3.28.0 @tiptap/extension-history@3.28.0
+  @tiptap/extension-table@3.28.0 @tiptap/extension-history@3.28.0 \
+  @tiptap/extension-bubble-menu@3.28.0 @tiptap/extension-floating-menu@3.28.0
 ```
+
+Conferir que nenhum `@tiptap/*` escapou para a linha proibida:
+
+```bash
+jq -r '.packages | to_entries[] | select(.key|test("@tiptap")) | "\(.key) \(.value.version)"' package-lock.json | sort -u
+```
+
+Expected: uma única versão, `3.28.0`, em todas as linhas.
 
 Conferir o custo real e que nada além do previsto entrou:
 
