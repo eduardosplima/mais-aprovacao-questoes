@@ -1929,7 +1929,7 @@ git commit -m "feat(admin): login, cliente de API e guarda de sessão, com e2e"
 
 **Interfaces:**
 - Consumes: `api`, `mensagemDe`, `Layout`, `Tabela`, `Coluna`, `Badge`, `Botao`, `Card`, `Modal`, `useToast`.
-- Produces: `SeletorTaxonomia({ kind, valor, aoMudar, rotulo, permitirVazio? })` de `@/componentes/SeletorTaxonomia`.
+- Produces: `SeletorTaxonomia({ kind, valor, aoMudar, rotulo?, obrigatorio?, erro? })` de `@/componentes/SeletorTaxonomia`.
 
 **Regra de filtro herdada da API, e o que ela obriga na tela:** filtro inválido responde 400 com código por campo, paginação inválida cai no default (`api/README.md`, "Códigos de erro"). Os `<select>` só emitem valores válidos, então o 400 de filtro não deve acontecer na prática — mas se acontecer, a lista mostra a mensagem em vez de exibir o acervo inteiro fingindo estar filtrada. É exatamente o cenário que motivou a regra.
 
