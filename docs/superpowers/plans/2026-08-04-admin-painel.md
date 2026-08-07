@@ -888,9 +888,13 @@ export function Modal({
     if (!aberto) return;
 
     focoAnteriorRef.current = document.activeElement as HTMLElement | null;
-    // Cancelar é o primeiro botão do diálogo — a opção segura e não
-    // destrutiva para receber o foco inicial.
-    dialogoRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    // `children` é renderizado antes da linha de botões, isso manda o foco
+    // pro campo de formulário quando há um (ex.: o diálogo de renomear) e,
+    // na ausência de um (children é só texto, ex.: o diálogo de excluir),
+    // cai no Cancelar — o primeiro botão e a opção segura e não destrutiva.
+    dialogoRef.current
+      ?.querySelector<HTMLElement>("input, select, textarea, button, [href]")
+      ?.focus();
 
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key === "Escape") aoCancelarRef.current();
