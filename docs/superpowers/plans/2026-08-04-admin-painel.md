@@ -64,6 +64,8 @@ O custo real do Tailwind é **+25 pacotes**, não +1. A diferença entre as duas
 - **Sem SSR, sem Server Actions, sem Route Handlers.** `output: 'export'` é configuração de projeto, não de rota: basta uma rota exigir servidor para o adaptador `@opennextjs/cloudflare` (+405 pacotes) voltar. Todo componente que busca dados é `"use client"`.
 - **Sem rota dinâmica de segmento.** `/questoes/[id]` exigiria `generateStaticParams` com os ids conhecidos no build, o que é impossível para um acervo vivo. O editor é uma página estática com o id em query param: `/questoes/editar?id=<uuid>`.
 - **Comentários, textos de interface e mensagens de erro em português**, como todo o código existente.
+- **Cada spec semeia o próprio banco.** `web/admin/e2e/seed.mjs` exporta uma função, e todo spec a chama num `test.beforeAll`. Sem isso a suíte fica dependente da ordem alfabética dos arquivos: o `caminho-critico.spec.ts` persiste uma questão de verdade — é o que ele existe para provar — e quebra o teste de "acervo vazio" do `lista.spec.ts` e o nome "Cebraspe" do `taxonomias.spec.ts`. Ordenar os arquivos esconderia o problema até o próximo spec que persistir dado (o sub-projeto 3 traz `attempts`, `comments`, `notes` e `favorites`); limpar no fim do teste não roda quando o teste falha no meio, que é justamente quando o banco fica sujo. Descoberto na Task 9.
+- **Escopar em `<table>` só onde existe tabela.** O escopo certo depende da tela: a lista tem `<table>`, o editor não. Um `page.locator("table")` numa página sem tabela não falha com mensagem clara — ele só não acha nada, e o diagnóstico custa caro. Na dúvida, `page.locator("main")`.
 - **Conteúdo de linha em teste sempre com escopo na `<table>`:** `page.locator("table").getByText(…)`. A `Tabela` do design system renderiza **cada linha duas vezes** — a versão desktop em `<table>` e a mobile em `<ul>`, alternadas só por CSS —, então as duas estão sempre no DOM e um `getByText` solto viola o strict mode do Playwright. Vale também para os botões de ação da linha. Descoberto na Task 4, e repetido na Task 5.
 - **`getByText` e `getByLabel` casam por substring, sem diferenciar maiúscula — e isso morde três vezes neste projeto.** `getByLabel("Nome")` casa o `aria-label="Renomear Cespe"` ("Re**nome**ar"); `getByText("Certo")` casa o `<option>"Certo/errado"` do select de Tipo, **mesmo com o select fechado**. A regra geral: quando o alvo for uma palavra curta que possa aparecer dentro de outra string da página, ou use `{ exact: true }`, ou — melhor — mire no papel acessível do elemento (`getByRole("radio", { name: … })`), que testa a semântica em vez da marcação de apresentação. Descoberto nas Tasks 5 e 7.
 - **Alerta em teste sempre com escopo no `<main>`:** `page.locator("main").getByRole("alert")`, nunca `page.getByRole("alert")` sozinho. O App Router monta um `AppRouterAnnouncer` com `role="alert"` no `document.body`, dentro de um shadow root aberto que o Playwright atravessa por padrão (`next/dist/client/components/app-router-announcer.js:25`). Sem o escopo, todo `getByRole("alert")` casa dois elementos e nenhuma asserção de contagem funciona. Descoberto na Task 3.
@@ -3945,7 +3947,9 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await expect(page.locator("table").getByText("Português")).toBeVisible();
 
   // 3. Cadastrar e publicar num envio só (o "cadastro em um step" da §2)
-  await page.getByRole("link", { name: "Questões" }).click();
+  // exact: o link do logo tem nome acessível "Mais Aprovação Questões"
+  // (vem do alt da imagem), que contém "Questões" como substring.
+  await page.getByRole("link", { name: "Questões", exact: true }).click();
   await page.getByRole("link", { name: "Nova questão" }).click();
 
   await page.getByLabel("Enunciado").fill("Assinale a alternativa correta.");
