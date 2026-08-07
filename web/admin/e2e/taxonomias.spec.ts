@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./entrar";
+import { semear } from "./seed.mjs";
+
+test.beforeAll(semear);
 
 // "Nome" com exact: true — sem isso, getByLabel casa por substring
 // case-insensitive, e "Re[nome]ar" contém "nome": assim que uma linha

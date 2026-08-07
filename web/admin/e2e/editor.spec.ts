@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 import { entrar } from "./entrar";
+import { semear } from "./seed.mjs";
+
+test.beforeAll(semear);
 
 async function criarTaxonomias(page: Page) {
   await page.goto("/taxonomias");

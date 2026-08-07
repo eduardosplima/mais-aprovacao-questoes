@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./entrar";
+import { semear } from "./seed.mjs";
+
+test.beforeAll(semear);
 
 test("o preview mostra enunciado, letras e a alternativa correta", async ({
   page,

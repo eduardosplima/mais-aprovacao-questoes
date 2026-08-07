@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { entrar } from "./entrar";
+import { semear } from "./seed.mjs";
+
+test.beforeAll(semear);
 
 test("acervo vazio explica o que fazer", async ({ page }) => {
   await entrar(page);

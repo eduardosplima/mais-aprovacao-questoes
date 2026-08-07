@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { EMAIL, SENHA } from "./credenciais.mjs";
+import { semear } from "./seed.mjs";
+
+test.beforeAll(semear);
 
 test("sem sessão, qualquer tela redireciona para o login", async ({ page }) => {
   await page.goto("/");

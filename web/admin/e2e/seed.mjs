@@ -1,6 +1,13 @@
 /**
- * Cria (ou recria) o admin de desenvolvimento no D1 local. Roda uma vez por
- * suíte, pelo script `npm test` — nunca por import de spec.
+ * Cria (ou recria) o admin de desenvolvimento no D1 local, e limpa o acervo.
+ * Exportada como `semear()` para que cada spec a chame no próprio
+ * `test.beforeAll` — cada arquivo fica independente dos outros, sem depender
+ * da ordem em que a suíte executa os arquivos (Task 9: sem isso, um spec que
+ * persiste dado real, como o do caminho crítico, contamina o D1 compartilhado
+ * para quem rodar depois).
+ *
+ * Continua funcionando como script solto (`node e2e/seed.mjs` / `npm run
+ * seed`), pro ambiente de desenvolvimento manual.
  *
  * O hash PBKDF2 é recalculado aqui em vez de importado de
  * `api/src/lib/password.ts`: aquele arquivo é TypeScript de Worker e este é um
@@ -9,6 +16,7 @@
  * falha imediatamente, que é o teste logo ao lado.
  */
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { EMAIL, SENHA } from "./credenciais.mjs";
 
 const ITERACOES = 100_000;
@@ -42,19 +50,27 @@ function d1(sql) {
   );
 }
 
-const hash = await hashSenha(SENHA);
-const agora = Date.now();
+export async function semear() {
+  const hash = await hashSenha(SENHA);
+  const agora = Date.now();
 
-// Limpa o acervo entre execuções para que o e2e do caminho crítico não conte
-// questões deixadas pela rodada anterior.
-d1("delete from alternatives");
-d1("delete from explanations");
-d1("delete from questions");
-d1("delete from taxonomy_terms");
-d1(`delete from users where email = '${EMAIL}'`);
-d1(
-  `insert into users (id, email, name, role, password_hash, created_at, updated_at)
-   values ('dev-admin', '${EMAIL}', 'Admin Dev', 'admin', '${hash}', ${agora}, ${agora})`,
-);
+  // Limpa o acervo inteiro — cada spec começa do zero, sem dado de nenhum
+  // outro arquivo.
+  d1("delete from alternatives");
+  d1("delete from explanations");
+  d1("delete from questions");
+  d1("delete from taxonomy_terms");
+  d1(`delete from users where email = '${EMAIL}'`);
+  d1(
+    `insert into users (id, email, name, role, password_hash, created_at, updated_at)
+     values ('dev-admin', '${EMAIL}', 'Admin Dev', 'admin', '${hash}', ${agora}, ${agora})`,
+  );
 
-console.log(`admin de desenvolvimento pronto: ${EMAIL}`);
+  console.log(`admin de desenvolvimento pronto: ${EMAIL}`);
+}
+
+// Modo CLI: `node e2e/seed.mjs` (via `npm run seed`) continua preparando o
+// ambiente de desenvolvimento manual.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  await semear();
+}
