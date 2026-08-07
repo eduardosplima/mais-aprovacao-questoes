@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, type ReactNode } from "react";
 import { Botao } from "./Botao";
 
 export function Modal({
@@ -18,6 +20,33 @@ export function Modal({
   rotuloConfirmar?: string;
   perigo?: boolean;
 }) {
+  const dialogoRef = useRef<HTMLDivElement>(null);
+  const focoAnteriorRef = useRef<HTMLElement | null>(null);
+  // Guarda a versão mais recente de aoCancelar sem entrar nas deps do efeito
+  // abaixo — assim ele não refaz o setup (e rouba o foco de novo) só porque
+  // o chamador passou uma nova função inline num re-render.
+  const aoCancelarRef = useRef(aoCancelar);
+  aoCancelarRef.current = aoCancelar;
+
+  useEffect(() => {
+    if (!aberto) return;
+
+    focoAnteriorRef.current = document.activeElement as HTMLElement | null;
+    // Cancelar é o primeiro botão do diálogo — a opção segura e não
+    // destrutiva para receber o foco inicial.
+    dialogoRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === "Escape") aoCancelarRef.current();
+    }
+    document.addEventListener("keydown", aoTeclar);
+
+    return () => {
+      document.removeEventListener("keydown", aoTeclar);
+      focoAnteriorRef.current?.focus();
+    };
+  }, [aberto]);
+
   if (!aberto) return null;
   return (
     <div
@@ -25,6 +54,7 @@ export function Modal({
       onClick={aoCancelar}
     >
       <div
+        ref={dialogoRef}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}

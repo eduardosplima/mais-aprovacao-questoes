@@ -4,7 +4,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -16,10 +18,20 @@ const Ctx = createContext<Avisar | null>(null);
 
 export function ProvedorToast({ children }: { children: ReactNode }) {
   const [aviso, setAviso] = useState<{ texto: string; tom: Tom } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const avisar = useCallback<Avisar>((texto, tom = "ok") => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setAviso({ texto, tom });
-    setTimeout(() => setAviso(null), 4000);
+    timerRef.current = setTimeout(() => setAviso(null), 4000);
+  }, []);
+
+  // Limpa o timer pendente se o provedor desmontar antes dos 4s — evita
+  // chamar setAviso depois que o componente já saiu de cena.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   const valor = useMemo(() => avisar, [avisar]);
