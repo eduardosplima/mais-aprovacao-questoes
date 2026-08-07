@@ -11,7 +11,7 @@
     "audit": "node ../api/scripts/audit-osv.mjs ./node_modules"
   },
   "overrides": {
-    "postcss": "8.5.21",
+    "postcss": "8.5.23",
     "sharp": "0.35.3"
   }
 }
