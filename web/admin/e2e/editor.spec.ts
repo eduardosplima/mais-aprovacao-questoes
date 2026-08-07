@@ -93,3 +93,56 @@ test("vídeo com mailto: é recusado", async ({ page }) => {
 
   await expect(page.locator("main").getByRole("alert")).toHaveText(/confira os campos/i);
 });
+
+test("certo/errado: preenche, salva e aparece na lista", async ({ page }) => {
+  await entrar(page);
+  await criarTaxonomias(page);
+  await page.goto("/questoes/editar");
+
+  await page.getByLabel("Enunciado").fill("Verdadeiro ou falso: 2 + 2 = 4.");
+  await page.getByLabel("Assunto").selectOption({ label: "Direito Administrativo" });
+  await page.getByLabel("Banca").selectOption({ label: "Cespe" });
+  await page.getByLabel("Tipo").selectOption("true_false");
+  await page.getByRole("radio", { name: "Certo é a resposta" }).check();
+  await page.getByLabel("Gabarito comentado").fill("A soma está correta.");
+  await page.getByRole("button", { name: "Publicar" }).click();
+
+  await expect(page).toHaveURL("http://localhost:3000/");
+  await expect(
+    page.locator("table").getByText("Verdadeiro ou falso: 2 + 2 = 4."),
+  ).toBeVisible();
+});
+
+test("upload de imagem: insere a tag <img> no enunciado", async ({ page }) => {
+  await entrar(page);
+  await page.goto("/questoes/editar");
+
+  // PNG 1x1 de verdade — bytes reais, não um arquivo de texto renomeado. O
+  // servidor confere os magic bytes (api/src/lib/magicBytes.ts) e recusaria
+  // um `.png` fake com 415; provar isso não é o objetivo deste teste, que é
+  // o caminho feliz do upload.
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA" +
+      "60e6kgAAAABJRU5ErkJggg==",
+    "base64",
+  );
+
+  // O <input type="file"> da barra de ferramentas fica `hidden` de propósito
+  // (UploadImagem.tsx) — o botão visível só o aciona por clique de verdade,
+  // que o navegador não deixa automatizar. setInputFiles no input escondido
+  // dispara o mesmo evento `change` e exercita o mesmo caminho de código.
+  //
+  // Existem dois — o Enunciado e o Gabarito comentado são cada um seu
+  // próprio Editor, cada um com a própria BarraFerramentas. O primeiro no
+  // DOM é o do Enunciado (o Card dele vem antes do Card do gabarito).
+  await page
+    .locator('input[type="file"]')
+    .first()
+    .setInputFiles({
+      name: "minusculo.png",
+      mimeType: "image/png",
+      buffer: png,
+    });
+
+  await expect(page.getByLabel("Enunciado").locator("img")).toBeVisible();
+});

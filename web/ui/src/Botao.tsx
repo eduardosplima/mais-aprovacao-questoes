@@ -20,6 +20,7 @@ export function Botao({
   className = "",
   children,
   disabled,
+  type = "button",
   ...resto
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variante?: VarianteBotao;
@@ -28,6 +29,7 @@ export function Botao({
   return (
     <button
       {...resto}
+      type={type}
       disabled={disabled || carregando}
       aria-busy={carregando || undefined}
       className={`${BASE} ${VARIANTE[variante]} ${className}`}

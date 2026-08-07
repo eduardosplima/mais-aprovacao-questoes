@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Botao,
   Campo,
@@ -26,6 +26,8 @@ const ABAS: { kind: TipoTermo; rotulo: string }[] = [
 export default function PaginaTaxonomias() {
   const [aba, setAba] = useState<TipoTermo>("banca");
   const [termos, setTermos] = useState<Termo[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erroCarregamento, setErroCarregamento] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -33,15 +35,27 @@ export default function PaginaTaxonomias() {
   const [novoNome, setNovoNome] = useState("");
   const [aExcluir, setAExcluir] = useState<Termo | null>(null);
   const avisar = useToast();
+  // Descarta respostas fora de ordem: trocar de aba rápido (Banca → Assunto →
+  // Cargo) pode fazer a resposta de uma aba antiga chegar depois da atual, e
+  // sem isto ela sobrescreveria a tela com os termos da aba errada.
+  const idRequisicao = useRef(0);
 
   const carregar = useCallback(async () => {
+    const id = ++idRequisicao.current;
+    setCarregando(true);
+    setErroCarregamento(null);
     try {
-      setTermos(await api.termos(aba));
+      const dados = await api.termos(aba);
+      if (id !== idRequisicao.current) return;
+      setTermos(dados);
     } catch (falha) {
-      avisar(mensagemDe(falha), "erro");
+      if (id !== idRequisicao.current) return;
+      setErroCarregamento(mensagemDe(falha));
       setTermos([]);
+    } finally {
+      if (id === idRequisicao.current) setCarregando(false);
     }
-  }, [aba, avisar]);
+  }, [aba]);
 
   useEffect(() => {
     void carregar();
@@ -166,12 +180,20 @@ export default function PaginaTaxonomias() {
       </Card>
 
       <Card>
-        <Tabela
-          colunas={colunas}
-          linhas={termos}
-          chave={(t) => t.id}
-          vazio="Nenhum termo cadastrado neste tipo."
-        />
+        {carregando && <p className="p-8 text-center text-txt-2">Carregando…</p>}
+        {!carregando && erroCarregamento && (
+          <p role="alert" className="p-8 text-center font-semibold text-erro">
+            {erroCarregamento}
+          </p>
+        )}
+        {!carregando && !erroCarregamento && (
+          <Tabela
+            colunas={colunas}
+            linhas={termos}
+            chave={(t) => t.id}
+            vazio="Nenhum termo cadastrado neste tipo."
+          />
+        )}
       </Card>
 
       <Modal

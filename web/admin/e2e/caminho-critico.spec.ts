@@ -96,20 +96,80 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await expect(page.locator("main").getByText("Publicada")).toBeVisible();
 });
 
-// 360 é o Android comum mais estreito, 390 é o iPhone moderno — larguras
-// bem diferentes, testadas as duas para não confiar só na folga de uma.
-for (const largura of [360, 390]) {
-  test(`responde em viewport de celular (${largura}px)`, async ({ page }) => {
+const ENUNCIADO_RESPONSIVO = "Questão para checagem de layout responsivo.";
+
+// 320 é o iPhone SE (1ª geração) e boa parte dos Android de entrada — a
+// largura comum mais estreita. 360 é o Android comum, 390 o iPhone moderno.
+// Três larguras bem diferentes, para não confiar só na folga de uma.
+const LARGURAS = [320, 360, 390];
+
+// A lista e as taxonomias têm Tabela; o editor não tem tabela nenhuma, mas é
+// a tela mais densa (grade de três colunas, barra de ~12 botões) — a que tem
+// mais chance de estourar a largura antes das outras.
+const TELAS = ["/", "/taxonomias", "/questoes/editar"];
+
+// Sem uma questão de verdade, `toBeHidden()` em <table> passa com o acervo
+// vazio — a Tabela do design system nem renderiza <table> quando não há
+// linha nenhuma (web/ui/src/Tabela.tsx:23) — e continuaria passando mesmo que
+// a tabela desktop fosse removida do design system inteiramente. Roda como
+// teste próprio (não um `beforeAll` com `browser.newPage()`) para herdar o
+// `baseURL` do projeto pela fixture `page`, e porque workers: 1 garante que
+// os testes deste arquivo rodam na ordem declarada.
+test("prepara taxonomias e uma questão para os testes de layout responsivo", async ({
+  page,
+}) => {
+  await entrar(page);
+
+  await page.goto("/taxonomias");
+  await page.getByLabel("Nome", { exact: true }).fill("Banca Responsiva");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(
+    page.locator("table").getByText("Banca Responsiva"),
+  ).toBeVisible();
+
+  await page.getByRole("tab", { name: "Assunto" }).click();
+  await page.getByLabel("Nome", { exact: true }).fill("Assunto Responsivo");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(
+    page.locator("table").getByText("Assunto Responsivo"),
+  ).toBeVisible();
+
+  await page.goto("/questoes/editar");
+  await page.getByLabel("Enunciado").fill(ENUNCIADO_RESPONSIVO);
+  await page.getByLabel("Assunto").selectOption({ label: "Assunto Responsivo" });
+  await page.getByLabel("Banca").selectOption({ label: "Banca Responsiva" });
+  await page.getByRole("textbox", { name: "Alternativa A" }).fill("Primeira");
+  await page.getByRole("textbox", { name: "Alternativa B" }).fill("Segunda");
+  await page.getByRole("textbox", { name: "Alternativa C" }).fill("Terceira");
+  await page.getByRole("textbox", { name: "Alternativa D" }).fill("Quarta");
+  await page.getByRole("radio", { name: "Alternativa A é a correta" }).check();
+  await page.getByLabel("Gabarito comentado").fill("Explicação.");
+  await page.getByRole("button", { name: "Salvar rascunho" }).click();
+  await expect(page).toHaveURL("http://localhost:3000/");
+});
+
+for (const largura of LARGURAS) {
+  for (const tela of TELAS) {
+    test(`${tela} sem rolagem horizontal em ${largura}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: 844 });
+      await entrar(page);
+      if (tela !== "/") await page.goto(tela);
+
+      // Sem rolagem horizontal: é o sintoma mais comum de layout que não responde.
+      const estouro = await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth + 1,
+      );
+      expect(estouro).toBe(false);
+    });
+  }
+
+  test(`a tabela vira lista de cartões em ${largura}px`, async ({ page }) => {
     await page.setViewportSize({ width: largura, height: 844 });
     await entrar(page);
 
-    // Sem rolagem horizontal: é o sintoma mais comum de layout que não responde.
-    const estouro = await page.evaluate(
-      () => document.documentElement.scrollWidth > window.innerWidth + 1,
-    );
-    expect(estouro).toBe(false);
-
-    // A tabela virou lista de cartões.
+    // As duas direções: a tabela desktop some, e a lista de cartões mobile —
+    // que é quem carrega o conteúdo nessa largura — aparece de verdade.
     await expect(page.locator("table")).toBeHidden();
+    await expect(page.locator("ul").getByText(ENUNCIADO_RESPONSIVO)).toBeVisible();
   });
 }

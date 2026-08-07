@@ -168,6 +168,16 @@ export default function PaginaLista() {
           className="flex gap-2 flex-wrap"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Clicar na linha também abre o editor, mas é conveniência, não a
+              única via — sem um link explícito, quem navega só pelo teclado
+              não tem como reabrir uma questão (a linha não é focável de
+              propósito, ver Tabela.tsx). */}
+          <Link
+            href={`/questoes/editar?id=${l.id}`}
+            className="h-9 px-3 inline-flex items-center justify-center rounded-btn border border-borda-2 bg-card text-txt text-[13px] font-bold transition-colors hover:border-borda-3 hover:bg-roxo-bg/40"
+          >
+            Editar
+          </Link>
           <Botao
             variante="secundario"
             className="h-9 px-3 text-[13px]"

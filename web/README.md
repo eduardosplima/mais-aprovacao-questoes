@@ -10,6 +10,16 @@ questões. Dois workspaces npm:
 
 A API vive em `../api` e já está pronta. Este pacote não a modifica.
 
+**Atenção para quem for consumir `ui/` (o sub-projeto 4):** importar só
+`@mais/ui/tokens.css` dá os tokens, mas **não** as classes dos componentes.
+O Tailwind v4 gera CSS apenas para as classes que encontra varrendo os
+arquivos declarados — ele não varre um pacote irmão sozinho. É por isso que
+`web/admin/src/app/globals.css:6` declara `@source "../../../ui/src"`; sem
+essa linha (ou equivalente), `Botao`, `Card` e os demais componentes
+renderizam sem estilo nenhum, silenciosamente, sem erro de build. Qualquer
+consumidor de `@mais/ui` precisa da mesma declaração `@source` apontando
+para o `src` do pacote.
+
 ## Setup
 
 ```bash
