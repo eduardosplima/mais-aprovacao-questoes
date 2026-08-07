@@ -64,6 +64,7 @@ O custo real do Tailwind é **+25 pacotes**, não +1. A diferença entre as duas
 - **Sem SSR, sem Server Actions, sem Route Handlers.** `output: 'export'` é configuração de projeto, não de rota: basta uma rota exigir servidor para o adaptador `@opennextjs/cloudflare` (+405 pacotes) voltar. Todo componente que busca dados é `"use client"`.
 - **Sem rota dinâmica de segmento.** `/questoes/[id]` exigiria `generateStaticParams` com os ids conhecidos no build, o que é impossível para um acervo vivo. O editor é uma página estática com o id em query param: `/questoes/editar?id=<uuid>`.
 - **Comentários, textos de interface e mensagens de erro em português**, como todo o código existente.
+- **Alerta em teste sempre com escopo no `<main>`:** `page.locator("main").getByRole("alert")`, nunca `page.getByRole("alert")` sozinho. O App Router monta um `AppRouterAnnouncer` com `role="alert"` no `document.body`, dentro de um shadow root aberto que o Playwright atravessa por padrão (`next/dist/client/components/app-router-announcer.js:25`). Sem o escopo, todo `getByRole("alert")` casa dois elementos e nenhuma asserção de contagem funciona. Descoberto na Task 3.
 - **Nunca logar conteúdo de questão nem dado pessoal.** Mesma regra da Fundação.
 - **Tema claro apenas.** O `docs/demo.html` é claro, e nenhum dos cinco critérios de pronto pede alternância de tema. Os tokens ficam em custom properties, então um bloco `@media (prefers-color-scheme: dark)` é adição futura barata — mas não entra agora (YAGNI).
 - Rodar `npm run typecheck` (nos dois workspaces) antes de cada commit.
@@ -1102,12 +1103,15 @@ Expected: baixa o Chromium para `~/Library/Caches/ms-playwright`. Não passar `-
 
 - [ ] **Step 3: Preparar o ambiente local da API**
 
-O Worker precisa de duas variáveis para o e2e funcionar. Em `api/.dev.vars` (arquivo local, já no `.gitignore` — **nunca commitar**), garantir:
+Em `api/.dev.vars` (arquivo local, já no `.gitignore` — **nunca commitar**; **acrescentar, não sobrescrever**, porque ele pode já ter os segredos do sandbox da Hotmart), garantir:
 
 ```
 ACCESS_DEV_BYPASS=true
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
+JWT_SECRET=<qualquer segredo forte — só desenvolvimento>
 ```
+
+**O `JWT_SECRET` não é opcional e é fácil de esquecer.** Sem ele o `signSession` estoura (`DataError: Imported HMAC key length (0)`) e o login responde 500. A suíte de testes do Worker **não** pega isso, porque o `@cloudflare/vitest-pool-workers` injeta o valor como binding do Miniflare — o `wrangler dev`, não. Os outros três segredos que o `api/README.md` lista (`HOTMART_*`, `DOCUMENT_HMAC_KEY`) não são exercitados por este e2e, mas não custa tê-los.
 
 `ACCESS_DEV_BYPASS=true` pula a camada 1 (o JWT do Access), que não existe fora da borda da Cloudflare — é exatamente o que `api/src/middleware/access.ts:45` prevê. As camadas 2 e 3 (sessão + `role=admin`) continuam valendo, então o e2e ainda exerce o login de verdade.
 
@@ -1323,7 +1327,7 @@ test("credencial errada mostra a mensagem genérica e não entra", async ({
   await page.getByLabel("Senha").fill("senha-errada");
   await page.getByRole("button", { name: "Entrar" }).click();
 
-  await expect(page.getByRole("alert")).toHaveText(/email ou senha inválidos/i);
+  await expect(page.locator("main").getByRole("alert")).toHaveText(/email ou senha inválidos/i);
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -1862,7 +1866,16 @@ export default function PaginaLogin() {
               </p>
             )}
 
-            <Botao type="submit" carregando={enviando}>
+            {/* Sem token o Worker responde `captcha_failed` antes mesmo de
+                olhar a credencial, então enviar cedo só produz um erro que
+                confunde. O widget de teste leva ~3s para resolver. */}
+            {!token && (
+              <p className="text-[12.5px] text-txt-3">
+                Aguardando a verificação de segurança…
+              </p>
+            )}
+
+            <Botao type="submit" carregando={enviando} disabled={!token}>
               Entrar
             </Botao>
           </form>
@@ -2361,7 +2374,7 @@ test("nome repetido no mesmo tipo mostra o 409 traduzido", async ({ page }) => {
 
   await page.getByLabel("Nome").fill("FGV");
   await page.getByRole("button", { name: "Adicionar" }).click();
-  await expect(page.getByRole("alert")).toHaveText(/já existe um termo ativo/i);
+  await expect(page.locator("main").getByRole("alert")).toHaveText(/já existe um termo ativo/i);
 });
 
 test("o mesmo nome em tipos diferentes é permitido", async ({ page }) => {
@@ -2376,7 +2389,7 @@ test("o mesmo nome em tipos diferentes é permitido", async ({ page }) => {
   await page.getByLabel("Nome").fill("Analista");
   await page.getByRole("button", { name: "Adicionar" }).click();
   await expect(page.getByText("Analista")).toBeVisible();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
 });
 ```
 
@@ -3144,7 +3157,7 @@ test("sem alternativa correta, a API recusa e a tela explica", async ({
   // Nenhuma marcada como correta.
   await page.getByRole("button", { name: "Salvar rascunho" }).click();
 
-  await expect(page.getByRole("alert")).toHaveText(
+  await expect(page.locator("main").getByRole("alert")).toHaveText(
     /marque exatamente uma alternativa/i,
   );
 });
@@ -3165,7 +3178,7 @@ test("vídeo com mailto: é recusado", async ({ page }) => {
   await page.getByRole("radio", { name: "Alternativa A é a correta" }).check();
   await page.getByRole("button", { name: "Salvar rascunho" }).click();
 
-  await expect(page.getByRole("alert")).toHaveText(/confira os campos/i);
+  await expect(page.locator("main").getByRole("alert")).toHaveText(/confira os campos/i);
 });
 ```
 
