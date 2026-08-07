@@ -30,7 +30,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <header className="bg-card border-b border-borda">
-        <div className="max-w-[1320px] mx-auto px-4 md:px-6 flex items-center gap-2 md:gap-6 h-[68px] md:h-[84px]">
+        {/*
+          flex-wrap em vez de espremer gap: abaixo de md o <nav> (w-full,
+          order-3) quebra pra linha própria, então a largura da tela nunca
+          decide se cabe — cabe sempre, por construção, em vez de depender de
+          uma soma de larguras específicas caber num viewport específico.
+          order-* só muda a posição visual, não a ordem do DOM, então a ordem
+          de tab (Logo → Questões → Taxonomias → Sair) não muda em nenhum
+          tamanho de tela.
+        */}
+        <div className="max-w-[1320px] mx-auto px-4 md:px-6 flex flex-wrap items-center gap-x-4 gap-y-3 py-3 md:py-0 md:h-[84px]">
           <Link href="/" className="shrink-0">
             <Image
               src="/logo.png"
@@ -41,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               priority
             />
           </Link>
-          <nav className="flex items-center gap-3 md:gap-8">
+          <nav className="order-3 md:order-none w-full md:w-auto flex items-center gap-5 md:gap-8">
             {NAV.map((item) => (
               <Link
                 key={item.href}
@@ -54,7 +63,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="order-2 md:order-none ml-auto flex items-center gap-3">
             <span className="hidden sm:inline text-[15px] font-semibold">
               {usuario.name ?? usuario.email}
             </span>

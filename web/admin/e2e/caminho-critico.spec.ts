@@ -49,11 +49,41 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await expect(page.locator("table").getByText("Assinale a alternativa correta.")).toBeVisible();
   await expect(page.locator("table").getByText("Publicada")).toBeVisible();
 
-  // 5. E o filtro de publicadas a encontra
+  // 5. Controle negativo: um rascunho para provar que o filtro filtra, não
+  // só que a questão publicada aparece — com uma questão só no acervo, um
+  // filtro quebrado (query param ignorado, cláusula errada no backend)
+  // passaria pelo teste antigo do mesmo jeito.
+  await page.getByRole("link", { name: "Nova questão" }).click();
+  await page.getByLabel("Enunciado").fill("Questão de rascunho para controle");
+  await page.getByLabel("Assunto").selectOption({ label: "Português" });
+  await page.getByLabel("Banca").selectOption({ label: "Cebraspe" });
+  await page.getByRole("textbox", { name: "Alternativa A" }).fill("Primeira");
+  await page.getByRole("textbox", { name: "Alternativa B" }).fill("Segunda");
+  await page.getByRole("textbox", { name: "Alternativa C" }).fill("Terceira");
+  await page.getByRole("textbox", { name: "Alternativa D" }).fill("Quarta");
+  await page.getByRole("radio", { name: "Alternativa A é a correta" }).check();
+  await page.getByLabel("Gabarito comentado").fill("Rascunho, não publicado.");
+  await page.getByRole("button", { name: "Salvar rascunho" }).click();
+  await expect(page).toHaveURL("http://localhost:3000/");
+
+  // 6. O filtro de publicadas encontra a publicada e não o rascunho.
   await page.getByLabel("Situação").selectOption("published");
   await expect(page.locator("table").getByText("Assinale a alternativa correta.")).toBeVisible();
+  await expect(
+    page.locator("table").getByText("Questão de rascunho para controle"),
+  ).not.toBeVisible();
 
-  // 6. Reabrir preserva tudo — o id não muda ao editar (spec §1)
+  // 7. E o inverso: o filtro de rascunho encontra só o rascunho.
+  await page.getByLabel("Situação").selectOption("draft");
+  await expect(
+    page.locator("table").getByText("Questão de rascunho para controle"),
+  ).toBeVisible();
+  await expect(
+    page.locator("table").getByText("Assinale a alternativa correta."),
+  ).not.toBeVisible();
+
+  // 8. Reabrir preserva tudo — o id não muda ao editar (spec §1)
+  await page.getByLabel("Situação").selectOption("published");
   await page.locator("table").getByText("Assinale a alternativa correta.").click();
   await expect(page).toHaveURL(/\/questoes\/editar\?id=/);
   await expect(page.getByRole("textbox", { name: "Alternativa C" })).toHaveValue(
@@ -66,16 +96,20 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await expect(page.locator("main").getByText("Publicada")).toBeVisible();
 });
 
-test("responde em viewport de celular", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await entrar(page);
+// 360 é o Android comum mais estreito, 390 é o iPhone moderno — larguras
+// bem diferentes, testadas as duas para não confiar só na folga de uma.
+for (const largura of [360, 390]) {
+  test(`responde em viewport de celular (${largura}px)`, async ({ page }) => {
+    await page.setViewportSize({ width: largura, height: 844 });
+    await entrar(page);
 
-  // Sem rolagem horizontal: é o sintoma mais comum de layout que não responde.
-  const estouro = await page.evaluate(
-    () => document.documentElement.scrollWidth > window.innerWidth + 1,
-  );
-  expect(estouro).toBe(false);
+    // Sem rolagem horizontal: é o sintoma mais comum de layout que não responde.
+    const estouro = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    );
+    expect(estouro).toBe(false);
 
-  // A tabela virou lista de cartões.
-  await expect(page.locator("table")).toBeHidden();
-});
+    // A tabela virou lista de cartões.
+    await expect(page.locator("table")).toBeHidden();
+  });
+}

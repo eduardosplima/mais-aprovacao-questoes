@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
     "seed": "node e2e/seed.mjs",
-    "test": "npm run seed && playwright test -c e2e/playwright.config.ts"
+    "test": "playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
     "@mais/ui": "*",
