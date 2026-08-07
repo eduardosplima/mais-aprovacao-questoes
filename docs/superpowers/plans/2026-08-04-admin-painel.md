@@ -2058,7 +2058,7 @@ Substituir `web/admin/src/app/page.tsx`:
 ```tsx
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -2081,7 +2081,15 @@ const POR_PAGINA = 50;
 
 /** Enunciado é HTML sanitizado; na tabela queremos texto curto e sem tags. */
 function resumo(html: string): string {
-  const texto = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  // DOMParser não executa script nem busca recurso, e decodifica entidades —
+  // o que o regex anterior errava em dois pontos: `&amp;` aparecia cru na
+  // tela, e um `>` dentro de um atributo (ex.: alt="x > y") cortava a tag no
+  // lugar errado e deixava sobra de marcação colada no texto.
+  const texto = (
+    new DOMParser().parseFromString(html, "text/html").body.textContent ?? ""
+  )
+    .replace(/\s+/g, " ")
+    .trim();
   return texto.length > 120 ? `${texto.slice(0, 120)}…` : texto;
 }
 
@@ -2095,19 +2103,49 @@ export default function PaginaLista() {
   const [aExcluir, setAExcluir] = useState<LinhaQuestao | null>(null);
   const avisar = useToast();
   const router = useRouter();
+  // Descarta respostas fora de ordem: se o pedido do filtro A responder
+  // depois do B, o resultado de A não pode sobrescrever a tela que já
+  // corresponde ao que os <select> mostram.
+  const idRequisicao = useRef(0);
 
   const carregar = useCallback(async () => {
+    const id = ++idRequisicao.current;
     setCarregando(true);
     setErro(null);
     try {
-      const dados = await api.questoes({
+      let paginaAlvo = pagina;
+      let dados = await api.questoes({
         ...filtros,
         limit: POR_PAGINA,
-        offset: pagina * POR_PAGINA,
+        offset: paginaAlvo * POR_PAGINA,
       });
+      if (id !== idRequisicao.current) return;
+
+      // Uma exclusão pode encolher o total abaixo da página em que o
+      // operador está; a API não clampa o offset (devolve `rows: []`), então
+      // sem isso a tela mostraria "nenhuma questão" com registros vivos
+      // escondidos atrás dela, e sem paginação visível para voltar. Recua
+      // para a última página válida e refaz a busca — não zera para 0 cego,
+      // porque quem excluiu um item na página 3 de 10 quer continuar na 3.
+      const ultimaPaginaValida = Math.max(
+        0,
+        Math.ceil(dados.total / POR_PAGINA) - 1,
+      );
+      if (paginaAlvo > ultimaPaginaValida) {
+        paginaAlvo = ultimaPaginaValida;
+        dados = await api.questoes({
+          ...filtros,
+          limit: POR_PAGINA,
+          offset: paginaAlvo * POR_PAGINA,
+        });
+        if (id !== idRequisicao.current) return;
+      }
+
       setLinhas(dados.rows);
       setTotal(dados.total);
+      if (paginaAlvo !== pagina) setPagina(paginaAlvo);
     } catch (falha) {
+      if (id !== idRequisicao.current) return;
       // Filtro inválido responde 400 com código por campo. Mostrar o erro em
       // vez de cair para "sem filtro" é o ponto da regra: uma lista completa
       // exibida como se estivesse filtrada mente sobre o acervo.
@@ -2115,7 +2153,7 @@ export default function PaginaLista() {
       setLinhas([]);
       setTotal(0);
     } finally {
-      setCarregando(false);
+      if (id === idRequisicao.current) setCarregando(false);
     }
   }, [filtros, pagina]);
 
