@@ -111,6 +111,7 @@ O custo real do Tailwind é **+25 pacotes**, não +1. A diferença entre as duas
 | `web/admin/src/componentes/Preview.tsx` *(criar)* | Renderiza a questão como o aluno verá |
 | `web/admin/e2e/playwright.config.ts` *(criar)* | Sobe `wrangler dev` e `next dev` e roda os specs |
 | `web/admin/e2e/credenciais.mjs` *(criar)* | Email e senha do admin de desenvolvimento — só constantes, sem efeito colateral |
+| `web/admin/e2e/entrar.ts` *(criar)* | Helper de login pela tela, pré-condição compartilhada pelos specs |
 | `web/admin/e2e/seed.mjs` *(criar)* | Cria o admin de desenvolvimento no D1 local |
 | `web/admin/e2e/login.spec.ts` *(criar)* | e2e: login e guarda de rota |
 | `web/admin/e2e/caminho-critico.spec.ts` *(criar)* | e2e: login → criar → publicar → aparece na lista |
@@ -1012,7 +1013,7 @@ git commit -m "feat(ui): design system com os tokens e componentes do demo.html"
 ## Task 3: Harness de e2e, cliente de API e tela de login
 
 **Files:**
-- Create: `web/admin/e2e/playwright.config.ts`, `web/admin/e2e/credenciais.mjs`, `web/admin/e2e/seed.mjs`, `web/admin/e2e/tsconfig.json`, `web/admin/e2e/login.spec.ts`
+- Create: `web/admin/e2e/playwright.config.ts`, `web/admin/e2e/credenciais.mjs`, `web/admin/e2e/entrar.ts`, `web/admin/e2e/seed.mjs`, `web/admin/e2e/tsconfig.json`, `web/admin/e2e/login.spec.ts`
 - Create: `web/admin/src/lib/api.ts`, `web/admin/src/lib/erros.ts`, `web/admin/src/lib/sessao.tsx`
 - Create: `web/admin/src/app/login/page.tsx`
 - Create: `web/admin/src/componentes/Layout.tsx`
@@ -1024,6 +1025,7 @@ git commit -m "feat(ui): design system com os tokens e componentes do demo.html"
   - `api` (objeto) e `ApiError` de `@/lib/api`
   - `mensagemDe(erro: unknown): string` de `@/lib/erros`
   - `useSessao(): { carregando: boolean; usuario: Usuario | null }` de `@/lib/sessao`
+  - `entrar(page: Page): Promise<void>` de `e2e/entrar.ts`, usado como pré-condição pelos specs das Tasks 4, 5, 7, 8 e 9
   - `Layout({ children })` de `@/componentes/Layout`
 
 **Pacote aprovado nesta task:** `@playwright/test@1.61.1`, publicado 2026-06-23 (42 dias em 04/08 ✓). São 4 pacotes npm. A 1.62.0 é de 2026-07-24 e só passa no cooldown em 07/08.
@@ -1158,6 +1160,32 @@ Antes de rodar o seed pela primeira vez, aplicar as migrações no D1 local:
 ```bash
 cd api && npm run db:migrate:local
 ```
+
+Criar `web/admin/e2e/entrar.ts` — o login pela tela, que quase todo spec precisa fazer antes de chegar no que ele realmente testa:
+
+```ts
+import { expect, type Page } from "@playwright/test";
+import { EMAIL, SENHA } from "./credenciais.mjs";
+
+/**
+ * Entra no painel do jeito que o operador entra. Um lugar só, porque seis
+ * specs precisam disto como pré-condição.
+ *
+ * `login.spec.ts` e o primeiro teste de `caminho-critico.spec.ts` NÃO usam
+ * este helper de propósito: nesses dois o login é o objeto do teste, não a
+ * pré-condição — se ele mudar, quero ver o teste do login falhar, não o
+ * helper esconder a mudança.
+ */
+export async function entrar(page: Page): Promise<void> {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(EMAIL);
+  await page.getByLabel("Senha").fill(SENHA);
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).toHaveURL("http://localhost:3000/");
+}
+```
+
+O Playwright só coleta `*.spec.ts` (`testMatch` padrão), então `entrar.ts` e `credenciais.mjs` convivem no `testDir` sem virarem suítes vazias.
 
 - [ ] **Step 5: Configurar o Playwright**
 
@@ -1851,16 +1879,8 @@ git commit -m "feat(admin): login, cliente de API e guarda de sessão, com e2e"
 Criar `web/admin/e2e/lista.spec.ts`:
 
 ```ts
-import { test, expect, type Page } from "@playwright/test";
-import { EMAIL, SENHA } from "./credenciais.mjs";
-
-async function entrar(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
-}
+import { test, expect } from "@playwright/test";
+import { entrar } from "./entrar";
 
 test("acervo vazio explica o que fazer", async ({ page }) => {
   await entrar(page);
@@ -2264,16 +2284,8 @@ Uma tela para as quatro taxonomias, com abas — é o reflexo direto da decisão
 Criar `web/admin/e2e/taxonomias.spec.ts`:
 
 ```ts
-import { test, expect, type Page } from "@playwright/test";
-import { EMAIL, SENHA } from "./credenciais.mjs";
-
-async function entrar(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
-}
+import { test, expect } from "@playwright/test";
+import { entrar } from "./entrar";
 
 test("cria, renomeia e exclui um termo", async ({ page }) => {
   await entrar(page);
@@ -3027,15 +3039,7 @@ Criar `web/admin/e2e/editor.spec.ts`:
 
 ```ts
 import { test, expect, type Page } from "@playwright/test";
-import { EMAIL, SENHA } from "./credenciais.mjs";
-
-async function entrar(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
-}
+import { entrar } from "./entrar";
 
 async function criarTaxonomias(page: Page) {
   await page.goto("/taxonomias");
@@ -3641,16 +3645,8 @@ O preview mostra a questão como o aluno a verá — layout do `docs/demo.html`.
 Criar `web/admin/e2e/preview.spec.ts`:
 
 ```ts
-import { test, expect, type Page } from "@playwright/test";
-import { EMAIL, SENHA } from "./credenciais.mjs";
-
-async function entrar(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
-}
+import { test, expect } from "@playwright/test";
+import { entrar } from "./entrar";
 
 test("o preview mostra enunciado, letras e a alternativa correta", async ({
   page,
@@ -3801,6 +3797,7 @@ Criar `web/admin/e2e/caminho-critico.spec.ts` — é o teste que a §5 da spec n
 ```ts
 import { test, expect } from "@playwright/test";
 import { EMAIL, SENHA } from "./credenciais.mjs";
+import { entrar } from "./entrar";
 
 test("login → cadastrar → publicar → aparece na lista", async ({ page }) => {
   // 1. Login
@@ -3857,11 +3854,7 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
 
 test("responde em viewport de celular", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
+  await entrar(page);
 
   // Sem rolagem horizontal: é o sintoma mais comum de layout que não responde.
   const estouro = await page.evaluate(
