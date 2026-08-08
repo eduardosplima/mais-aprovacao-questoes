@@ -19,9 +19,34 @@ export type CampoQuestao =
 
 export type ErrosQuestao = Partial<Record<CampoQuestao, string>>;
 
-/** O enunciado é HTML do editor; vazio de verdade é só a moldura do TipTap. */
+/**
+ * O enunciado é HTML do editor; vazio de verdade é só a moldura do TipTap.
+ *
+ * Uma `<img>` conta como conteúdo mesmo sem texto — o servidor aceita
+ * enunciado puramente gráfico (`sanitizeHtml` mantém `img` na allowlist, o
+ * editor tem upload de imagem) e barrar isso aqui seria falso positivo.
+ */
 function vazio(html: string): boolean {
-  return html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
+  const semImagens = html.replace(/<img\b[^>]*>/gi, "x");
+  return semImagens.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
+}
+
+/**
+ * Mesma regra do servidor (api/src/routes/admin/questions.ts:33-42), copiada
+ * em vez de importada: aquele arquivo é rota de Worker, este é lib do painel.
+ * `new URL` recusa protocolo relativo, espaço e host malformado — um regex
+ * feito à mão divergiria desses casos de borda e devolveria mensagem
+ * contraditória (barrar o que a API aceitaria) ou a genérica (deixar passar
+ * o que a API recusaria).
+ */
+function isHttpUrl(value: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  return parsed.protocol === "http:" || parsed.protocol === "https:";
 }
 
 export function validarQuestao(entrada: {
@@ -63,7 +88,7 @@ export function validarQuestao(entrada: {
     erros.alternativas = "Marque exatamente uma alternativa como correta.";
   }
 
-  if (entrada.videoUrl && !/^https?:\/\//i.test(entrada.videoUrl)) {
+  if (entrada.videoUrl && !isHttpUrl(entrada.videoUrl)) {
     erros.videoUrl = "Use um endereço começando com http:// ou https://.";
   }
 

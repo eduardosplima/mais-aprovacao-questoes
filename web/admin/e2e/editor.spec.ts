@@ -60,6 +60,13 @@ test("sem alternativa correta, a tela explica antes de enviar", async ({
   await criarTaxonomias(page);
   await page.goto("/questoes/editar");
 
+  const envios: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().includes("/admin/questions")) {
+      envios.push(r.url());
+    }
+  });
+
   await page.getByLabel("Enunciado").fill("Qual das alternativas está correta?");
   await page.getByLabel("Assunto").selectOption({ label: "Direito Administrativo" });
   await page.getByLabel("Banca").selectOption({ label: "Cespe" });
@@ -74,6 +81,9 @@ test("sem alternativa correta, a tela explica antes de enviar", async ({
   await expect(page.locator("main").getByRole("alert")).toHaveText(
     /marque exatamente uma alternativa/i,
   );
+
+  // A prova de que é o cliente barrando, não a API: nenhuma requisição saiu.
+  expect(envios).toHaveLength(0);
 });
 
 test("vídeo sem esquema http é barrado antes de chegar na API", async ({

@@ -97,6 +97,16 @@ function Formulario() {
     };
   }, [id]);
 
+  useEffect(() => {
+    // querySelector logo após setErros pegaria o DOM de antes do commit (o
+    // resumo ainda não existe na primeira falha, com o batching do React 19).
+    // Um efeito roda depois do commit, então o elemento já está lá.
+    if (Object.keys(erros).length === 0) return;
+    document
+      .querySelector("[data-resumo-erros]")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [erros]);
+
   function trocarTipo(novo: TipoQuestao) {
     setTipo(novo);
     // Trocar o tipo troca o conjunto de alternativas: certo/errado tem duas
@@ -134,10 +144,10 @@ function Formulario() {
     setErros(achados);
     if (Object.keys(achados).length > 0) {
       setErro(null);
-      // Rola até o primeiro campo marcado; o resumo fica no topo do formulário.
-      document
-        .querySelector("[data-resumo-erros]")
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // O resumo e os campos marcados só existem fora da pré-visualização —
+      // sem isto, salvar durante o preview validava, barrava e não mostrava
+      // nada (regressão: antes ao menos a mensagem genérica aparecia).
+      setVendoPreview(false);
       return;
     }
 
