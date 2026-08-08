@@ -8,6 +8,9 @@ import {
   Campo,
   Card,
   CONTROLE,
+  Controle,
+  IconeAno,
+  IconeTipo,
   useToast,
 } from "@mais/ui";
 import { Layout } from "@/componentes/Layout";
@@ -185,15 +188,17 @@ function Formulario() {
           <Card className="p-5 flex flex-col gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               <Campo rotulo="Tipo" htmlFor="tipo">
-                <select
-                  id="tipo"
-                  className={CONTROLE}
-                  value={tipo}
-                  onChange={(e) => trocarTipo(e.target.value as TipoQuestao)}
-                >
-                  <option value="multiple_choice">Múltipla escolha</option>
-                  <option value="true_false">Certo/errado</option>
-                </select>
+                <Controle icone={<IconeTipo />}>
+                  <select
+                    id="tipo"
+                    className={`${CONTROLE} pl-11`}
+                    value={tipo}
+                    onChange={(e) => trocarTipo(e.target.value as TipoQuestao)}
+                  >
+                    <option value="multiple_choice">Múltipla escolha</option>
+                    <option value="true_false">Certo/errado</option>
+                  </select>
+                </Controle>
               </Campo>
               <SeletorTaxonomia
                 kind="subject"
@@ -210,13 +215,15 @@ function Formulario() {
               <SeletorTaxonomia kind="cargo" valor={cargoId} aoMudar={setCargoId} />
               <SeletorTaxonomia kind="level" valor={levelId} aoMudar={setLevelId} />
               <Campo rotulo="Ano" htmlFor="ano" dica="Opcional">
-                <input
-                  id="ano"
-                  className={CONTROLE}
-                  inputMode="numeric"
-                  value={ano}
-                  onChange={(e) => setAno(e.target.value.replace(/\D/g, ""))}
-                />
+                <Controle icone={<IconeAno />}>
+                  <input
+                    id="ano"
+                    className={`${CONTROLE} pl-11`}
+                    inputMode="numeric"
+                    value={ano}
+                    onChange={(e) => setAno(e.target.value.replace(/\D/g, ""))}
+                  />
+                </Controle>
               </Campo>
             </div>
 

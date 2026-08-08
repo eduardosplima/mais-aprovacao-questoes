@@ -6,6 +6,10 @@ import {
   Campo,
   Card,
   CONTROLE,
+  IconeAssunto,
+  IconeBanca,
+  IconeCargo,
+  IconeNivel,
   Modal,
   Tabela,
   useToast,
@@ -16,11 +20,15 @@ import { api, type Termo, type TipoTermo } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
 // Banca primeiro: é a taxonomia que a operação mais cadastra.
-const ABAS: { kind: TipoTermo; rotulo: string }[] = [
-  { kind: "banca", rotulo: "Banca" },
-  { kind: "subject", rotulo: "Assunto" },
-  { kind: "cargo", rotulo: "Cargo" },
-  { kind: "level", rotulo: "Nível" },
+const ABAS: {
+  kind: TipoTermo;
+  rotulo: string;
+  Icone: (props: { className?: string }) => React.JSX.Element;
+}[] = [
+  { kind: "banca", rotulo: "Banca", Icone: IconeBanca },
+  { kind: "subject", rotulo: "Assunto", Icone: IconeAssunto },
+  { kind: "cargo", rotulo: "Cargo", Icone: IconeCargo },
+  { kind: "level", rotulo: "Nível", Icone: IconeNivel },
 ];
 
 export default function PaginaTaxonomias() {
@@ -148,12 +156,13 @@ export default function PaginaTaxonomias() {
               setErro(null);
               setNome("");
             }}
-            className={`px-4 h-11 rounded-btn border text-[14.5px] font-semibold transition-colors ${
+            className={`px-4 h-11 rounded-btn border text-[14.5px] font-semibold transition-colors inline-flex items-center gap-2 ${
               aba === item.kind
                 ? "border-roxo bg-roxo-bg text-roxo"
                 : "border-borda-2 bg-card text-txt hover:border-borda-3"
             }`}
           >
+            <item.Icone />
             {item.rotulo}
           </button>
         ))}

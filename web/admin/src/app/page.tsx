@@ -9,6 +9,8 @@ import {
   Campo,
   Card,
   CONTROLE,
+  Controle,
+  IconeSituacao,
   Modal,
   Tabela,
   useToast,
@@ -231,16 +233,18 @@ export default function PaginaLista() {
             aoMudar={(v) => mudarFiltro("levelId", v)}
           />
           <Campo rotulo="Situação" htmlFor="filtro-situacao">
-            <select
-              id="filtro-situacao"
-              className={CONTROLE}
-              value={filtros.status ?? ""}
-              onChange={(e) => mudarFiltro("status", e.target.value)}
-            >
-              <option value="">Todas</option>
-              <option value="draft">Rascunho</option>
-              <option value="published">Publicada</option>
-            </select>
+            <Controle icone={<IconeSituacao />}>
+              <select
+                id="filtro-situacao"
+                className={`${CONTROLE} pl-11`}
+                value={filtros.status ?? ""}
+                onChange={(e) => mudarFiltro("status", e.target.value)}
+              >
+                <option value="">Todas</option>
+                <option value="draft">Rascunho</option>
+                <option value="published">Publicada</option>
+              </select>
+            </Controle>
           </Campo>
         </div>
       </Card>

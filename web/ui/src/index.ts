@@ -1,5 +1,6 @@
 export { Botao, type VarianteBotao } from "./Botao";
 export { Campo, CONTROLE } from "./Campo";
+export { Controle } from "./Controle";
 export { Card } from "./Card";
 export { Badge } from "./Badge";
 export { Tabela, type Coluna } from "./Tabela";
