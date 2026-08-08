@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Botao,
+  BotaoIcone,
   Campo,
   Card,
   CONTROLE,
   IconeAssunto,
   IconeBanca,
   IconeCargo,
+  IconeEditar,
+  IconeExcluir,
   IconeNivel,
   Modal,
   Tabela,
@@ -117,25 +120,20 @@ export default function PaginaTaxonomias() {
       titulo: "Ações",
       celula: (t) => (
         <div className="flex gap-2">
-          <Botao
-            variante="secundario"
-            className="h-9 px-3 text-[13px]"
-            aria-label={`Renomear ${t.name}`}
+          <BotaoIcone
+            rotulo={`Renomear ${t.name}`}
+            icone={<IconeEditar />}
             onClick={() => {
               setARenomear(t);
               setNovoNome(t.name);
             }}
-          >
-            Renomear
-          </Botao>
-          <Botao
+          />
+          <BotaoIcone
             variante="perigo"
-            className="h-9 px-3 text-[13px]"
-            aria-label={`Excluir ${t.name}`}
+            rotulo={`Excluir ${t.name}`}
+            icone={<IconeExcluir />}
             onClick={() => setAExcluir(t)}
-          >
-            Excluir
-          </Botao>
+          />
         </div>
       ),
     },

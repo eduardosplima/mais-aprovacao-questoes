@@ -1,6 +1,6 @@
 "use client";
 
-import { Botao, Campo, CONTROLE } from "@mais/ui";
+import { Botao, BotaoIcone, Campo, CONTROLE, IconeExcluir } from "@mais/ui";
 import type { TipoQuestao } from "@/lib/api";
 
 export type AlternativaForm = { body: string; isCorrect: boolean };
@@ -89,15 +89,13 @@ export function ListaAlternativas({
             onChange={() => marcarCorreta(i)}
             aria-label={`Alternativa ${LETRAS[i]} é a correta`}
           />
-          <Botao
+          <BotaoIcone
             variante="secundario"
-            className="h-10 w-10 px-0 shrink-0"
-            aria-label={`Remover alternativa ${LETRAS[i]}`}
+            rotulo={`Remover alternativa ${LETRAS[i]}`}
+            icone={<IconeExcluir />}
             disabled={alternativas.length <= 2}
             onClick={() => aoMudar(alternativas.filter((_, j) => j !== i))}
-          >
-            ✕
-          </Botao>
+          />
         </div>
       ))}
 

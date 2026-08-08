@@ -35,3 +35,40 @@ test("os campos de escolha e as abas exibem ícone sem afetar o nome acessível"
   await expect(aba).toBeVisible();
   await expect(aba.locator("svg")).toHaveCount(1);
 });
+
+test("as ações da linha têm a mesma altura e expõem o rótulo como tooltip", async ({
+  page,
+}) => {
+  await page.route("**/admin/questions**", async (route) => {
+    await route.fulfill({
+      json: {
+        total: 1,
+        rows: [
+          {
+            id: "q-1",
+            statement: "Questão de exemplo",
+            type: "multiple_choice",
+            status: "draft",
+            year: 2024,
+            subjectName: null,
+            bancaName: null,
+          },
+        ],
+      },
+    });
+  });
+
+  await entrar(page);
+
+  const linha = page.locator("table tbody tr").first();
+  const editar = linha.getByRole("link", { name: "Editar" });
+  const excluir = linha.getByRole("button", { name: "Excluir" });
+
+  const caixaEditar = await editar.boundingBox();
+  const caixaExcluir = await excluir.boundingBox();
+  expect(caixaEditar?.height).toBe(caixaExcluir?.height);
+
+  // O rótulo vira tooltip, e continua sendo o nome acessível.
+  await expect(editar).toHaveAttribute("title", "Editar");
+  await expect(excluir).toHaveAttribute("title", "Excluir");
+});

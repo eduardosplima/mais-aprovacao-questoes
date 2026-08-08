@@ -1,4 +1,9 @@
-export { Botao, type VarianteBotao } from "./Botao";
+export {
+  Botao,
+  BotaoIcone,
+  classesBotaoIcone,
+  type VarianteBotao,
+} from "./Botao";
 export { Campo, CONTROLE } from "./Campo";
 export { Controle } from "./Controle";
 export { Card } from "./Card";
