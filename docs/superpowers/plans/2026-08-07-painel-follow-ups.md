@@ -29,20 +29,29 @@ isso —, mas o empacotamento tem duas arestas:
 
 ## Qualidade de erro no editor
 
-Toda rejeição do Zod colapsa em `invalid_request` → "Confira os campos — algum
-valor está fora do formato esperado.", sem destacar campo nenhum. O caso
-concreto: colar `youtube.com/watch?v=abc` sem esquema é recusado pelo servidor
-(`isHttpUrl` exige http/https) e o operador recebe essa frase genérica
-espalhada por quatro Cards.
+> **Resolvido em 2026-08-08** pelo branch `feat/identidade-visual-painel`
+> (spec `specs/2026-08-08-identidade-visual-painel-design.md`). O que era o
+> problema central desta seção — toda rejeição do Zod colapsando em
+> "Confira os campos", sem destacar campo nenhum — passou a ser validado no
+> cliente antes do envio, com resumo no topo, borda vermelha por campo e
+> rolagem. `videoUrl` reusa a lógica de `isHttpUrl` do servidor, e o teste
+> fraco que assertava a frase genérica agora prova que nada foi enviado.
+>
+> A API continua sendo a autoridade: o que ela recusar e o cliente não previr
+> segue caindo na mensagem genérica, que permanece.
 
-Isso também enfraquece o teste que assere exatamente essa string: ele passaria
-se a validação de `videoUrl` fosse removida e outro campo estivesse inválido.
+Continua aberto desta seção:
 
-Relacionado: o preview renderiza o link de vídeo sem checar o esquema, então
-mostra como link funcional algo que o servidor recusará ao salvar.
-
-E `SeletorTaxonomia` engole falha de carga (`.catch(() => setTermos([]))`) —
-um select vazio sem explicação, seguido da mensagem genérica acima ao salvar.
+- O preview renderiza o link de vídeo sem checar o esquema
+  (`Preview.tsx:62-71`), então mostra como link funcional algo que o servidor
+  recusará ao salvar. A validação nova barra antes de salvar, mas o preview
+  ainda mente enquanto o operador digita.
+- `SeletorTaxonomia` engole falha de carga (`.catch(() => vivo && setTermos([]))`,
+  `SeletorTaxonomia.tsx:53`) — um select vazio sem explicação.
+- O campo Enunciado exibe a mensagem de erro pelo `Campo`, mas **não** recebe
+  borda vermelha: `CONTROLE_INVALIDO` se aplica a input e select, e o Enunciado
+  é o wrapper do TipTap, que não usa `CONTROLE`. Mesma classe do defeito
+  corrigido no `SeletorTaxonomia`, num componente que a correção não alcança.
 
 ## Tipos
 
