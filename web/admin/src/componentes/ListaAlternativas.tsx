@@ -1,6 +1,13 @@
 "use client";
 
-import { Botao, BotaoIcone, Campo, CONTROLE, IconeExcluir } from "@mais/ui";
+import {
+  Botao,
+  BotaoIcone,
+  Campo,
+  CONTROLE,
+  IconeAdicionar,
+  IconeExcluir,
+} from "@mais/ui";
 import type { TipoQuestao } from "@/lib/api";
 
 export type AlternativaForm = { body: string; isCorrect: boolean };
@@ -107,6 +114,7 @@ export function ListaAlternativas({
               aoMudar([...alternativas, { body: "", isCorrect: false }])
             }
           >
+            <IconeAdicionar />
             Adicionar alternativa
           </Botao>
         </div>

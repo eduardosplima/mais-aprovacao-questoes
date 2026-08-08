@@ -12,6 +12,7 @@ import {
   classesBotaoIcone,
   CONTROLE,
   Controle,
+  IconeAdicionar,
   IconeDespublicar,
   IconeEditar,
   IconeExcluir,
@@ -210,7 +211,10 @@ export default function PaginaLista() {
       <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
         <h1 className="font-display text-2xl font-bold">Questões</h1>
         <Link href="/questoes/editar">
-          <Botao>Nova questão</Botao>
+          <Botao>
+            <IconeAdicionar />
+            Nova questão
+          </Botao>
         </Link>
       </div>
 

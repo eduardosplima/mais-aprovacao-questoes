@@ -7,6 +7,7 @@ import {
   Campo,
   Card,
   CONTROLE,
+  IconeAdicionar,
   IconeAssunto,
   IconeBanca,
   IconeCargo,
@@ -181,6 +182,7 @@ export default function PaginaTaxonomias() {
             </Campo>
           </div>
           <Botao type="submit" carregando={salvando}>
+            <IconeAdicionar />
             Adicionar
           </Botao>
         </form>

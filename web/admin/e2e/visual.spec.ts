@@ -72,3 +72,24 @@ test("as ações da linha têm a mesma altura e expõem o rótulo como tooltip",
   await expect(editar).toHaveAttribute("title", "Editar");
   await expect(excluir).toHaveAttribute("title", "Excluir");
 });
+
+test("os botões de inserção e o rodapé do editor exibem ícone junto do texto", async ({
+  page,
+}) => {
+  await entrar(page);
+
+  const nova = page.getByRole("link", { name: "Nova questão" });
+  await expect(nova.locator("svg")).toHaveCount(1);
+
+  await page.goto("/taxonomias");
+  await expect(
+    page.getByRole("button", { name: "Adicionar" }).locator("svg"),
+  ).toHaveCount(1);
+
+  await page.goto("/questoes/editar");
+  for (const nome of ["Salvar rascunho", "Publicar", "Cancelar", "Pré-visualizar"]) {
+    await expect(
+      page.getByRole("button", { name: nome }).locator("svg"),
+    ).toHaveCount(1);
+  }
+});

@@ -10,6 +10,11 @@ import {
   CONTROLE,
   Controle,
   IconeAno,
+  IconeCancelar,
+  IconeDespublicar,
+  IconePreview,
+  IconePublicar,
+  IconeSalvar,
   IconeTipo,
   useToast,
 } from "@mais/ui";
@@ -170,6 +175,7 @@ function Formulario() {
             variante="secundario"
             onClick={() => setVendoPreview((v) => !v)}
           >
+            <IconePreview />
             {vendoPreview ? "Voltar a editar" : "Pré-visualizar"}
           </Botao>
         </div>
@@ -281,9 +287,11 @@ function Formulario() {
         {id ? (
           <>
             <Botao carregando={salvando} onClick={() => void salvar("draft")}>
+              <IconeSalvar />
               Salvar
             </Botao>
             <Botao variante="secundario" onClick={() => void alternarSituacao()}>
+              {situacao === "published" ? <IconeDespublicar /> : <IconePublicar />}
               {situacao === "published" ? "Despublicar" : "Publicar"}
             </Botao>
           </>
@@ -294,14 +302,17 @@ function Formulario() {
               carregando={salvando}
               onClick={() => void salvar("draft")}
             >
+              <IconeSalvar />
               Salvar rascunho
             </Botao>
             <Botao carregando={salvando} onClick={() => void salvar("published")}>
+              <IconePublicar />
               Publicar
             </Botao>
           </>
         )}
         <Botao variante="secundario" onClick={() => router.push("/")}>
+          <IconeCancelar />
           Cancelar
         </Botao>
       </div>
