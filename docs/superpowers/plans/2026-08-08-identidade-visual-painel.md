@@ -357,12 +357,11 @@ test("os campos de escolha e as abas exibem ícone sem afetar o nome acessível"
 }) => {
   await entrar(page);
 
-  // Filtros da lista: o ícone é irmão do <select>, dentro do mesmo envelope.
+  // O Controle envolve o select num div; o ícone fica num <span> irmão, então
+  // o svg está a dois níveis do select — subir ao pai e descer é o caminho.
   const situacao = page.getByLabel("Situação");
   await expect(situacao).toBeVisible();
-  await expect(
-    situacao.locator("xpath=preceding-sibling::svg"),
-  ).toHaveCount(1);
+  await expect(situacao.locator("xpath=..").locator("svg")).toHaveCount(1);
 
   // O aria-hidden do ícone preserva o nome acessível da aba — sem ele,
   // getByRole("tab", { name: "Cargo" }) deixaria de casar.
@@ -1298,7 +1297,7 @@ O resumo, renderizado logo antes do primeiro `Card`:
         <li key={campo}>
           <strong>
             {ROTULO_CAMPO[campo] ??
-              `Alternativa ${LETRAS_RESUMO[Number(campo.split("-")[1])]}`}
+              `Alternativa ${LETRAS[Number(campo.split("-")[1])]}`}
           </strong>{" "}
           — {mensagem}
         </li>
@@ -1308,11 +1307,24 @@ O resumo, renderizado logo antes do primeiro `Card`:
 )}
 ```
 
-com, no topo do arquivo:
+A letra da alternativa vem de `ListaAlternativas`, que já a define. **Não criar uma terceira cópia da constante:** tornar a existente exportada em `web/admin/src/componentes/ListaAlternativas.tsx`
 
 ```tsx
-const LETRAS_RESUMO = "ABCDEFGHIJ";
+export const LETRAS = "ABCDEFGHIJ";
 ```
+
+e importá-la no editor:
+
+```tsx
+import {
+  ALTERNATIVAS_VF,
+  LETRAS,
+  ListaAlternativas,
+  type AlternativaForm,
+} from "@/componentes/ListaAlternativas";
+```
+
+usando `LETRAS[...]` no lugar de `LETRAS_RESUMO[...]` no resumo. A cópia em `Preview.tsx` é pré-existente e fica fora deste plano.
 
 Os campos passam o erro adiante:
 
@@ -1505,5 +1517,6 @@ Dois e2e mudam de premissa porque o cliente agora barra antes da rede."
 ## Dívida registrada, fora deste plano
 
 - Regras de validação duplicadas entre `web/admin/src/lib/validacao.ts` e o schema Zod da API. O cliente cobre só o subconjunto que consegue apontar na tela; ainda assim, podem divergir.
-- `Bot` duplicado entre `BarraFerramentas.tsx` e `UploadImagem.tsx`, e `LETRAS` entre `Preview.tsx` e `ListaAlternativas.tsx` — este plano acrescenta um terceiro ponto, `LETRAS_RESUMO` no editor. Consolidar os três num só lugar é trabalho à parte.
+- `Bot` duplicado entre `BarraFerramentas.tsx` e `UploadImagem.tsx`. Consolidar é trabalho à parte.
+- `LETRAS` duplicado entre `Preview.tsx` e `ListaAlternativas.tsx`. Este plano **não** acrescenta um terceiro ponto — o editor importa a constante de `ListaAlternativas` —, mas a cópia do `Preview.tsx` continua lá.
 - Os demais itens de `plans/2026-08-07-painel-follow-ups.md`.
