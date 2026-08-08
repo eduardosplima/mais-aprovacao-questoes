@@ -53,7 +53,7 @@ test("certo/errado troca para duas alternativas fixas", async ({ page }) => {
   ).toHaveCount(0);
 });
 
-test("sem alternativa correta, a API recusa e a tela explica", async ({
+test("sem alternativa correta, a tela explica antes de enviar", async ({
   page,
 }) => {
   await entrar(page);
@@ -67,7 +67,8 @@ test("sem alternativa correta, a API recusa e a tela explica", async ({
   for (const letra of ["A", "B", "C", "D"]) {
     await page.getByRole("textbox", { name: `Alternativa ${letra}` }).fill(letra);
   }
-  // Nenhuma marcada como correta.
+  // Nenhuma marcada como correta. Desde o item 4 quem barra é o cliente, com
+  // a mesma frase que a API usaria para exactly_one_correct.
   await page.getByRole("button", { name: "Salvar rascunho" }).click();
 
   await expect(page.locator("main").getByRole("alert")).toHaveText(
@@ -75,7 +76,9 @@ test("sem alternativa correta, a API recusa e a tela explica", async ({
   );
 });
 
-test("vídeo com mailto: é recusado", async ({ page }) => {
+test("vídeo sem esquema http é barrado antes de chegar na API", async ({
+  page,
+}) => {
   await entrar(page);
   await criarTaxonomias(page);
   await page.goto("/questoes/editar");
@@ -91,7 +94,14 @@ test("vídeo com mailto: é recusado", async ({ page }) => {
   await page.getByRole("radio", { name: "Alternativa A é a correta" }).check();
   await page.getByRole("button", { name: "Salvar rascunho" }).click();
 
-  await expect(page.locator("main").getByRole("alert")).toHaveText(/confira os campos/i);
+  // Antes esta asserção era /confira os campos/i — a frase genérica que a API
+  // devolve para qualquer rejeição do Zod. O ponto do item 4 é justamente que
+  // ela não dizia qual campo estava errado.
+  await expect(page.getByLabel("Vídeo do gabarito")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.locator("main")).toContainText(/http:\/\/ ou https:\/\//i);
 });
 
 test("certo/errado: preenche, salva e aparece na lista", async ({ page }) => {

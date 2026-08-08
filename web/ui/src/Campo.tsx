@@ -40,3 +40,6 @@ export const CONTROLE =
   "w-full h-[50px] px-3.5 rounded-btn border border-borda-2 bg-white " +
   "text-[14.5px] text-txt outline-none transition-colors " +
   "hover:border-borda-3 focus:border-roxo";
+
+/** Aplicado junto do CONTROLE quando o campo tem erro. Vence por vir depois. */
+export const CONTROLE_INVALIDO = "border-erro focus:border-erro";

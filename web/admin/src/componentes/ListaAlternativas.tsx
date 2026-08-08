@@ -5,14 +5,16 @@ import {
   BotaoIcone,
   Campo,
   CONTROLE,
+  CONTROLE_INVALIDO,
   IconeAdicionar,
   IconeExcluir,
 } from "@mais/ui";
 import type { TipoQuestao } from "@/lib/api";
+import type { ErrosQuestao } from "@/lib/validacao";
 
 export type AlternativaForm = { body: string; isCorrect: boolean };
 
-const LETRAS = "ABCDEFGHIJ";
+export const LETRAS = "ABCDEFGHIJ";
 const MAX = 10;
 
 /** As duas de certo/errado, com corpo fixo (spec §1). */
@@ -25,10 +27,12 @@ export function ListaAlternativas({
   tipo,
   alternativas,
   aoMudar,
+  erros,
 }: {
   tipo: TipoQuestao;
   alternativas: AlternativaForm[];
   aoMudar: (novas: AlternativaForm[]) => void;
+  erros?: ErrosQuestao;
 }) {
   function marcarCorreta(indice: number) {
     aoMudar(
@@ -77,7 +81,10 @@ export function ListaAlternativas({
             {LETRAS[i]}
           </span>
           <input
-            className={CONTROLE}
+            className={`${CONTROLE} ${
+              erros?.[`alternativa-${i}`] ? CONTROLE_INVALIDO : ""
+            }`}
+            aria-invalid={erros?.[`alternativa-${i}`] ? true : undefined}
             aria-label={`Alternativa ${LETRAS[i]}`}
             value={alt.body}
             onChange={(e) =>
