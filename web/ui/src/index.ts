@@ -27,4 +27,5 @@ export {
   IconeAdicionar,
   IconeSalvar,
   IconeCancelar,
+  type ComponenteIcone,
 } from "./Icone";

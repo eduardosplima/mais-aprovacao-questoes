@@ -95,7 +95,11 @@ export function validarQuestao(entrada: {
   return erros;
 }
 
-/** Rótulos para o resumo no topo, na ordem em que aparecem no formulário. */
+/**
+ * Rótulos para o resumo no topo. A ordem exibida não vem daqui: o resumo
+ * itera `Object.entries(erros)`, cuja ordem é a de inserção dos campos em
+ * `validarQuestao`.
+ */
 export const ROTULO_CAMPO: Record<string, string> = {
   enunciado: "Enunciado",
   subjectId: "Assunto",

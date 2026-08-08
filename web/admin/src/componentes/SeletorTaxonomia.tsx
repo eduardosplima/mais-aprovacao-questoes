@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import {
   Campo,
   CONTROLE,
+  CONTROLE_INVALIDO,
   Controle,
   IconeAssunto,
   IconeBanca,
   IconeCargo,
   IconeNivel,
+  type ComponenteIcone,
 } from "@mais/ui";
 import { api, type TipoTermo, type Termo } from "@/lib/api";
 
@@ -19,10 +21,7 @@ const ROTULO: Record<TipoTermo, string> = {
   level: "Nível",
 };
 
-const ICONE: Record<
-  TipoTermo,
-  (props: { className?: string }) => React.JSX.Element
-> = {
+const ICONE: Record<TipoTermo, ComponenteIcone> = {
   subject: IconeAssunto,
   banca: IconeBanca,
   cargo: IconeCargo,
@@ -64,7 +63,8 @@ export function SeletorTaxonomia({
       <Controle icone={<Icone />}>
         <select
           id={id}
-          className={`${CONTROLE} pl-11`}
+          className={`${CONTROLE} pl-11 ${erro ? CONTROLE_INVALIDO : ""}`}
+          aria-invalid={erro ? true : undefined}
           value={valor}
           required={obrigatorio}
           onChange={(e) => aoMudar(e.target.value)}

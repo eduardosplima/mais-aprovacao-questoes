@@ -32,7 +32,10 @@ function Svg({
   );
 }
 
-type PropsIcone = { className?: string };
+export type PropsIcone = { className?: string };
+
+/** Assinatura comum a todos os componentes de ícone deste arquivo. */
+export type ComponenteIcone = (props: PropsIcone) => React.JSX.Element;
 
 // ---- taxonomias e campos de escolha (docs/demo.html) ----
 

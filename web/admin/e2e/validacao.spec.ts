@@ -82,6 +82,14 @@ test("salvar com pendências aponta os campos e não envia nada", async ({
   );
   await expect(page.locator("main")).toContainText(/http:\/\/ ou https:\/\//i);
 
+  // Assunto também fica marcado como inválido, não só com a mensagem no
+  // resumo — o SeletorTaxonomia precisa aplicar CONTROLE_INVALIDO e
+  // aria-invalid ao <select>, como os outros campos.
+  await expect(page.getByLabel("Assunto")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+
   // Nada foi enviado ao servidor.
   expect(envios).toHaveLength(0);
 });

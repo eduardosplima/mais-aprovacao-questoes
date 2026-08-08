@@ -18,6 +18,7 @@ import {
   Tabela,
   useToast,
   type Coluna,
+  type ComponenteIcone,
 } from "@mais/ui";
 import { Layout } from "@/componentes/Layout";
 import { api, type Termo, type TipoTermo } from "@/lib/api";
@@ -27,7 +28,7 @@ import { mensagemDe } from "@/lib/erros";
 const ABAS: {
   kind: TipoTermo;
   rotulo: string;
-  Icone: (props: { className?: string }) => React.JSX.Element;
+  Icone: ComponenteIcone;
 }[] = [
   { kind: "banca", rotulo: "Banca", Icone: IconeBanca },
   { kind: "subject", rotulo: "Assunto", Icone: IconeAssunto },

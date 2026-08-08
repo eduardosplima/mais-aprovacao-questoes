@@ -66,7 +66,8 @@ test("as ações da linha têm a mesma altura e expõem o rótulo como tooltip",
 
   const caixaEditar = await editar.boundingBox();
   const caixaExcluir = await excluir.boundingBox();
-  expect(caixaEditar?.height).toBe(caixaExcluir?.height);
+  expect(caixaEditar?.height).toBe(36);
+  expect(caixaExcluir?.height).toBe(36);
 
   // O rótulo vira tooltip, e continua sendo o nome acessível.
   await expect(editar).toHaveAttribute("title", "Editar");
