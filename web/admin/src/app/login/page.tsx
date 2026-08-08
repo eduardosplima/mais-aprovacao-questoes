@@ -108,7 +108,12 @@ function Formulario() {
             />
           </Campo>
 
-          <div ref={widget} />
+          {/* O Turnstile injeta um widget de largura fixa (300px no tamanho
+              padrão), e este contêiner é esticado pelo flex do formulário até
+              a largura do Card. Sem centrar, o widget é o único elemento da
+              coluna que nem preenche a linha nem fica no meio dela — encosta
+              à esquerda e deixa uma folga morta à direita. */}
+          <div ref={widget} className="flex justify-center" />
 
           {erro && (
             <p role="alert" className="text-[13.5px] font-semibold text-erro">
