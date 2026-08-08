@@ -50,7 +50,7 @@ export function Tabela<T>({
               }`}
             >
               {colunas.map((c) => (
-                <td key={c.titulo} className="px-5 py-4 text-[14.5px] align-top">
+                <td key={c.titulo} className="px-5 py-4 text-[14.5px] align-middle">
                   {c.celula(linha)}
                 </td>
               ))}
