@@ -1,11 +1,20 @@
 "use client";
 
-import { Botao, Campo, CONTROLE } from "@mais/ui";
+import {
+  Botao,
+  BotaoIcone,
+  Campo,
+  CONTROLE,
+  CONTROLE_INVALIDO,
+  IconeAdicionar,
+  IconeExcluir,
+} from "@mais/ui";
 import type { TipoQuestao } from "@/lib/api";
+import type { ErrosQuestao } from "@/lib/validacao";
 
 export type AlternativaForm = { body: string; isCorrect: boolean };
 
-const LETRAS = "ABCDEFGHIJ";
+export const LETRAS = "ABCDEFGHIJ";
 const MAX = 10;
 
 /** As duas de certo/errado, com corpo fixo (spec §1). */
@@ -18,10 +27,12 @@ export function ListaAlternativas({
   tipo,
   alternativas,
   aoMudar,
+  erros,
 }: {
   tipo: TipoQuestao;
   alternativas: AlternativaForm[];
   aoMudar: (novas: AlternativaForm[]) => void;
+  erros?: ErrosQuestao;
 }) {
   function marcarCorreta(indice: number) {
     aoMudar(
@@ -70,7 +81,10 @@ export function ListaAlternativas({
             {LETRAS[i]}
           </span>
           <input
-            className={CONTROLE}
+            className={`${CONTROLE} ${
+              erros?.[`alternativa-${i}`] ? CONTROLE_INVALIDO : ""
+            }`}
+            aria-invalid={erros?.[`alternativa-${i}`] ? true : undefined}
             aria-label={`Alternativa ${LETRAS[i]}`}
             value={alt.body}
             onChange={(e) =>
@@ -89,15 +103,13 @@ export function ListaAlternativas({
             onChange={() => marcarCorreta(i)}
             aria-label={`Alternativa ${LETRAS[i]} é a correta`}
           />
-          <Botao
+          <BotaoIcone
             variante="secundario"
-            className="h-10 w-10 px-0 shrink-0"
-            aria-label={`Remover alternativa ${LETRAS[i]}`}
+            rotulo={`Remover alternativa ${LETRAS[i]}`}
+            icone={<IconeExcluir />}
             disabled={alternativas.length <= 2}
             onClick={() => aoMudar(alternativas.filter((_, j) => j !== i))}
-          >
-            ✕
-          </Botao>
+          />
         </div>
       ))}
 
@@ -109,6 +121,7 @@ export function ListaAlternativas({
               aoMudar([...alternativas, { body: "", isCorrect: false }])
             }
           >
+            <IconeAdicionar />
             Adicionar alternativa
           </Botao>
         </div>

@@ -40,3 +40,15 @@ export const CONTROLE =
   "w-full h-[50px] px-3.5 rounded-btn border border-borda-2 bg-white " +
   "text-[14.5px] text-txt outline-none transition-colors " +
   "hover:border-borda-3 focus:border-roxo";
+
+/**
+ * Aplicado junto do CONTROLE quando o campo tem erro.
+ *
+ * Não vence por vir depois: `hover:border-borda-3` tem especificidade maior
+ * (0,2,0 contra 0,1,0 de `border-erro`) e ganha de qualquer forma, e
+ * `focus:border-roxo` é gerado depois de `focus:border-erro`, então venceria
+ * por ordem. As três variantes levam o modificador `!` do Tailwind v4 para
+ * forçar `!important` e garantir que o erro sempre apareça, em repouso, no
+ * hover e no foco.
+ */
+export const CONTROLE_INVALIDO = "border-erro! hover:border-erro! focus:border-erro!";

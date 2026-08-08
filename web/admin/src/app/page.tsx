@@ -6,9 +6,18 @@ import { useRouter } from "next/navigation";
 import {
   Badge,
   Botao,
+  BotaoIcone,
   Campo,
   Card,
+  classesBotaoIcone,
   CONTROLE,
+  Controle,
+  IconeAdicionar,
+  IconeDespublicar,
+  IconeEditar,
+  IconeExcluir,
+  IconePublicar,
+  IconeSituacao,
   Modal,
   Tabela,
   useToast,
@@ -164,34 +173,32 @@ export default function PaginaLista() {
     {
       titulo: "Ações",
       celula: (l) => (
-        <div
-          className="flex gap-2 flex-wrap"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
           {/* Clicar na linha também abre o editor, mas é conveniência, não a
               única via — sem um link explícito, quem navega só pelo teclado
               não tem como reabrir uma questão (a linha não é focável de
               propósito, ver Tabela.tsx). */}
           <Link
             href={`/questoes/editar?id=${l.id}`}
-            className="h-9 px-3 inline-flex items-center justify-center rounded-btn border border-borda-2 bg-card text-txt text-[13px] font-bold transition-colors hover:border-borda-3 hover:bg-roxo-bg/40"
+            title="Editar"
+            aria-label="Editar"
+            className={classesBotaoIcone()}
           >
-            Editar
+            <IconeEditar />
           </Link>
-          <Botao
-            variante="secundario"
-            className="h-9 px-3 text-[13px]"
+          <BotaoIcone
+            rotulo={l.status === "published" ? "Despublicar" : "Publicar"}
+            icone={
+              l.status === "published" ? <IconeDespublicar /> : <IconePublicar />
+            }
             onClick={() => void alternarSituacao(l)}
-          >
-            {l.status === "published" ? "Despublicar" : "Publicar"}
-          </Botao>
-          <Botao
+          />
+          <BotaoIcone
             variante="perigo"
-            className="h-9 px-3 text-[13px]"
+            rotulo="Excluir"
+            icone={<IconeExcluir />}
             onClick={() => setAExcluir(l)}
-          >
-            Excluir
-          </Botao>
+          />
         </div>
       ),
     },
@@ -204,7 +211,10 @@ export default function PaginaLista() {
       <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
         <h1 className="font-display text-2xl font-bold">Questões</h1>
         <Link href="/questoes/editar">
-          <Botao>Nova questão</Botao>
+          <Botao>
+            <IconeAdicionar />
+            Nova questão
+          </Botao>
         </Link>
       </div>
 
@@ -231,16 +241,18 @@ export default function PaginaLista() {
             aoMudar={(v) => mudarFiltro("levelId", v)}
           />
           <Campo rotulo="Situação" htmlFor="filtro-situacao">
-            <select
-              id="filtro-situacao"
-              className={CONTROLE}
-              value={filtros.status ?? ""}
-              onChange={(e) => mudarFiltro("status", e.target.value)}
-            >
-              <option value="">Todas</option>
-              <option value="draft">Rascunho</option>
-              <option value="published">Publicada</option>
-            </select>
+            <Controle icone={<IconeSituacao />}>
+              <select
+                id="filtro-situacao"
+                className={`${CONTROLE} pl-11`}
+                value={filtros.status ?? ""}
+                onChange={(e) => mudarFiltro("status", e.target.value)}
+              >
+                <option value="">Todas</option>
+                <option value="draft">Rascunho</option>
+                <option value="published">Publicada</option>
+              </select>
+            </Controle>
           </Campo>
         </div>
       </Card>

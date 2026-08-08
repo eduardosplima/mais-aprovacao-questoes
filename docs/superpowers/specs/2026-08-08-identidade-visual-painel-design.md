@@ -169,7 +169,11 @@ Função `validar(estado)` no editor, devolvendo `Record<campo, string>`:
 Três indicadores, porque o formulário é mais alto que a tela e um só não
 alcança:
 
-1. **Resumo no topo** com os campos em falta; cada item foca o campo ao clique.
+1. **Resumo no topo** com os campos em falta, como lista estática. Uma versão
+   anterior desta spec previa cada item focando o campo ao clique; foi cortado
+   em 2026-08-08, depois da implementação: o alcance que motivava os três
+   indicadores já vem da rolagem e da borda por campo, e o clique seria
+   conveniência, não cobertura.
 2. **Borda vermelha e mensagem** sob o controle, pelo `erro` que o `Campo` já
    aceita (`Campo.tsx:29`). `Campo.tsx` passa a exportar `CONTROLE_INVALIDO`
    ao lado do `CONTROLE` existente — uma segunda string de classes que o ponto

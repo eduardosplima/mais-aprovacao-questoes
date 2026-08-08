@@ -8,6 +8,15 @@ import {
   Campo,
   Card,
   CONTROLE,
+  CONTROLE_INVALIDO,
+  Controle,
+  IconeAno,
+  IconeCancelar,
+  IconeDespublicar,
+  IconePreview,
+  IconePublicar,
+  IconeSalvar,
+  IconeTipo,
   useToast,
 } from "@mais/ui";
 import { Layout } from "@/componentes/Layout";
@@ -15,6 +24,7 @@ import { Editor } from "@/componentes/Editor";
 import { SeletorTaxonomia } from "@/componentes/SeletorTaxonomia";
 import {
   ALTERNATIVAS_VF,
+  LETRAS,
   ListaAlternativas,
   type AlternativaForm,
 } from "@/componentes/ListaAlternativas";
@@ -26,6 +36,7 @@ import {
   type TipoQuestao,
 } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
+import { ROTULO_CAMPO, validarQuestao, type ErrosQuestao } from "@/lib/validacao";
 
 const VAZIAS: AlternativaForm[] = [
   { body: "", isCorrect: false },
@@ -55,6 +66,7 @@ function Formulario() {
   const [carregando, setCarregando] = useState(id !== null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [erros, setErros] = useState<ErrosQuestao>({});
   const [vendoPreview, setVendoPreview] = useState(false);
 
   useEffect(() => {
@@ -85,6 +97,16 @@ function Formulario() {
     };
   }, [id]);
 
+  useEffect(() => {
+    // querySelector logo após setErros pegaria o DOM de antes do commit (o
+    // resumo ainda não existe na primeira falha, com o batching do React 19).
+    // Um efeito roda depois do commit, então o elemento já está lá.
+    if (Object.keys(erros).length === 0) return;
+    document
+      .querySelector("[data-resumo-erros]")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [erros]);
+
   function trocarTipo(novo: TipoQuestao) {
     setTipo(novo);
     // Trocar o tipo troca o conjunto de alternativas: certo/errado tem duas
@@ -110,6 +132,25 @@ function Formulario() {
   }
 
   async function salvar(status: SituacaoQuestao) {
+    const achados = validarQuestao({
+      enunciado,
+      subjectId,
+      bancaId,
+      ano,
+      gabarito,
+      videoUrl,
+      alternativas,
+    });
+    setErros(achados);
+    if (Object.keys(achados).length > 0) {
+      setErro(null);
+      // O resumo e os campos marcados só existem fora da pré-visualização —
+      // sem isto, salvar durante o preview validava, barrava e não mostrava
+      // nada (regressão: antes ao menos a mensagem genérica aparecia).
+      setVendoPreview(false);
+      return;
+    }
+
     setErro(null);
     setSalvando(true);
     try {
@@ -167,6 +208,7 @@ function Formulario() {
             variante="secundario"
             onClick={() => setVendoPreview((v) => !v)}
           >
+            <IconePreview />
             {vendoPreview ? "Voltar a editar" : "Pré-visualizar"}
           </Botao>
         </div>
@@ -182,45 +224,75 @@ function Formulario() {
         />
       ) : (
         <>
+          {Object.keys(erros).length > 0 && (
+            <div
+              data-resumo-erros
+              role="alert"
+              className="rounded-row border border-erro bg-erro-bg p-4"
+            >
+              <p className="font-bold text-erro mb-2">
+                Corrija {Object.keys(erros).length} ponto(s) para salvar:
+              </p>
+              <ul className="flex flex-col gap-1 text-[14px] text-erro">
+                {Object.entries(erros).map(([campo, mensagem]) => (
+                  <li key={campo}>
+                    <strong>
+                      {ROTULO_CAMPO[campo] ??
+                        `Alternativa ${LETRAS[Number(campo.split("-")[1])]}`}
+                    </strong>{" "}
+                    — {mensagem}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <Card className="p-5 flex flex-col gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               <Campo rotulo="Tipo" htmlFor="tipo">
-                <select
-                  id="tipo"
-                  className={CONTROLE}
-                  value={tipo}
-                  onChange={(e) => trocarTipo(e.target.value as TipoQuestao)}
-                >
-                  <option value="multiple_choice">Múltipla escolha</option>
-                  <option value="true_false">Certo/errado</option>
-                </select>
+                <Controle icone={<IconeTipo />}>
+                  <select
+                    id="tipo"
+                    className={`${CONTROLE} pl-11`}
+                    value={tipo}
+                    onChange={(e) => trocarTipo(e.target.value as TipoQuestao)}
+                  >
+                    <option value="multiple_choice">Múltipla escolha</option>
+                    <option value="true_false">Certo/errado</option>
+                  </select>
+                </Controle>
               </Campo>
               <SeletorTaxonomia
                 kind="subject"
                 valor={subjectId}
                 aoMudar={setSubjectId}
                 obrigatorio
+                erro={erros.subjectId}
               />
               <SeletorTaxonomia
                 kind="banca"
                 valor={bancaId}
                 aoMudar={setBancaId}
                 obrigatorio
+                erro={erros.bancaId}
               />
               <SeletorTaxonomia kind="cargo" valor={cargoId} aoMudar={setCargoId} />
               <SeletorTaxonomia kind="level" valor={levelId} aoMudar={setLevelId} />
-              <Campo rotulo="Ano" htmlFor="ano" dica="Opcional">
-                <input
-                  id="ano"
-                  className={CONTROLE}
-                  inputMode="numeric"
-                  value={ano}
-                  onChange={(e) => setAno(e.target.value.replace(/\D/g, ""))}
-                />
+              <Campo rotulo="Ano" htmlFor="ano" dica="Opcional" erro={erros.ano}>
+                <Controle icone={<IconeAno />}>
+                  <input
+                    id="ano"
+                    className={`${CONTROLE} pl-11 ${erros.ano ? CONTROLE_INVALIDO : ""}`}
+                    aria-invalid={erros.ano ? true : undefined}
+                    inputMode="numeric"
+                    value={ano}
+                    onChange={(e) => setAno(e.target.value.replace(/\D/g, ""))}
+                  />
+                </Controle>
               </Campo>
             </div>
 
-            <Campo rotulo="Enunciado">
+            <Campo rotulo="Enunciado" erro={erros.enunciado}>
               <Editor
                 valor={enunciado}
                 aoMudar={setEnunciado}
@@ -236,11 +308,12 @@ function Formulario() {
               tipo={tipo}
               alternativas={alternativas}
               aoMudar={setAlternativas}
+              erros={erros}
             />
           </Card>
 
           <Card className="p-5 flex flex-col gap-5">
-            <Campo rotulo="Gabarito comentado">
+            <Campo rotulo="Gabarito comentado" erro={erros.gabarito}>
               <Editor
                 valor={gabarito}
                 aoMudar={setGabarito}
@@ -252,10 +325,12 @@ function Formulario() {
               rotulo="Vídeo do gabarito"
               htmlFor="video"
               dica="Opcional. Endereço http ou https."
+              erro={erros.videoUrl}
             >
               <input
                 id="video"
-                className={CONTROLE}
+                className={`${CONTROLE} ${erros.videoUrl ? CONTROLE_INVALIDO : ""}`}
+                aria-invalid={erros.videoUrl ? true : undefined}
                 value={videoUrl}
                 onChange={(e) => setVideoUrl(e.target.value)}
               />
@@ -274,9 +349,11 @@ function Formulario() {
         {id ? (
           <>
             <Botao carregando={salvando} onClick={() => void salvar("draft")}>
+              <IconeSalvar />
               Salvar
             </Botao>
             <Botao variante="secundario" onClick={() => void alternarSituacao()}>
+              {situacao === "published" ? <IconeDespublicar /> : <IconePublicar />}
               {situacao === "published" ? "Despublicar" : "Publicar"}
             </Botao>
           </>
@@ -287,14 +364,17 @@ function Formulario() {
               carregando={salvando}
               onClick={() => void salvar("draft")}
             >
+              <IconeSalvar />
               Salvar rascunho
             </Botao>
             <Botao carregando={salvando} onClick={() => void salvar("published")}>
+              <IconePublicar />
               Publicar
             </Botao>
           </>
         )}
         <Botao variante="secundario" onClick={() => router.push("/")}>
+          <IconeCancelar />
           Cancelar
         </Botao>
       </div>

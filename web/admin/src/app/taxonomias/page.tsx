@@ -3,24 +3,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Botao,
+  BotaoIcone,
   Campo,
   Card,
   CONTROLE,
+  IconeAdicionar,
+  IconeAssunto,
+  IconeBanca,
+  IconeCargo,
+  IconeEditar,
+  IconeExcluir,
+  IconeNivel,
   Modal,
   Tabela,
   useToast,
   type Coluna,
+  type ComponenteIcone,
 } from "@mais/ui";
 import { Layout } from "@/componentes/Layout";
 import { api, type Termo, type TipoTermo } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
 // Banca primeiro: é a taxonomia que a operação mais cadastra.
-const ABAS: { kind: TipoTermo; rotulo: string }[] = [
-  { kind: "banca", rotulo: "Banca" },
-  { kind: "subject", rotulo: "Assunto" },
-  { kind: "cargo", rotulo: "Cargo" },
-  { kind: "level", rotulo: "Nível" },
+const ABAS: {
+  kind: TipoTermo;
+  rotulo: string;
+  Icone: ComponenteIcone;
+}[] = [
+  { kind: "banca", rotulo: "Banca", Icone: IconeBanca },
+  { kind: "subject", rotulo: "Assunto", Icone: IconeAssunto },
+  { kind: "cargo", rotulo: "Cargo", Icone: IconeCargo },
+  { kind: "level", rotulo: "Nível", Icone: IconeNivel },
 ];
 
 export default function PaginaTaxonomias() {
@@ -109,25 +122,20 @@ export default function PaginaTaxonomias() {
       titulo: "Ações",
       celula: (t) => (
         <div className="flex gap-2">
-          <Botao
-            variante="secundario"
-            className="h-9 px-3 text-[13px]"
-            aria-label={`Renomear ${t.name}`}
+          <BotaoIcone
+            rotulo={`Renomear ${t.name}`}
+            icone={<IconeEditar />}
             onClick={() => {
               setARenomear(t);
               setNovoNome(t.name);
             }}
-          >
-            Renomear
-          </Botao>
-          <Botao
+          />
+          <BotaoIcone
             variante="perigo"
-            className="h-9 px-3 text-[13px]"
-            aria-label={`Excluir ${t.name}`}
+            rotulo={`Excluir ${t.name}`}
+            icone={<IconeExcluir />}
             onClick={() => setAExcluir(t)}
-          >
-            Excluir
-          </Botao>
+          />
         </div>
       ),
     },
@@ -148,12 +156,13 @@ export default function PaginaTaxonomias() {
               setErro(null);
               setNome("");
             }}
-            className={`px-4 h-11 rounded-btn border text-[14.5px] font-semibold transition-colors ${
+            className={`px-4 h-11 rounded-btn border text-[14.5px] font-semibold transition-colors inline-flex items-center gap-2 ${
               aba === item.kind
                 ? "border-roxo bg-roxo-bg text-roxo"
                 : "border-borda-2 bg-card text-txt hover:border-borda-3"
             }`}
           >
+            <item.Icone />
             {item.rotulo}
           </button>
         ))}
@@ -174,6 +183,7 @@ export default function PaginaTaxonomias() {
             </Campo>
           </div>
           <Botao type="submit" carregando={salvando}>
+            <IconeAdicionar />
             Adicionar
           </Botao>
         </form>
