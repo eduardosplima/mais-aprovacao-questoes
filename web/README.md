@@ -62,7 +62,7 @@ cd web && npm test            # Playwright (sobe os dois servidores sozinho)
 cd web && npm run audit       # OSV.dev contra a árvore instalada
 ```
 
-## Um hostname, duas origens de conteúdo
+## Um hostname para o painel, duas origens de conteúdo
 
 O painel e a API dividem `admin.<domínio>`, e a divisão é por path. **Uma
 Worker Route casa a URL mas não a reescreve** — por isso as routes usam os
@@ -82,8 +82,29 @@ Em desenvolvimento o `next dev` reproduz o mesmo recorte por proxy
 (`next.config.ts` → `rewrites`), então o navegador vê uma origem só nos dois
 ambientes e não existe CORS em lugar nenhum.
 
-O hostname público continua servindo `/auth/*` e `/webhooks/hotmart` **fora do
-Access** — a Hotmart precisa alcançar o webhook sem passar por identidade.
+**O Worker não tem hostname próprio** — não existe `api.<domínio>`. Ele é
+montado por cima dos hostnames de frontend, dividido por path, e é isso que
+mantém toda chamada same-origin. O mesmo padrão vale para o sub-projeto 4: o
+frontend do aluno recebe suas próprias Worker Routes em `app.<domínio>`, não
+um backend separado.
+
+### O webhook mora fora do `admin.`
+
+Existe uma quarta Worker Route, em **outro hostname**:
+
+| Padrão | Serve |
+|---|---|
+| `app.<domínio>/webhooks/*` | Worker — webhook da Hotmart |
+
+A Hotmart precisa alcançar o webhook sem passar por identidade, e o Access é
+por hostname: `admin.<domínio>` fica coberto **inteiro**, incluindo `/auth/*`,
+enquanto `app.<domínio>` não tem Access nenhum. Manter o webhook lá evita
+depender de uma exceção por política de *Bypass* dentro do `admin.` — exceção
+que um aperto futuro da política desfaz sem avisar, derrubando o
+provisionamento em silêncio.
+
+Passo a passo de provisionamento, com os hostnames reais:
+[`docs/runbook-deploy-producao.md`](../docs/runbook-deploy-producao.md).
 
 ## Segurança
 

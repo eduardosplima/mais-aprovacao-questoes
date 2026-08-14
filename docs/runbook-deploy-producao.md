@@ -435,7 +435,6 @@ Só depois da fase 12 passar inteira.
 | Item | Onde |
 |---|---|
 | `/definir-senha` não existe — link mágico cai em 404 | sub-projeto 4 |
-| `web/README.md` documenta duas Worker Routes e omite a do webhook | `web/README.md` |
 | Sem script para migração remota nem para deploy do Pages | `package.json` |
 | Sem CI — nada roda a suíte antes de publicar | — |
 | `hono@4.12.28` marcado, correção liberada em 2026-08-17 | `api/package.json` |
