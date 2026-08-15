@@ -94,17 +94,32 @@ inteiramente de fora. Não há caminho a excluir, nem exceção a manter.
 
 ## Fase 0 — Registros DNS
 
-| Hostname | Papel | Consumido por |
-|---|---|---|
-| `admin.maisaprovacao.com.br` | painel + API do painel | Worker Routes, Access, Pages |
-| `app.maisaprovacao.com.br` | webhook hoje, aluno depois | Worker Route, `APP_BASE_URL` |
-| `media.maisaprovacao.com.br` | bucket R2 | `MEDIA_PUBLIC_BASE` |
+Nem todo hostname precisa de registro manual — e é justamente onde precisa que
+está a armadilha.
 
-- [ ] Os três com registro DNS **proxied** (nuvem laranja).
-- [ ] `app.` ainda não tem origem própria. Worker Route só funciona se existir
-      registro DNS para o hostname, então crie um registro placeholder proxied
-      agora — um `AAAA` para `100::` (prefixo de descarte) é o padrão para esse
-      caso. O Worker atende antes de qualquer origem ser consultada.
+| Hostname | Quem cria o registro | Criar à mão? |
+|---|---|---|
+| `admin.maisaprovacao.com.br` | Custom Domain do Pages, na fase 9 | **Sim, placeholder agora** |
+| `app.maisaprovacao.com.br` | ninguém | **Sim, placeholder agora** |
+| `media.maisaprovacao.com.br` | Custom Domain do R2, na fase 2 | Não |
+
+**Por que criar placeholder para `admin.` se o Pages criaria depois.** Porque as
+Worker Routes vêm **antes** (fase 8), e a documentação da Cloudflare é explícita:
+*route* exige registro proxied **preexistente**, e a ausência dele é erro
+crítico — a rota é aceita e as requisições nunca alcançam o Worker, sem
+mensagem nenhuma. Criar o registro agora também destrava o teste do Access na
+fase 5, com o painel ainda inexistente. Na fase 9 o Pages assume esse registro.
+
+- [ ] `admin` → `AAAA` para `100::`, **proxied** (nuvem laranja).
+- [ ] `app` → `AAAA` para `100::`, **proxied**.
+- [ ] `media` → **não criar**. A fase 2 cria junto com o Custom Domain do R2;
+      criar antes só gera conflito.
+
+> `100::` é o prefixo de descarte do IPv6 — o padrão documentado para "quero a
+> borda no caminho, ainda não tenho origem". Enquanto for ele que estiver ali,
+> qualquer requisição que passe pela borda e chegue à origem morre num 5xx
+> (tipicamente 522 ou 523). Isso é esperado, e a fase 5 usa exatamente esse
+> comportamento como sinal de sucesso.
 
 > **`media.` merece atenção extra.** A URL absoluta da imagem é **persistida
 > dentro do HTML da questão** (`api/src/routes/admin/media.ts` grava
@@ -137,7 +152,8 @@ npx wrangler r2 bucket create mais-aprovacao-media
 ```
 
 - [ ] Dashboard → R2 → `mais-aprovacao-media` → Settings → **Custom Domain** →
-      `media.maisaprovacao.com.br`.
+      `media.maisaprovacao.com.br`. **O registro DNS nasce daqui** — é por isso
+      que a fase 0 manda não criá-lo à mão.
 - [ ] Conferir que o domínio ficou ativo e que um objeto de teste é servido
       publicamente.
 - [ ] `MEDIA_PUBLIC_BASE` = `https://media.maisaprovacao.com.br` — **sem barra
@@ -217,8 +233,10 @@ banco. Access mal configurado **quebra** o painel — não o expõe.
 - [ ] Access → Applications → **Self-hosted**, cobrindo
       `admin.maisaprovacao.com.br` — o hostname **inteiro**, sem exceção de
       caminho.
-- [ ] Política: Google ou GitHub, com MFA, restrita aos seus emails.
-- [ ] Copiar a **Application Audience (AUD) tag** → `ACCESS_AUD`.
+- [ ] Campo de **path vazio** — é o hostname inteiro.
+- [ ] Uma política (detalhada logo abaixo).
+- [ ] Copiar a **Application Audience (AUD) tag** → `ACCESS_AUD`. Criar ou
+      editar política **não** muda o AUD.
 
 **Uma aplicação só, um `aud` só.** O Worker valida contra exatamente um
 `ACCESS_AUD`. Se um dia você criar uma segunda aplicação (staging, por
@@ -242,6 +260,114 @@ essencial no `app.`, onde o aluno entra sem Access).
 
 - [ ] `app.` e `media.` **não** têm aplicação Access. Não é esquecimento: o
       aluno e o bucket são públicos, e é o que mantém o webhook alcançável.
+
+### A política
+
+A aplicação define **o que** proteger; a política define **quem entra**. Sem
+política nenhuma, ninguém entra — não existe "aberto por padrão".
+
+Uma política é uma **ação** mais regras, e as regras têm três tipos com
+significado booleano diferente:
+
+| Tipo | Semântica | Papel |
+|---|---|---|
+| **Include** | **OU** — basta uma casar | Quem pode entrar. O único obrigatório |
+| **Require** | **E** — todas precisam casar | Condição extra sobre quem passou no Include |
+| **Exclude** | **NÃO** — nenhuma pode casar | Veto; ganha de tudo |
+
+Cada regra é um par **seletor + valor**. Para uma operação de uma ou duas
+pessoas, a política inteira é uma linha:
+
+| Ação | Tipo | Seletor | Valor |
+|---|---|---|---|
+| **Allow** | **Include** | **Emails** | o seu email |
+
+- [ ] `Require` e `Exclude` vazios. Existem para cenários que este projeto não
+      tem.
+- [ ] Nenhuma política de `Block` sobrando de tentativa anterior — `Block` e
+      `Exclude` ganham de `Allow`.
+- [ ] **Session duration** num valor que você tolere reautenticar. 24h é
+      confortável; sessão longa demais enfraquece a camada.
+
+> **Use `Emails`, não `Emails ending in`.** O seletor de domínio casa com o
+> email **da conta do IdP**. Se você entra com uma conta Google `@gmail.com`,
+> uma regra `@maisaprovacao.com.br` não casa e você se tranca para fora.
+> Listar emails exatos é mais apertado e não tem esse modo de falha.
+
+Se a interface resistir, a política também sai pela API — imune a mudança de
+tela. O `APP_UUID` está na URL da aplicação no dashboard:
+
+```bash
+curl -X POST \
+  "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/access/apps/$APP_UUID/policies" \
+  --header "Authorization: Bearer $CF_API_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "name": "Admins do painel",
+    "decision": "allow",
+    "include": [{ "email": { "email": "voce@exemplo.com" } }],
+    "require": [],
+    "exclude": [],
+    "precedence": 1
+  }'
+```
+
+### O método de login
+
+A política diz *quais emails* entram. Ela não diz *como* a pessoa prova ser
+aquele email — isso é o **login method**, e mora em outro lugar:
+**Settings → Authentication**. É a causa mais provável de uma política correta
+não funcionar.
+
+- **Cloudflare (padrão).** Organizações novas do Zero Trust já vêm com o
+  provedor da Cloudflare habilitado. Nesse caso a política funciona sem
+  configurar mais nada.
+- **One-time PIN.** Código de 6 dígitos por email, válido 10 minutos, uso
+  único. **Não** vem habilitado automaticamente em organizações novas.
+- **Google ou GitHub.** Precisa ser adicionado em Authentication **antes** de
+  aparecer como opção, e exige criar credencial OAuth do lado do provedor.
+
+> **Sobre "com MFA".** O Access **não implementa MFA** — ele delega ao IdP.
+> "Com MFA" quer dizer entrar com uma conta que tem 2FA ligado. Existe o
+> seletor `Login Method` numa regra de `Require`, mas ele restringe *qual
+> provedor*, não *se houve segundo fator*; com um método só habilitado, não
+> acrescenta nada.
+
+### Duas identidades que não se misturam
+
+O email da política do Access **não** é a conta do painel:
+
+| | Prova o quê | De onde vem |
+|---|---|---|
+| **Access** | que você pode *alcançar* `admin.` | sua conta Google/GitHub |
+| **Painel** | que você é *admin da aplicação* | email em `ADMIN_EMAILS`, com senha, nascido de uma compra |
+
+Podem ser emails diferentes, e está certo. É o motivo de existirem duas
+camadas: o Worker ignora o email do JWT do Access de propósito
+(`api/src/middleware/access.ts`). Se o usasse, o Access viraria fonte de
+identidade e a segunda camada perderia sentido.
+
+### Testar agora, com o painel ainda inexistente
+
+Com o placeholder da fase 0 no lugar, dá para validar o Access **antes** de
+existir Pages ou Worker. Janela anônima → `https://admin.maisaprovacao.com.br`:
+
+1. Aparece a **tela de login do Access**. Ela é servida inteiramente pela
+   borda, antes de qualquer origem — só isso já prova que a aplicação está
+   casando o hostname.
+2. Você autentica com o email do Include.
+3. Você toma um **erro de origem (522 ou 523)**. A borda tenta falar com
+   `100::`, que é um buraco negro.
+
+**Esse erro é o sinal de sucesso.** Chegar até ele significa que o Access
+deixou passar e faltou apenas alguém do outro lado para atender — o que a fase
+9 resolve.
+
+| O que acontece | O que significa |
+|---|---|
+| Erro de DNS, site não encontrado | Registro não existe ou está sem proxy (nuvem cinza) |
+| Vai direto ao 5xx, **sem** tela de login | A aplicação Access não está casando o hostname |
+| Tela de login aparece, mas depois "forbidden" | O email autenticado não bate com o Include |
 
 ---
 
@@ -327,6 +453,9 @@ caminhos que o Worker já serve, sem prefixo:
 | `admin.maisaprovacao.com.br/*` | Pages — o painel |
 
 - [ ] As três rotas do Worker criadas, apontando para `mais-aprovacao-api`.
+- [ ] **Os registros DNS da fase 0 precisam já existir.** Route exige registro
+      proxied preexistente; sem ele a rota é aceita e as requisições nunca
+      alcançam o Worker, silenciosamente.
 - [ ] A do webhook é a que falta na documentação atual. Sem ela, o
       `POST /webhooks/hotmart` devolve 404 para toda compra.
 - [ ] Confirmar que o painel **não** tem página em `/admin` nem em `/auth` — as
@@ -344,7 +473,9 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site key da fase 4> npm run build
 npx wrangler pages deploy admin/out --project-name=mais-aprovacao-admin
 ```
 
-- [ ] Projeto Pages criado e ligado a `admin.maisaprovacao.com.br`.
+- [ ] Projeto Pages criado e ligado a `admin.maisaprovacao.com.br`. Ao
+      confirmar o Custom Domain, o Pages **assume o registro placeholder** da
+      fase 0 — o `100::` some e o 5xx da fase 5 vira o painel de verdade.
 - [ ] Se usar build automático pelo Git, cadastrar
       `NEXT_PUBLIC_TURNSTILE_SITE_KEY` nas variáveis de build do projeto.
 - [ ] Abrir `https://admin.maisaprovacao.com.br/login` — passando primeiro pelo
