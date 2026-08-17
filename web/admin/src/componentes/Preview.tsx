@@ -3,6 +3,7 @@
 import { Card } from "@mais/ui";
 import type { AlternativaForm } from "./ListaAlternativas";
 import type { TipoQuestao } from "@/lib/api";
+import { vazio } from "@/lib/validacao";
 
 const LETRAS = "ABCDEFGHIJ";
 
@@ -55,25 +56,30 @@ export function Preview({
         ))}
       </div>
 
-      <div className="rounded-row border border-borda bg-[#fcfbff] p-5">
-        <h4 className="text-[13px] font-bold uppercase tracking-wide text-roxo mb-3">
-          Gabarito comentado
-        </h4>
-        {videoUrl && (
-          <p className="mb-3 text-[14px]">
-            Vídeo:{" "}
-            <a
-              href={videoUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="text-roxo underline"
-            >
-              {videoUrl}
-            </a>
-          </p>
-        )}
-        <div className="prosa" dangerouslySetInnerHTML={{ __html: gabarito }} />
-      </div>
+      {/* Ausência é legítima desde que o gabarito virou opcional — sem esta
+          checagem, uma questão sem gabarito pré-visualiza com um cartão
+          vazio. */}
+      {(!vazio(gabarito) || videoUrl) && (
+        <div className="rounded-row border border-borda bg-[#fcfbff] p-5">
+          <h4 className="text-[13px] font-bold uppercase tracking-wide text-roxo mb-3">
+            Gabarito comentado
+          </h4>
+          {videoUrl && (
+            <p className="mb-3 text-[14px]">
+              Vídeo:{" "}
+              <a
+                href={videoUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-roxo underline"
+              >
+                {videoUrl}
+              </a>
+            </p>
+          )}
+          <div className="prosa" dangerouslySetInnerHTML={{ __html: gabarito }} />
+        </div>
+      )}
     </Card>
   );
 }
