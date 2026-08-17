@@ -15,7 +15,11 @@ declare global {
     turnstile?: {
       render: (
         el: HTMLElement,
-        opts: { sitekey: string; callback: (token: string) => void },
+        opts: {
+          sitekey: string;
+          callback: (token: string) => void;
+          theme?: "light" | "dark" | "auto";
+        },
       ) => string;
     };
   }
@@ -48,6 +52,11 @@ function Formulario() {
         window.turnstile.render(widget.current, {
           sitekey: SITE_KEY,
           callback: setToken,
+          // O padrão do Turnstile é `auto`, que segue o prefers-color-scheme
+          // do sistema. O painel é claro e não tem tema escuro, então em quem
+          // usa o macOS no escuro o widget aparecia escuro dentro de um card
+          // branco. Fixar em `light` é o que casa com o resto da tela.
+          theme: "light",
         });
         clearInterval(timer);
       }
