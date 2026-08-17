@@ -876,3 +876,63 @@ descartado junto, porque o schema exige body quando explanation existe."
 | Dark theme | Decidido não fazer. A Task 1 fixa o claro justamente por isso |
 | Consertar falhas de WebKit alheias a esta rodada | A Task 2 as cataloga e reporta. Consertar bug de Safari desconhecido é escopo que ninguém aprovou |
 | Alinhar `DISPUTE`/`PROTEST` e `CANCELED`/`EXPIRED` | Divergências de rótulo de auditoria achadas na conferência dos payloads. Não afetam acesso; ficaram para uma próxima rodada |
+
+## Estado da execução — 2026-08-17
+
+Entregues: **Tasks 1, 4 e 5**. Paradas: **Tasks 2 e 3**.
+
+### Por que as Tasks 2 e 3 pararam
+
+O binário do WebKit foi instalado e o projeto Playwright acrescentado. A
+primeira rodada revelou o que ninguém sabia: **chromium 100% verde, WebKit com
+35 falhas**. Distribuição por spec:
+
+| Spec | Falhas |
+|---|---|
+| `caminho-critico` | 11 |
+| `editor` | 6 |
+| `lista` | 5 |
+| `visual` | 4 |
+| `taxonomias` | 3 |
+| `validacao` | 3 |
+| `login` | 2 |
+| `preview` | 1 |
+
+Duas amostras lidas antes de o catálogo detalhado se perder: `login.spec.ts`
+parando na tela de login, e `visual.spec.ts:77` falhando **depois** do login,
+num `toHaveCount` de `svg` que volta 0. Ou seja: **há mais de uma causa**, e a
+hipótese inicial (o cookie de sessão em `api/src/lib/cookies.ts:8` é `secure:
+true`, e o WebKit recusa cookie `Secure` sobre `http://localhost`, ao contrário
+do Chromium) explica no máximo parte do conjunto.
+
+A Task 3 depende disto porque o teste que ela precisa escrever mora justamente
+em `visual.spec.ts`, e roda no navegador que está vermelho.
+
+A mudança de configuração foi **revertida** — comitar uma config que deixa a
+suíte vermelha é pior que não comitar. Ela está preservada fora do versionamento
+e é trivial de refazer: acrescentar um projeto `webkit` com
+`{ ...devices["Desktop Safari"] }` ao lado do `chromium` em
+`web/admin/e2e/playwright.config.ts`, sem tocar em `workers: 1` nem em
+`fullyParallel: false`.
+
+Para regenerar o catálogo: refazer a config e rodar
+`cd web && npm run test -w admin -- --project=webkit`.
+
+### As saídas possíveis, e por que nenhuma foi tomada
+
+| Saída | Por que depende do dono |
+|---|---|
+| Tornar `secure` condicional ao protocolo em `cookies.ts` | Altera código sensível a segurança para acomodar teste |
+| Servir o dev em HTTPS (`next dev --experimental-https`) | Muda o ferramental de desenvolvimento de todo mundo |
+| Recortar o WebKit a um subconjunto de specs | Entrega menos cobertura do que foi pedido |
+
+### Achado colateral, que não é de teste
+
+`editor.spec.ts` ("upload de imagem") é instável **também no chromium**. A causa
+não é flutuação: `MEDIA_PUBLIC_BASE` aponta para o domínio de **produção**
+(`api/wrangler.jsonc`), então o teste afirma a visibilidade de uma imagem que o
+navegador precisa buscar num host remoto onde o objeto recém-enviado ao R2
+local não existe. É o item que a rodada de ajustes tinha registrado como "e2e do
+upload depende de `MEDIA_PUBLIC_BASE` real" — agora com diagnóstico. Sai da
+instabilidade apontando a base para um host local em dev, ou afirmando o `src`
+do `<img>` em vez da visibilidade.
