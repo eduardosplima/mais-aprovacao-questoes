@@ -11,7 +11,7 @@
 | Seção | Estado |
 |---|---|
 | 1. Endpoint da API de dados | ✅ **fechada** — ver os achados abaixo |
-| 2. Fixtures contra evento real | 🟡 payloads coletados, conferência pendente |
+| 2. Fixtures contra evento real | 🟡 oito conferidos e aprovados; falta `PURCHASE_EXPIRED` e dois campos a confirmar numa compra de assinatura |
 | 3–6. Fluxo ponta a ponta, recuperação, cancelamento, idempotência | ⬜ |
 | 7. Reconciliação | 🔴 **bloqueada** — `HOTMART_SUBSCRIPTION_UCODES` ainda é placeholder |
 | 8. Turnstile e segredos | ⬜ |
@@ -114,7 +114,7 @@ cobertura é total, sem status órfão**. Isso só importa quando
 `date_next_charge` não vem, porque a data é que manda; mas nesse caso a decisão
 agora está provada exaustiva.
 
-### Paginação — ✅ formato confirmado, ⬜ terminação a observar
+### Paginação — ✅ fechada
 
 ```json
 "page_info": {
@@ -129,47 +129,98 @@ O código lê só `page_info.next_page_token` e para quando ele não vem
 requisitamos a última página, no atributo `page_info` não virá o
 `next_page_token`"*. Formato e contrato batem.
 
-Falta um detalhe, e ele é o que decide entre funcionar e travar num laço
-infinito. A chamada foi feita sem filtros e devolveu a **primeira** de duas
-páginas (10 de 18):
+A terminação era o que decidia entre funcionar e travar num laço infinito, e
+foi verificada na segunda página (`page_token` = o token acima):
 
-- [ ] Repetir a chamada com `page_token` = o token acima e confirmar que a
-      segunda página **não** traz `next_page_token`:
-
-```bash
-curl -s "https://sandbox.hotmart.com/payments/api/v1/subscriptions?page_token=eyJyb3dzIjoxMCwicGFnZSI6Mn0=" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | grep -o 'next_page_token' || echo "AUSENTE — correto"
+```json
+"page_info": {
+  "results_per_page": 8,
+  "total_results": 18,
+  "prev_page_token": "eyJyb3dzIjoxMCwicGFnZSI6MX0="
+}
 ```
 
-- [ ] Observar o `results_per_page` quando `max_results=50` é enviado. O
-      endpoint tem um máximo próprio não documentado; se ele for menor que 50, o
-      retorno vem capado. Isso só gera mais páginas — o laço trata —, mas
-      convém saber o número.
+- [x] **A última página não traz `next_page_token`** — traz `prev_page_token`
+      no lugar. O `do…while` termina. 10 + 8 = 18, que fecha com
+      `total_results`.
+
+- [ ] Observar o `results_per_page` quando `max_results=50` é enviado (as duas
+      chamadas acima foram sem filtro, e caíram no default de 10). O endpoint
+      tem um máximo próprio não documentado; se for menor que 50, o retorno vem
+      capado. Só gera mais páginas — o laço trata —, mas convém saber o número.
 
 ---
 
-## 2. Conferir os fixtures contra um evento real
+## 2. Conferir os fixtures contra um evento real — 🟡 quase
 
-> Divergência aqui é o risco mais provável do plano: os 325 testes podem estar
-> verdes contra um payload que a Hotmart não envia.
+> Divergência aqui era o risco mais provável do plano: os 325 testes podem
+> estar verdes contra um payload que a Hotmart não envia.
 
-Os payloads de todos os eventos já foram coletados. A conferência é feita
-**um evento por vez**, comparando com `api/test/fixtures/hotmart.ts`:
+Oito payloads do sandbox conferidos em 2026-08-17, passados pelo schema zod
+real de `webhooks/hotmart.ts` — não a olho.
 
 - [x] Webhook do sandbox apontado para um coletor e payloads salvos.
-- [ ] `PURCHASE_APPROVED` — `data.product.ucode`, `data.buyer.email` / `.name` /
-      `.document`, `data.purchase.transaction` / `.date_next_charge` /
-      `.recurrence_number`, `data.subscription.subscriber.code` / `.plan.name` /
-      `.status`.
-- [ ] `PURCHASE_DELAYED`
-- [ ] `PURCHASE_CANCELED`
-- [ ] `PURCHASE_EXPIRED`
-- [ ] `PURCHASE_REFUNDED`
-- [ ] `PURCHASE_CHARGEBACK`
-- [ ] `PURCHASE_PROTEST`
-- [ ] `SUBSCRIPTION_CANCELLATION` — inclusive confirmar que ele **não** traz
-      `product.ucode` (é a premissa da seção 5).
-- [ ] Ajustar os fixtures onde divergirem e rodar `npm test`.
+- [x] **Os oito parseiam.** Nenhum devolveria `invalid_payload` (400).
+- [x] `PURCHASE_APPROVED`, `PURCHASE_DELAYED`, `PURCHASE_CANCELED`,
+      `PURCHASE_REFUNDED`, `PURCHASE_CHARGEBACK`, `PURCHASE_PROTEST`,
+      `PURCHASE_COMPLETE`
+- [x] `SUBSCRIPTION_CANCELLATION` — **confirmado que não traz `product.ucode`**,
+      e que o `subscriber.code` e o `date_next_charge` ficam na raiz de `data`.
+      É a premissa de `handleCancellation` e da seção 5.
+- [ ] `PURCHASE_EXPIRED` — **não foi capturado**. É o único que falta.
+
+### O que se confirmou
+
+A estrutura de duas formas num schema só está correta. O `product.ucode` vem em
+todo evento de compra e o `subscription.subscriber.code` também; no
+cancelamento, os dois campos mudam de lugar exatamente como o código previa.
+`buyer.email` / `.name` / `.document` e `purchase.transaction` presentes em
+todos.
+
+`PURCHASE_COMPLETE` existe de verdade, é grafado **sem D**, e já cai no
+`ignored` de fim de garantia. Ele não está na lista de eventos assinados da
+fase 11 do runbook de deploy — e não precisa estar, já que não tem efeito.
+
+**A minimização LGPD foi verificada, não presumida.** O payload real traz
+endereço completo do comprador, telefone, e o CPF do produtor. Nenhum dos três
+sobrevive ao `safeParse` — o schema é uma allowlist e o zod descarta o resto.
+Isso é a seção 9 provada na origem, antes mesmo de olhar log.
+
+### A divergência: dois campos, no mesmo lugar
+
+| Campo | Fixture | Payload do sandbox |
+|---|---|---|
+| `purchase.date_next_charge` | presente | **ausente nos oito** |
+| `purchase.recurrence_number` | presente | **ausente nos oito** |
+
+**Não conclua que a Hotmart não os envia.** Estes payloads são o "Produto test
+postback2" — `product.id: 0`, produto físico, frete dos Correios, order bump,
+ingressos. É o payload de demonstração genérico, não uma compra de assinatura.
+O que se pode afirmar é que os dois campos continuam **não confirmados**.
+
+O código não quebra em nenhum dos casos — os dois têm fallback deliberado. O
+que importa é o que cada fallback custa se a ausência for real:
+
+| Campo ausente | Fallback | O que isso custa |
+|---|---|---|
+| `date_next_charge` | 7 dias (`NO_NEXT_CHARGE_FALLBACK_MS`) | o cron corrige em 24h — **mas só se o ucode estiver preenchido**. Com o placeholder da seção 7, todo comprador ganha 7 dias e é cortado em silêncio |
+| `recurrence_number` | `?? 1` | toda renovação parece primeira compra. A guarda de tombstone (`hotmart.ts:154`) só recusa quando `> 1`, então uma **renovação de conta excluída ressuscitaria a conta** |
+
+O segundo é o sério: é LGPD, não cosmética.
+
+- [ ] Resolver os dois de uma vez na seção 3, com uma compra de teste num
+      produto de **assinatura** de verdade. É o único jeito de saber.
+
+### Duas divergências de auditoria, sem efeito no acesso
+
+Nenhuma das duas muda quem tem acesso — a decisão é sempre por data. É a coluna
+`status`, que alguém leria num incidente, que fica mentindo:
+
+- `PURCHASE_PROTEST` traz `purchase.status: "DISPUTE"`; o código grava
+  `"PROTEST"` (`REVOKING_EVENTS`).
+- `PURCHASE_CANCELED` cai em `handleExpired` e grava `"EXPIRED"`.
+
+- [ ] Decidir se vale alinhar os rótulos ao vocabulário da Hotmart.
 
 ---
 
@@ -340,7 +391,9 @@ curl "http://localhost:8787/__scheduled?cron=0+3+*+*+*"
 |---|---|
 | ~~Caminho da API diferente~~ | ✅ confirmado — `/payments/api/v1/subscriptions` |
 | ~~`product.ucode` ausente na listagem~~ | ✅ vem no payload; filtro por ucode viável |
-| Segunda página ainda traz `next_page_token` | laço infinito em `listSubscriptions` — passa a exigir guarda por `total_results` |
+| ~~Segunda página ainda traz `next_page_token`~~ | ✅ não traz — o laço termina |
+| `date_next_charge` ausente numa compra de **assinatura** real | o fallback de 7 dias vira o caminho normal, e ele depende do cron — ou seja, do ucode |
+| `recurrence_number` ausente numa compra real | a guarda de tombstone deixa de proteger; renovação ressuscitaria conta excluída |
 | Fixtures divergentes | corrigir `test/fixtures/hotmart.ts` |
 | Email não chega | conferir SPF/DKIM e a cota diária (conta nova tem limite conservador) |
 | `send_email` incompatível com o vitest-pool-workers | contorno documentado em `vitest.config.ts` |
