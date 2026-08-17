@@ -4,7 +4,7 @@ import * as hotmartApi from "../src/lib/hotmartApi";
 import {
   fetchAccessToken,
   listSubscriptions,
-  RECONCILE_START_DATE_MS,
+  RECONCILE_ACCESSION_DATE_MS,
 } from "../src/lib/hotmartApi";
 
 afterEach(() => {
@@ -87,7 +87,7 @@ describe("listSubscriptions", () => {
     });
   });
 
-  it("passa start_date antigo e explícito", async () => {
+  it("passa accession_date antigo e explícito", async () => {
     const spy = vi.fn(
       async (_input: RequestInfo | URL, _init: RequestInit) =>
         new Response(JSON.stringify({ items: [] }), { status: 200 }),
@@ -97,10 +97,23 @@ describe("listSubscriptions", () => {
     await listSubscriptions(env, "AT");
 
     const url = new URL(String(spy.mock.calls[0][0]));
-    expect(url.searchParams.get("start_date")).toBe(
-      String(RECONCILE_START_DATE_MS),
+    expect(url.searchParams.get("accession_date")).toBe(
+      String(RECONCILE_ACCESSION_DATE_MS),
     );
-    expect(RECONCILE_START_DATE_MS).toBeLessThan(Date.UTC(2021, 0, 1));
+    expect(RECONCILE_ACCESSION_DATE_MS).toBeLessThan(Date.UTC(2021, 0, 1));
+  });
+
+  it("não passa start_date — a API não conhece esse parâmetro", async () => {
+    const spy = vi.fn(
+      async (_input: RequestInfo | URL, _init: RequestInit) =>
+        new Response(JSON.stringify({ items: [] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", spy);
+
+    await listSubscriptions(env, "AT");
+
+    const url = new URL(String(spy.mock.calls[0][0]));
+    expect(url.searchParams.get("start_date")).toBeNull();
   });
 
   it("envia o Bearer token", async () => {

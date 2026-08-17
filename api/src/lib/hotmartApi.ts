@@ -25,11 +25,17 @@ export interface HotmartSubscription {
 }
 
 /**
- * O `start_date` da API tem default de *hoje − 30 dias* sobre a data de início
- * da assinatura. Sem passá-lo explicitamente com data antiga, toda assinatura
- * veterana parece inexistente — e a reconciliação acharia que a base sumiu.
+ * O filtro de data de início da assinatura chama-se `accession_date`, e tem
+ * default de *hoje − 30 dias*. Sem passá-lo explicitamente com data antiga,
+ * toda assinatura veterana parece inexistente — e a reconciliação acharia que
+ * a base sumiu.
+ *
+ * O nome importa: até 2026-08-17 este módulo mandava `start_date`, que **não
+ * existe** na API de assinaturas (conferido contra a documentação e contra uma
+ * chamada real no sandbox). Parâmetro desconhecido é ignorado em silêncio, de
+ * modo que a proteção acima nunca esteve ligada.
  */
-export const RECONCILE_START_DATE_MS = Date.UTC(2020, 0, 1);
+export const RECONCILE_ACCESSION_DATE_MS = Date.UTC(2020, 0, 1);
 
 const PAGE_SIZE = 50;
 
@@ -94,7 +100,10 @@ export async function listSubscriptions(
       env.HOTMART_API_BASE_URL,
     );
     url.searchParams.set("max_results", String(PAGE_SIZE));
-    url.searchParams.set("start_date", String(RECONCILE_START_DATE_MS));
+    url.searchParams.set(
+      "accession_date",
+      String(RECONCILE_ACCESSION_DATE_MS),
+    );
     if (pageToken) url.searchParams.set("page_token", pageToken);
 
     const res = await fetch(url.toString(), {
