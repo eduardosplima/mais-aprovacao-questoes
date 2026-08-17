@@ -36,7 +36,7 @@ import {
   type TipoQuestao,
 } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
-import { ROTULO_CAMPO, validarQuestao, type ErrosQuestao } from "@/lib/validacao";
+import { ROTULO_CAMPO, validarQuestao, vazio, type ErrosQuestao } from "@/lib/validacao";
 
 const VAZIAS: AlternativaForm[] = [
   { body: "", isCorrect: false },
@@ -129,7 +129,11 @@ function Formulario() {
         body: a.body,
         isCorrect: a.isCorrect,
       })),
-      ...(gabarito.trim()
+      // `.trim()` não serve: o TipTap nunca devolve "" para um editor
+      // esvaziado, e sim "<p></p>" (o schema do ProseMirror exige um
+      // parágrafo). `.trim()` seria sempre truthy e o gabarito nunca
+      // seria removido.
+      ...(!vazio(gabarito)
         ? { explanation: { body: gabarito, videoUrl: videoUrl || null } }
         : {}),
     };

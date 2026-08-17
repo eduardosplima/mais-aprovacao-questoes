@@ -51,11 +51,22 @@ test.describe("validarQuestao: vídeo alinhado com isHttpUrl do servidor", () =>
     const erros = validarQuestao({ ...BASE, videoUrl: "https://exa mple.com" });
     expect(erros.videoUrl).toBeDefined();
   });
+
+  test("vídeo sem gabarito é erro — o servidor exige body quando explanation existe", () => {
+    const erros = validarQuestao({
+      ...BASE,
+      gabarito: "<p></p>",
+      videoUrl: "https://x.com",
+    });
+    expect(erros.videoUrl).toBe("O vídeo precisa de um gabarito comentado.");
+  });
 });
 
 test.describe("validarQuestao: gabarito", () => {
   test("vazio não é erro — o gabarito é opcional", () => {
-    const erros = validarQuestao({ ...BASE, gabarito: "" });
+    // "<p></p>" é o que o editor TipTap devolve depois de esvaziado, nunca
+    // "" — o schema do ProseMirror (doc: block+) sempre mantém um parágrafo.
+    const erros = validarQuestao({ ...BASE, gabarito: "<p></p>" });
     expect(erros.gabarito).toBeUndefined();
   });
 });

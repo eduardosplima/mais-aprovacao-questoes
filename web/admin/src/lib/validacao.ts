@@ -26,7 +26,7 @@ export type ErrosQuestao = Partial<Record<CampoQuestao, string>>;
  * enunciado puramente gráfico (`sanitizeHtml` mantém `img` na allowlist, o
  * editor tem upload de imagem) e barrar isso aqui seria falso positivo.
  */
-function vazio(html: string): boolean {
+export function vazio(html: string): boolean {
   const semImagens = html.replace(/<img\b[^>]*>/gi, "x");
   return semImagens.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim() === "";
 }
@@ -90,6 +90,10 @@ export function validarQuestao(entrada: {
 
   if (entrada.videoUrl && !isHttpUrl(entrada.videoUrl)) {
     erros.videoUrl = "Use um endereço começando com http:// ou https://.";
+  } else if (entrada.videoUrl && vazio(entrada.gabarito)) {
+    // O servidor exige `body` sempre que `explanation` existe — sem isto, o
+    // vídeo preenchido some em silêncio no envio (achado da revisão).
+    erros.videoUrl = "O vídeo precisa de um gabarito comentado.";
   }
 
   return erros;
