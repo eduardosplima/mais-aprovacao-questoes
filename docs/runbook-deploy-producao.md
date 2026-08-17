@@ -12,6 +12,30 @@
 > Complementa o [`runbook-verificacao-hotmart.md`](runbook-verificacao-hotmart.md),
 > que é a **fase 12** deste aqui.
 
+## Estado da execução — 2026-08-17
+
+| Fase | Estado |
+|---|---|
+| 0. Registros DNS | ✅ |
+| 1. D1 | ✅ `database_id` em `wrangler.jsonc` |
+| 2. R2 | ✅ `media.maisaprovacao.com.br` |
+| 3. Email Service | ✅ onboarding de `app.maisaprovacao.com.br` |
+| 4. Turnstile | ✅ |
+| 5. Zero Trust Access | ✅ `holy-rain-d92c.cloudflareaccess.com` + AUD |
+| 6. `wrangler.jsonc` e segredos | 🟡 tudo preenchido **menos** `HOTMART_SUBSCRIPTION_UCODES` |
+| 7. Migrar e publicar o Worker | ✅ |
+| 8. Worker Routes | ✅ as três, vindas do arquivo |
+| 9. Pages | ✅ |
+| 10. Rate Limiting Rule | ✅ uma regra, o que o plano Free permite |
+| 11. Hotmart (sandbox) e primeiro admin | 🟡 admin criado; **ucode não coletado** |
+| 12. Runbook de verificação | 🟡 seções 1 e 2 iniciadas, [detalhe lá](runbook-verificacao-hotmart.md) |
+| 13. Virar para produção | ⬜ em aberto, por decisão |
+
+**O único item que atravessa fases é o ucode.** Ele é pedido na fase 11,
+mora no `wrangler.jsonc` da fase 6 e é o que bloqueia a seção 7 (reconciliação)
+da fase 12. Enquanto for `REPLACE_WITH_REAL_UCODES`, o cron roda todo dia às
+3h, percorre a listagem inteira e não casa com nada.
+
 ## Leia isto antes de começar
 
 Três coisas que este runbook descobriu e que mudam o que dá para prometer ao
@@ -110,9 +134,9 @@ crítico — a rota é aceita e as requisições nunca alcançam o Worker, sem
 mensagem nenhuma. Criar o registro agora também destrava o teste do Access na
 fase 5, com o painel ainda inexistente. Na fase 9 o Pages assume esse registro.
 
-- [ ] `admin` → `AAAA` para `100::`, **proxied** (nuvem laranja).
-- [ ] `app` → `AAAA` para `100::`, **proxied**.
-- [ ] `media` → **não criar**. A fase 2 cria junto com o Custom Domain do R2;
+- [x] `admin` → `AAAA` para `100::`, **proxied** (nuvem laranja).
+- [x] `app` → `AAAA` para `100::`, **proxied**.
+- [x] `media` → **não criar**. A fase 2 cria junto com o Custom Domain do R2;
       criar antes só gera conflito.
 
 > `100::` é o prefixo de descarte do IPv6 — o padrão documentado para "quero a
@@ -140,7 +164,7 @@ cd api
 npx wrangler d1 create mais-aprovacao-db
 ```
 
-- [ ] Copiar o `database_id` da saída para `api/wrangler.jsonc:9`, no lugar de
+- [x] Copiar o `database_id` da saída para `api/wrangler.jsonc:9`, no lugar de
       `REPLACE_WITH_REAL_ID_BEFORE_DEPLOY`.
 
 ---
@@ -151,12 +175,12 @@ npx wrangler d1 create mais-aprovacao-db
 npx wrangler r2 bucket create mais-aprovacao-media
 ```
 
-- [ ] Dashboard → R2 → `mais-aprovacao-media` → Settings → **Custom Domain** →
+- [x] Dashboard → R2 → `mais-aprovacao-media` → Settings → **Custom Domain** →
       `media.maisaprovacao.com.br`. **O registro DNS nasce daqui** — é por isso
       que a fase 0 manda não criá-lo à mão.
-- [ ] Conferir que o domínio ficou ativo e que um objeto de teste é servido
+- [x] Conferir que o domínio ficou ativo e que um objeto de teste é servido
       publicamente.
-- [ ] `MEDIA_PUBLIC_BASE` = `https://media.maisaprovacao.com.br` — **sem barra
+- [x] `MEDIA_PUBLIC_BASE` = `https://media.maisaprovacao.com.br` — **sem barra
       final**.
 
 > Preencher isto também conserta um teste: o e2e `editor.spec.ts:136` ("upload
@@ -186,14 +210,14 @@ não há colisão em momento nenhum.
 | `TXT` DKIM | `cf-bounce._domainkey.app.maisaprovacao.com.br` |
 | `TXT` DMARC | `_dmarc.app.maisaprovacao.com.br` |
 
-- [ ] Dashboard → Email → **Email Sending** → onboarding de
+- [x] Dashboard → Email → **Email Sending** → onboarding de
       `app.maisaprovacao.com.br`.
-- [ ] Os quatro registros acima publicados. O dashboard os adiciona sozinho na
+- [x] Os quatro registros acima publicados. O dashboard os adiciona sozinho na
       zona; conferir que aparecem como **Locked**, que é o estado em que o Email
       Service gerencia o registro.
-- [ ] Aguardar o domínio aparecer como **onboarded**. Antes disso, envio só
+- [x] Aguardar o domínio aparecer como **onboarded**. Antes disso, envio só
       para destinatários verificados na conta.
-- [ ] `EMAIL_FROM` = `nao-responda@app.maisaprovacao.com.br`, dentro do domínio
+- [x] `EMAIL_FROM` = `nao-responda@app.maisaprovacao.com.br`, dentro do domínio
       onboardado.
 
 > **Onboardar o subdomínio autoriza só ele.** O apex `maisaprovacao.com.br` não
@@ -215,17 +239,17 @@ beta e a documentação se move:
   Routing. Se o envio falhar com erro de tipo, é essa a divergência — e a
   correção é uma função de ~15 linhas, como a spec previu.
 
-- [ ] Teste de fumaça: enviar para um endereço **externo** (Gmail) e confirmar
+- [x] Teste de fumaça: enviar para um endereço **externo** (Gmail) e confirmar
       a chegada, inclusive spam.
 
 ---
 
 ## Fase 4 — Turnstile → produz duas chaves
 
-- [ ] Dashboard → Turnstile → novo widget para `admin.maisaprovacao.com.br`
+- [x] Dashboard → Turnstile → novo widget para `admin.maisaprovacao.com.br`
       (e depois para `app.`, quando o frontend do aluno existir).
-- [ ] **Site key** → vai para o *build* do Pages (fase 9), não para o Worker.
-- [ ] **Secret key** → vira segredo do Worker (fase 6).
+- [x] **Site key** → vai para o *build* do Pages (fase 9), não para o Worker.
+- [x] **Secret key** → vira segredo do Worker (fase 6).
 
 > Atenção ao acoplamento: `web/admin/src/app/login/page.tsx:11` lê
 > `NEXT_PUBLIC_TURNSTILE_SITE_KEY` com fallback `""`. Se a variável faltar no
@@ -245,18 +269,18 @@ Fail-closed em `api/src/middleware/access.ts`: sem o header
 `Cf-Access-Jwt-Assertion`, `/admin/*` devolve 401 antes de qualquer consulta ao
 banco. Access mal configurado **quebra** o painel — não o expõe.
 
-- [ ] Zero Trust → Settings → **Team domain**: `<seutime>.cloudflareaccess.com`.
+- [x] Zero Trust → Settings → **Team domain**: `<seutime>.cloudflareaccess.com`.
       Esse é o `ACCESS_TEAM_DOMAIN`, **sem `https://` e sem barra final** — o
       código monta o issuer (`https://${ACCESS_TEAM_DOMAIN}`) e busca o JWKS em
       `${issuer}/cdn-cgi/access/certs`. Colar com o esquema junto produz
       `https://https://…`, e o `catch` devolve um 401 pelado, indistinguível de
       ataque.
-- [ ] Access → Applications → **Self-hosted**, cobrindo
+- [x] Access → Applications → **Self-hosted**, cobrindo
       `admin.maisaprovacao.com.br` — o hostname **inteiro**, sem exceção de
       caminho.
-- [ ] Campo de **path vazio** — é o hostname inteiro.
-- [ ] Uma política (detalhada logo abaixo).
-- [ ] Copiar a **Application Audience (AUD) tag** → `ACCESS_AUD`. Criar ou
+- [x] Campo de **path vazio** — é o hostname inteiro.
+- [x] Uma política (detalhada logo abaixo).
+- [x] Copiar a **Application Audience (AUD) tag** → `ACCESS_AUD`. Criar ou
       editar política **não** muda o AUD.
 
 **Uma aplicação só, um `aud` só.** O Worker valida contra exatamente um
@@ -279,7 +303,7 @@ aberta: só alcança quem já passou pelo seu IdP. O custo é que a Rate Limitin
 Rule da fase 10 perde boa parte da utilidade **neste** hostname (ela continua
 essencial no `app.`, onde o aluno entra sem Access).
 
-- [ ] `app.` e `media.` **não** têm aplicação Access. Não é esquecimento: o
+- [x] `app.` e `media.` **não** têm aplicação Access. Não é esquecimento: o
       aluno e o bucket são públicos, e é o que mantém o webhook alcançável.
 
 ### A política
@@ -303,11 +327,11 @@ pessoas, a política inteira é uma linha:
 |---|---|---|---|
 | **Allow** | **Include** | **Emails** | o seu email |
 
-- [ ] `Require` e `Exclude` vazios. Existem para cenários que este projeto não
+- [x] `Require` e `Exclude` vazios. Existem para cenários que este projeto não
       tem.
-- [ ] Nenhuma política de `Block` sobrando de tentativa anterior — `Block` e
+- [x] Nenhuma política de `Block` sobrando de tentativa anterior — `Block` e
       `Exclude` ganham de `Allow`.
-- [ ] **Session duration** num valor que você tolere reautenticar. 24h é
+- [x] **Session duration** num valor que você tolere reautenticar. 24h é
       confortável; sessão longa demais enfraquece a camada.
 
 > **Use `Emails`, não `Emails ending in`.** O seletor de domínio casa com o
@@ -405,14 +429,23 @@ deixou passar e faltou apenas alguém do outro lado para atender — o que a fas
 | `HOTMART_CHECKOUT_URL` | link do checkout | — (ver nota) |
 | `APP_BASE_URL` | `https://app.maisaprovacao.com.br` | topologia |
 | `ADMIN_EMAILS` | **seu email** | agora |
-| `HOTMART_API_BASE_URL` / `HOTMART_TOKEN_URL` | manter **sandbox** | 12 |
+| `HOTMART_API_BASE_URL` | manter **sandbox** | 12 |
+| `HOTMART_TOKEN_URL` | `https://api-sec-vlc.hotmart.com/security/oauth/token` | 12 |
 
-- [ ] `ADMIN_EMAILS` preenchido. Vazio, ninguém nunca vira admin — o papel só é
+- [x] `ADMIN_EMAILS` preenchido. Vazio, ninguém nunca vira admin — o papel só é
       concedido por essa allowlist, jamais pelo payload.
-- [ ] `APP_BASE_URL` apontando para `app.`, ciente de que `/definir-senha`
+- [x] `APP_BASE_URL` apontando para `app.`, ciente de que `/definir-senha`
       ainda não existe lá.
-- [ ] `HOTMART_API_BASE_URL` e `HOTMART_TOKEN_URL` **continuam em sandbox** até
-      o runbook de verificação passar. Virar para produção é a fase 13.
+- [x] `HOTMART_API_BASE_URL` **continua em sandbox** até o runbook de
+      verificação passar. Virar para produção é a fase 13.
+- [ ] `HOTMART_SUBSCRIPTION_UCODES` — **o único que falta**. Ver fase 11.
+
+> **`HOTMART_TOKEN_URL` não é um par com `HOTMART_API_BASE_URL`.** Parecia ser,
+> e o valor inicial deste arquivo tratava os dois como se acompanhassem o
+> ambiente. Não acompanham: a fase 12 confirmou que o host de autenticação é
+> `api-sec-vlc.hotmart.com` e é **o mesmo em sandbox e em produção**. Só o host
+> de dados troca. É por isso que ele já está no valor final e a fase 13 não o
+> toca.
 
 > `HOTMART_CHECKOUT_URL` é declarada em `config/env.ts:33` e **não é usada por
 > nenhum código**. Preencher é inofensivo; é configuração morta, provavelmente
@@ -430,9 +463,9 @@ npx wrangler secret put HOTMART_CLIENT_ID      # fase 11
 npx wrangler secret put HOTMART_CLIENT_SECRET  # fase 11
 ```
 
-- [ ] `npx wrangler secret list` mostra os seis.
-- [ ] Nenhum segredo aparece em `wrangler.jsonc`.
-- [ ] `ACCESS_DEV_BYPASS` **não** existe em produção (só em `.dev.vars`).
+- [x] `npx wrangler secret list` mostra os seis.
+- [x] Nenhum segredo aparece em `wrangler.jsonc`.
+- [x] `ACCESS_DEV_BYPASS` **não** existe em produção (só em `.dev.vars`).
 
 > **`DOCUMENT_HMAC_KEY` não pode mudar depois.** Ele é o pepper do HMAC de CPF;
 > trocá-lo invalida todo `document_hash` já gravado e quebra a recuperação de
@@ -452,13 +485,13 @@ npx wrangler d1 migrations apply mais-aprovacao-db --remote   # note o --remote
 npm run deploy
 ```
 
-- [ ] As duas migrações aplicadas no D1 **remoto**. O `npm run db:migrate:local`
+- [x] As duas migrações aplicadas no D1 **remoto**. O `npm run db:migrate:local`
       existente é `--local` e não serve aqui; não há script para o remoto.
-- [ ] Cron `0 3 * * *` aparece no dashboard do Worker (vem do `wrangler.jsonc`).
-- [ ] O deploy imprime as **três rotas** da fase 8, e **não** uma URL
+- [x] Cron `0 3 * * *` aparece no dashboard do Worker (vem do `wrangler.jsonc`).
+- [x] O deploy imprime as **três rotas** da fase 8, e **não** uma URL
       `*.workers.dev`. As três estão declaradas em `wrangler.jsonc:routes`, então
       sobem com o deploy — a fase 8 só confere.
-- [ ] Verificação do deploy: `npx wrangler deployments list` mostra a versão nova
+- [x] Verificação do deploy: `npx wrangler deployments list` mostra a versão nova
       no topo. Para ver o Worker efetivamente atendendo, `npx wrangler tail` numa
       aba e a fase 9 na outra.
 
@@ -499,21 +532,21 @@ caminhos que o Worker já serve, sem prefixo:
 | `app.maisaprovacao.com.br/webhooks/*` | Worker — **webhook da Hotmart** |
 | `admin.maisaprovacao.com.br/*` | Pages — o painel (Custom Domain, fase 9 — **não** é Worker Route) |
 
-- [ ] As três rotas aparecem em Workers → `mais-aprovacao-api` → Settings →
+- [x] As três rotas aparecem em Workers → `mais-aprovacao-api` → Settings →
       Domains & Routes, e **nenhuma outra**. Se sobrou alguma de tentativa
       manual, apagar lá — o arquivo é a fonte da verdade.
-- [ ] **Os registros DNS da fase 0 precisam já existir.** Route exige registro
+- [x] **Os registros DNS da fase 0 precisam já existir.** Route exige registro
       proxied preexistente; sem ele a rota é aceita e as requisições nunca
       alcançam o Worker, silenciosamente. Como as rotas sobem no deploy, isso
       virou pré-requisito da **fase 7**.
-- [ ] A do webhook é a que falta na documentação do `web/README.md`. Sem ela, o
+- [x] A do webhook é a que falta na documentação do `web/README.md`. Sem ela, o
       `POST /webhooks/hotmart` devolve 404 para toda compra.
-- [ ] Nenhuma URL `*.workers.dev` listada. `workers_dev: false` e
+- [x] Nenhuma URL `*.workers.dev` listada. `workers_dev: false` e
       `preview_urls: false` estão no `wrangler.jsonc` — os dois são necessários,
       porque Preview URLs são hostnames `workers.dev` por versão e dariam um
       caminho para `/admin/*` **sem passar pelo Access**. Desligar só pelo
       dashboard não resolve: o próximo `wrangler deploy` religa.
-- [ ] Confirmar que o painel **não** tem página em `/admin` nem em `/auth` — as
+- [x] Confirmar que o painel **não** tem página em `/admin` nem em `/auth` — as
       rotas do Worker capturam esses caminhos antes do Pages.
 
 ---
@@ -528,12 +561,12 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site key da fase 4> npm run build
 npx wrangler pages deploy admin/out --project-name=mais-aprovacao-admin
 ```
 
-- [ ] Projeto Pages criado e ligado a `admin.maisaprovacao.com.br`. Ao
+- [x] Projeto Pages criado e ligado a `admin.maisaprovacao.com.br`. Ao
       confirmar o Custom Domain, o Pages **assume o registro placeholder** da
       fase 0 — o `100::` some e o 5xx da fase 5 vira o painel de verdade.
-- [ ] Se usar build automático pelo Git, cadastrar
+- [x] Se usar build automático pelo Git, cadastrar
       `NEXT_PUBLIC_TURNSTILE_SITE_KEY` nas variáveis de build do projeto.
-- [ ] Abrir `https://admin.maisaprovacao.com.br/login` — passando primeiro pelo
+- [x] Abrir `https://admin.maisaprovacao.com.br/login` — passando primeiro pelo
       IdP — e confirmar que o widget do Turnstile **renderiza** (se a site key
       faltou, ele não aparece).
 
@@ -593,8 +626,8 @@ voltar aqui quando o front do aluno subir.
   http.request.uri.path eq "/webhooks/hotmart"))
 ```
 
-- [ ] Regra criada e **Deploy** — não *Save as Draft*.
-- [ ] `admin.` deliberadamente fora da expressão (ver adiante).
+- [x] Regra criada e **Deploy** — não *Save as Draft*.
+- [x] `admin.` deliberadamente fora da expressão (ver adiante).
 
 **De onde vem o 20.** O teto precisa ficar acima do pico legítimo e abaixo de
 qualquer coisa que mereça o nome de força bruta. O pico legítimo é o front do
@@ -645,10 +678,10 @@ for i in $(seq 1 25); do
 done; echo
 ```
 
-- [ ] A saída começa em `401` e vira `429` por volta da 20ª — se ficar tudo
+- [x] A saída começa em `401` e vira `429` por volta da 20ª — se ficar tudo
       `401`, a expressão não está casando.
-- [ ] O bloqueio some sozinho em ~10 s.
-- [ ] Security → **Events**, filtrando por serviço `ratelimit`, mostra os
+- [x] O bloqueio some sozinho em ~10 s.
+- [x] Security → **Events**, filtrando por serviço `ratelimit`, mostra os
       eventos bloqueados.
 
 ### O que muda quando o sub-projeto 4 subir
@@ -664,15 +697,15 @@ o quebra-molas em contenção de verdade.
 
 ## Fase 11 — Hotmart (sandbox) e o primeiro admin
 
-- [ ] Painel Hotmart → Ferramentas → **Webhook**: URL
+- [x] Painel Hotmart → Ferramentas → **Webhook**: URL
       `https://app.maisaprovacao.com.br/webhooks/hotmart`, versão **2.0.0**,
       eventos: `PURCHASE_APPROVED`, `PURCHASE_DELAYED`, `PURCHASE_CANCELED`,
       `PURCHASE_EXPIRED`, `PURCHASE_REFUNDED`, `PURCHASE_CHARGEBACK`,
       `PURCHASE_PROTEST`, `SUBSCRIPTION_CANCELLATION`.
-- [ ] Copiar o **hottok** → segredo `HOTMART_HOTTOK`.
-- [ ] Ferramentas → Credenciais → `client_id` / `client_secret` da API de
+- [x] Copiar o **hottok** → segredo `HOTMART_HOTTOK`.
+- [x] Ferramentas → Credenciais → `client_id` / `client_secret` da API de
       dados, com leitura de assinaturas **e** cancelamento.
-- [ ] **Exigir CPF no checkout.** Sem isso a recuperação de acesso recai só no
+- [x] **Exigir CPF no checkout.** Sem isso a recuperação de acesso recai só no
       email, e a validação por documento deixa de existir.
 - [ ] Anotar os **ucodes** dos produtos de assinatura →
       `HOTMART_SUBSCRIPTION_UCODES`.
@@ -691,7 +724,7 @@ cadastro de admin. Duas saídas:
   mais-aprovacao-db --remote --command "…"`, no mesmo formato que o
   `web/admin/e2e/seed.mjs` usa: hash `pbkdf2$sha256$100000$<salt>$<hash>`.
 
-- [ ] Admin de produção criado e login em
+- [x] Admin de produção criado e login em
       `https://admin.maisaprovacao.com.br/login` funcionando — passando **duas
       vezes** por identidade: Access, depois senha.
 
@@ -699,14 +732,20 @@ cadastro de admin. Duas saídas:
 
 ## Fase 12 — Rodar o runbook de verificação
 
-- [ ] [`runbook-verificacao-hotmart.md`](runbook-verificacao-hotmart.md), as
-      nove seções, contra o **sandbox**.
+- [x] Seção 1 — endpoint da API de dados. **Fechada.**
+- [ ] Seção 2 — fixtures contra evento real. Payloads coletados, conferência
+      em andamento.
+- [ ] Seções 3 a 6 e 8 a 9, contra o **sandbox**.
+- [ ] Seção 7 — reconciliação. **Bloqueada pelo ucode da fase 11.**
 
-Ele existe porque dois valores continuam **inferidos, não confirmados**: o
+Ele existia porque dois valores continuavam **inferidos, não confirmados**: o
 caminho `/payments/api/v1/subscriptions` (`api/src/lib/hotmartApi.ts`) e o
-`HOTMART_TOKEN_URL`. E porque os fixtures do webhook vieram da documentação,
-não de tráfego real — os 324 testes podem estar verdes contra um payload que a
-Hotmart não envia.
+`HOTMART_TOKEN_URL`. Os dois já foram confirmados contra o sandbox — e a
+conferência achou um terceiro problema que ninguém procurava: a listagem
+mandava um parâmetro `start_date` que a API não conhece, corrigido para
+`accession_date`. **O que sobra da razão de existir desta fase são os
+fixtures**, que vieram da documentação e não de tráfego real: os 325 testes
+podem estar verdes contra um payload que a Hotmart não envia.
 
 ---
 
@@ -714,15 +753,22 @@ Hotmart não envia.
 
 Só depois da fase 12 passar inteira.
 
-- [ ] `HOTMART_API_BASE_URL` e `HOTMART_TOKEN_URL` → hosts de produção.
+- [ ] `HOTMART_API_BASE_URL` → host de produção. **Só ele** —
+      `HOTMART_TOKEN_URL` já está no valor final e é o mesmo nos dois
+      ambientes (ver a nota na fase 6).
 - [ ] `HOTMART_HOTTOK`, `HOTMART_CLIENT_ID`, `HOTMART_CLIENT_SECRET` →
       credenciais de produção.
 - [ ] `HOTMART_SUBSCRIPTION_UCODES` → ucodes de produção.
 - [ ] Webhook de produção apontando para o Worker.
 - [ ] Chaves do Turnstile de produção (as de teste sempre passam).
-- [ ] `npm run deploy` e refazer o smoke test da fase 7.
+- [ ] `npm run deploy` e conferir o deploy pela fase 7 (`deployments list` +
+      `wrangler tail` — não há smoke test por `curl`).
 - [ ] Conferir a seção 9 do runbook (LGPD) nos logs reais: nenhum CPF,
       endereço ou telefone.
+- [ ] **Limpar o D1 dos registros de teste do sandbox** antes de abrir para
+      compradores reais — o procedimento está em *Rodada de testes* no
+      [runbook de verificação](runbook-verificacao-hotmart.md). Assinante de
+      sandbox que fica no banco vira acesso concedido de graça em produção.
 
 ---
 
@@ -733,6 +779,7 @@ Só depois da fase 12 passar inteira.
 | `/definir-senha` não existe — link mágico cai em 404 | sub-projeto 4 |
 | Sem script para migração remota nem para deploy do Pages | `package.json` |
 | Sem CI — nada roda a suíte antes de publicar | — |
-| `hono@4.12.28` marcado, correção liberada em 2026-08-17 | `api/package.json` |
+| `hono@4.12.28` marcado — **cooldown vencido em 2026-08-17, já dá para subir** | `api/package.json` |
 | `nanoid` marcado nos dois workspaces, 3.3.18 em 2026-08-21 | `api/`, `web/` |
 | e2e do upload depende de `MEDIA_PUBLIC_BASE` real | `editor.spec.ts:136` |
+| `HOTMART_SUBSCRIPTION_UCODES` ainda é placeholder | `api/wrangler.jsonc` |
