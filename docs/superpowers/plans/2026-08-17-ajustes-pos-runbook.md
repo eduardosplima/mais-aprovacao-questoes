@@ -12,11 +12,12 @@
 
 ## Global Constraints
 
-- **Não instalar pacote novo.** Nenhuma task precisa, e trazer dependência exige autorização explícita do dono do projeto.
-- **`npx playwright install webkit` está fora de escopo.** Fica pendente de decisão separada. A consequência está registrada na Task 2: a correção do Safari não tem cobertura automatizada no navegador em que o bug aparece.
-- **O acervo de produção está vazio.** Confirmado pelo dono em 2026-08-17. É o que dispensa migração de dados nas Tasks 3 e 4.
+- **Não instalar pacote npm novo.** Nenhuma task precisa, e trazer dependência exige autorização explícita do dono do projeto.
+- **`npx playwright install webkit` está autorizado**, pelo dono, em 2026-08-17, e só ele. É download de binário de navegador, não pacote npm: o `@playwright/test@1.61.1` já está em `devDependencies`, e o binário que ele baixa é o casado com essa versão. Nenhum `package.json` muda.
+- **`workers: 1` e `fullyParallel: false` não podem ser mexidos.** Há um D1 local só, e cada spec chama `semear()` no `beforeAll`, que apaga tabelas. Com dois projetos de navegador, paralelismo passaria a ser corrida entre o seed de um e os testes do outro. Em série, os dois projetos convivem — ao custo de dobrar o tempo da suíte.
+- **O acervo de produção está vazio.** Confirmado pelo dono em 2026-08-17. É o que dispensa migração de dados nas Tasks 4 e 5.
 - **A suíte do `api/` tem 325 testes e deve continuar inteiramente verde** ao fim de cada task.
-- **Comandos:** `api/` → `npx vitest run` e `npx tsc --noEmit`. `web/` → `npm run typecheck` e `npm run test -w admin` (Playwright, só chromium).
+- **Comandos:** `api/` → `npx vitest run` e `npx tsc --noEmit`. `web/` → `npm run typecheck` e `npm run test -w admin` (Playwright; chromium só até a Task 2, chromium + webkit depois dela).
 - **Idioma:** código, comentários, mensagens de erro e commits em português, como todo o repositório.
 
 ## Contexto e decisões
@@ -33,22 +34,23 @@ Quatro decisões foram tomadas antes deste plano e não devem ser reabertas dura
 | Arquivo | Responsabilidade | Task |
 |---|---|---|
 | `web/admin/src/app/login/page.tsx` | tela de login; monta o widget Turnstile à mão | 1 |
-| `web/ui/src/Campo.tsx` | classes compartilhadas de controle de formulário | 2 |
-| `web/ui/src/Controle.tsx` | sobreposição de ícone (e agora seta) em controles nativos | 2 |
-| `web/ui/src/Icone.tsx` | biblioteca de ícones de traço único | 2 |
-| `web/ui/src/index.ts` | superfície pública do pacote `@mais/ui` | 2 |
-| `web/admin/src/componentes/SeletorTaxonomia.tsx` | `<select>` de taxonomia | 2 |
-| `web/admin/src/app/page.tsx` | listagem; `<select>` de situação | 2 |
-| `web/admin/src/app/questoes/editar/page.tsx` | editor; `<select>` de tipo, campos Ano e Gabarito | 2, 3, 4 |
-| `web/admin/e2e/visual.spec.ts` | e2e de detalhes visuais | 2 |
-| `api/src/routes/admin/questions.ts` | schemas Zod de escrita | 3, 4 |
-| `api/src/db/questions.ts` | tipos de entrada e escrita de filhos | 3, 4 |
-| `web/admin/src/lib/validacao.ts` | validação de cliente | 3, 4 |
-| `web/admin/src/lib/api.ts` | tipos do cliente HTTP | 3, 4 |
-| `api/test/admin-questions.test.ts` | testes de rota | 3, 4 |
-| `api/test/questions-db.test.ts` | testes da camada de persistência | 4 |
-| `web/admin/e2e/validacao.spec.ts` | e2e da validação de cliente | 3, 4 |
-| `web/admin/e2e/editor.spec.ts`, `caminho-critico.spec.ts` | e2e que salvam questão | 3 |
+| `web/ui/src/Campo.tsx` | classes compartilhadas de controle de formulário | 3 |
+| `web/ui/src/Controle.tsx` | sobreposição de ícone (e agora seta) em controles nativos | 3 |
+| `web/ui/src/Icone.tsx` | biblioteca de ícones de traço único | 3 |
+| `web/ui/src/index.ts` | superfície pública do pacote `@mais/ui` | 3 |
+| `web/admin/src/componentes/SeletorTaxonomia.tsx` | `<select>` de taxonomia | 3 |
+| `web/admin/src/app/page.tsx` | listagem; `<select>` de situação | 3 |
+| `web/admin/src/app/questoes/editar/page.tsx` | editor; `<select>` de tipo, campos Ano e Gabarito | 3, 4, 5 |
+| `web/admin/e2e/playwright.config.ts` | configuração dos e2e; lista de navegadores | 2 |
+| `web/admin/e2e/visual.spec.ts` | e2e de detalhes visuais | 3 |
+| `api/src/routes/admin/questions.ts` | schemas Zod de escrita | 4, 5 |
+| `api/src/db/questions.ts` | tipos de entrada e escrita de filhos | 4, 5 |
+| `web/admin/src/lib/validacao.ts` | validação de cliente | 4, 5 |
+| `web/admin/src/lib/api.ts` | tipos do cliente HTTP | 4, 5 |
+| `api/test/admin-questions.test.ts` | testes de rota | 4, 5 |
+| `api/test/questions-db.test.ts` | testes da camada de persistência | 5 |
+| `web/admin/e2e/validacao.spec.ts` | e2e da validação de cliente | 4, 5 |
+| `web/admin/e2e/editor.spec.ts`, `caminho-critico.spec.ts` | e2e que salvam questão | 4 |
 
 ---
 
@@ -122,7 +124,92 @@ cobre a única parte que é nossa, que é a opção existir no tipo."
 
 ---
 
-### Task 2: `<select>` do Safari — ícone e texto sobrepostos
+### Task 2: WebKit na suíte e2e
+
+**Files:**
+- Modify: `web/admin/e2e/playwright.config.ts:20`
+
+**Interfaces:**
+- Consumes: nada de tasks anteriores.
+- Produces: um projeto Playwright chamado `webkit`. A Task 3 depende dele para testar o sintoma real do bug do Safari, em vez de um proxy. **Esta task tem de vir antes da Task 3.**
+
+**Por que esta task existe e por que ela vem antes.** O bug da Task 3 só se manifesta no Safari, e a suíte roda só chromium. Sem WebKit, o teste da Task 3 seria obrigado a afirmar a *causa* (`appearance: none`) em vez do *sintoma* (o padding descartado) — cobertura de segunda categoria, que passa mesmo se a correção estiver errada por outro motivo. Com WebKit disponível primeiro, a Task 3 vira TDD de verdade: escreve o teste, vê falhar pelo motivo certo, corrige.
+
+**O risco desta task, e é real.** A suíte nunca rodou em WebKit. É provável que apareça falha que não tem nada a ver com a nossa rodada — diferença de renderização, de timing, de comportamento de formulário. **Não conserte essas falhas.** Catalogue e reporte: consertar bug de Safari desconhecido é escopo que ninguém aprovou, e o dono precisa decidir item a item. Uma suíte parcialmente vermelha em WebKit, documentada, é um resultado honesto desta task.
+
+- [ ] **Step 1: Baixar o binário do WebKit**
+
+Autorizado explicitamente pelo dono em 2026-08-17. Nenhum `package.json` muda — o `@playwright/test@1.61.1` já está declarado, e este comando baixa o navegador casado com ele.
+
+Run: `cd web/admin && npx playwright install webkit`
+Expected: download concluído. Confirme com `npx playwright install --dry-run webkit`, que deve listar o WebKit como já instalado.
+
+- [ ] **Step 2: Medir a linha de base, antes de mexer na config**
+
+Antes de acrescentar o projeto, registre quanto tempo a suíte leva hoje e que ela está verde. É o número contra o qual você vai comparar depois.
+
+Run: `cd web && npm run test -w admin`
+Expected: verde. Anote a duração.
+
+- [ ] **Step 3: Acrescentar o projeto webkit**
+
+Em `web/admin/e2e/playwright.config.ts`, substitua a linha 20:
+
+```ts
+  /**
+   * Dois navegadores, e o WebKit não é luxo: ele é o único lugar onde o
+   * `<select>` com aparência nativa descarta o padding do autor, que foi o
+   * bug de sobreposição de ícone e texto corrigido em 2026-08-17. Chromium
+   * sozinho não observa essa classe de defeito.
+   *
+   * Rodam em série, não em paralelo — ver `workers: 1` acima. Os dois
+   * projetos compartilham o mesmo D1 local, e cada spec chama `semear()`,
+   * que apaga tabelas.
+   */
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  ],
+```
+
+- [ ] **Step 4: Rodar a suíte inteira nos dois navegadores**
+
+Run: `cd web && npm run test -w admin`
+Expected: o número de testes dobra. O chromium continua verde.
+
+O WebKit é a incógnita. Três desfechos possíveis, e cada um tem uma ação diferente:
+
+1. **Tudo verde.** Siga para o Step 5.
+2. **Falha só em `visual.spec.ts`, na contagem de `svg` ou algo do `<select>`.** Improvável, mas se acontecer é o bug da Task 3 se manifestando. Deixe falhando e anote — a Task 3 conserta.
+3. **Falha em qualquer outra coisa.** **Pare.** Não conserte. Rode `npx playwright show-report` para ver o trace, anote qual spec, qual asserção e o que o WebKit fez de diferente, e reporte ao dono antes de seguir.
+
+- [ ] **Step 5: Confirmar que o chromium não regrediu**
+
+Run: `cd web && npm run test -w admin -- --project=chromium`
+Expected: verde, e na mesma duração do Step 2. Serve para separar "o WebKit é lento" de "eu quebrei alguma coisa".
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add web/admin/e2e/playwright.config.ts
+git commit -m "test(web): acrescenta o WebKit à suíte e2e
+
+A suíte rodava só chromium, e existe uma classe inteira de defeito que
+ela não observa: o Safari descarta o padding declarado pelo autor num
+<select> com aparência nativa. Foi assim que a sobreposição de ícone e
+texto passou despercebida até um humano abrir o painel no Safari.
+
+Os dois projetos rodam em série. workers: 1 e fullyParallel: false
+continuam obrigatórios — o D1 local é um só e cada spec chama semear(),
+que apaga tabelas. O custo é dobrar a duração da suíte.
+
+O binário do WebKit foi baixado com autorização explícita do dono.
+Nenhum pacote npm entrou: o @playwright/test já estava declarado."
+```
+
+---
+
+### Task 3: `<select>` do Safari — ícone e texto sobrepostos
 
 **Files:**
 - Modify: `web/ui/src/Campo.tsx:39-42` (acrescentar `CONTROLE_SELECT`)
@@ -135,8 +222,8 @@ cobre a única parte que é nossa, que é a opção existir no tipo."
 - Test: `web/admin/e2e/visual.spec.ts:19-36`
 
 **Interfaces:**
-- Consumes: nada de tasks anteriores.
-- Produces: `CONTROLE_SELECT: string` e `IconeSeta: ComponenteIcone`, exportados de `@mais/ui`; `Controle` passa a aceitar `seta?: boolean`. A Task 3 e a Task 4 mexem no mesmo arquivo `editar/page.tsx`, mas em campos diferentes — não há conflito de conteúdo.
+- Consumes: o projeto `webkit` da Task 2. **Esta task não pode começar sem ele** — sem WebKit o teste do Step 1 passa desde o início e não prova nada.
+- Produces: `CONTROLE_SELECT: string` e `IconeSeta: ComponenteIcone`, exportados de `@mais/ui`; `Controle` passa a aceitar `seta?: boolean`. As Tasks 4 e 5 mexem no mesmo arquivo `editar/page.tsx`, mas em campos diferentes — não há conflito de conteúdo.
 
 **O diagnóstico, para você não desfazer a correção por engano.** O Safari, enquanto `appearance: auto` estiver valendo num `<select>`, **descarta o padding declarado pelo autor**. Confirmado no inspetor: `padding-left: 0px` computado com `.pl-11` presente na cascata em `@layer utilities`. O ícone fica em `left-3.5` e o texto começa em 0 — daí a sobreposição. O Chrome respeita o padding, e por isso o bug só aparece no Safari.
 
@@ -159,13 +246,6 @@ test("os campos de escolha e as abas exibem ícone sem afetar o nome acessível"
   await expect(situacao).toBeVisible();
   await expect(situacao.locator("xpath=..").locator("svg")).toHaveCount(2);
 
-  // Esta asserção é um proxy, e vale saber por quê: o bug que ela protege só
-  // se manifesta no Safari, e o Playwright aqui roda só chromium
-  // (playwright.config.ts:20). Não dá para medir o sintoma — o padding
-  // computado é correto no chromium com ou sem a correção. Dá para travar a
-  // causa: enquanto `appearance` for `none`, o Safari respeita o padding.
-  await expect(situacao).toHaveCSS("appearance", "none");
-
   // O aria-hidden do ícone preserva o nome acessível da aba — sem ele,
   // getByRole("tab", { name: "Cargo" }) deixaria de casar.
   await page.goto("/taxonomias");
@@ -173,12 +253,47 @@ test("os campos de escolha e as abas exibem ícone sem afetar o nome acessível"
   await expect(aba).toBeVisible();
   await expect(aba.locator("svg")).toHaveCount(1);
 });
+
+/**
+ * Este é o teste do bug de 2026-08-17, e ele só tem valor no WebKit.
+ *
+ * O sintoma: o Safari descarta o padding declarado pelo autor enquanto a
+ * aparência nativa do <select> estiver ligada. O texto começava colado na
+ * borda, em cima do ícone que o Controle sobrepõe em left-3.5.
+ *
+ * Mede-se o padding computado, não `appearance`. A diferença importa: uma
+ * correção que ponha `appearance: none` e esqueça o `pl-11` passaria numa
+ * asserção sobre `appearance` e continuaria com o bug na tela.
+ *
+ * No chromium ele passa desde sempre, porque lá o padding sempre funcionou.
+ * Isso é esperado e não o torna inútil: é a mesma asserção valendo nos dois,
+ * e é no WebKit que ela morde.
+ */
+test("o select reserva espaço para o ícone, inclusive no WebKit", async ({
+  page,
+}) => {
+  await entrar(page);
+
+  const situacao = page.getByLabel("Situação");
+  await expect(situacao).toBeVisible();
+
+  // pl-11 = 11 × 0.25rem = 44px.
+  await expect(situacao).toHaveCSS("padding-left", "44px");
+});
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [ ] **Step 2: Rodar e ver falhar — e conferir *onde* falha**
 
 Run: `cd web && npm run test -w admin -- visual.spec.ts`
-Expected: FALHA em duas asserções — `toHaveCount(2)` recebendo 1, e `toHaveCSS("appearance", "none")` recebendo `auto`. Se falhar por outro motivo (login, seed), resolva isso antes de seguir.
+
+Expected, e leia com atenção porque a assimetria é o ponto:
+
+| Projeto | Teste do ícone | Teste do padding |
+|---|---|---|
+| chromium | **FALHA** — `toHaveCount(2)` recebe 1, porque a seta ainda não existe | **PASSA** — o chromium sempre respeitou o padding |
+| webkit | **FALHA** — mesma razão | **FALHA** — recebe `0px`, que é o bug |
+
+Se o teste do padding **passar no WebKit**, pare: ou o projeto webkit não está ativo (confira a Task 2), ou o diagnóstico está errado e a correção abaixo não é a certa. Não siga em frente com o teste passando — você estaria escrevendo código sem saber o que ele conserta.
 
 - [ ] **Step 3: Acrescentar o ícone de seta**
 
@@ -305,16 +420,18 @@ Em `web/admin/src/app/questoes/editar/page.tsx`:
 - [ ] **Step 8: Rodar o teste e o typecheck**
 
 Run: `cd web && npm run typecheck && npm run test -w admin -- visual.spec.ts`
-Expected: PASSA nas duas asserções novas.
+Expected: PASSA nos dois navegadores, inclusive o teste do padding no WebKit — que é a prova de que o bug morreu. Se ele continuar em `0px` no WebKit, `appearance-none` não chegou ao elemento: confira se o `<select>` está usando `CONTROLE_SELECT` e não o `CONTROLE` antigo.
 
 - [ ] **Step 9: Rodar a suíte e2e inteira**
 
 Run: `cd web && npm run test -w admin`
 Expected: tudo verde. Se algum spec quebrar por causa da seta, é porque conta `svg` em algum lugar — conserte lá, com o mesmo raciocínio do Step 1.
 
-- [ ] **Step 10: Conferir no Safari, à mão**
+- [ ] **Step 10: Conferir a olho, nos dois navegadores**
 
-Isto não é opcional: é o único lugar onde o bug original é observável. Suba `cd web && npm run dev`, abra `http://localhost:3000` no Safari, e confirme nos três selects (Situação na listagem, Tipo e Assunto/Banca no editor) que o texto **não** encosta no ícone e que a seta aparece à direita. Confira também no Chrome, que é onde a seta mudou de dona.
+O teste do WebKit já cobre o sintoma original, então este passo não é mais a única rede — mas continua valendo por uma razão que nenhum teste cobre: a **seta é nova**, e ninguém nunca a viu. Alinhamento vertical, distância da borda e contraste são coisas que `toHaveCSS` não julga.
+
+Suba `cd web && npm run dev` e abra `http://localhost:3000` no Safari e no Chrome. Nos três selects (Situação na listagem, Tipo e Assunto/Banca no editor), confirme que a seta está centrada na vertical, que não encosta no texto da opção mais longa, e que o texto não encosta no ícone da esquerda.
 
 - [ ] **Step 11: Commit**
 
@@ -341,14 +458,14 @@ desenho, o elemento continua sendo um <select> e o comportamento
 nativo é o mesmo. Corrigido junto, porque era o que faria alguém
 reverter a correção.
 
-Cobertura: o Playwright roda só chromium, onde o sintoma não se
-reproduz. O teste trava a causa (appearance: none), não o sintoma. A
-conferência do sintoma foi manual, no Safari."
+Cobertura: o teste mede o padding computado do select e roda nos dois
+navegadores. No chromium ele sempre passou; no WebKit ele falhava com
+0px antes desta correção, que é exatamente o bug relatado."
 ```
 
 ---
 
-### Task 3: Ano passa a ser obrigatório
+### Task 4: Ano passa a ser obrigatório
 
 **Files:**
 - Modify: `api/src/routes/admin/questions.ts:62`
@@ -359,8 +476,8 @@ conferência do sintoma foi manual, no Safari."
 - Test: `api/test/admin-questions.test.ts`, `web/admin/e2e/validacao.spec.ts`, `web/admin/e2e/editor.spec.ts`, `web/admin/e2e/caminho-critico.spec.ts`
 
 **Interfaces:**
-- Consumes: nada da Task 2 (arquivo compartilhado, campos diferentes).
-- Produces: `QuestionInput.year` passa de `year?: number | null` para `year: number`. A Task 4 mexe no mesmo `QuestionInput` e no mesmo schema Zod, no campo `explanation` — aplique a Task 4 depois desta e some as mudanças.
+- Consumes: nada da Task 3 (compartilham `editar/page.tsx`, mas em campos diferentes).
+- Produces: `QuestionInput.year` passa de `year?: number | null` para `year: number`. A Task 5 mexe no mesmo `QuestionInput` e no mesmo schema Zod, no campo `explanation` — aplique a Task 5 depois desta e some as mudanças.
 
 **Cuidado que decide esta task.** Existem dois `year` no código e eles não têm a mesma regra. O de **escrita** (`questionSchema`, corpo do POST/PATCH) passa a ser obrigatório. O de **filtro de listagem** (`?year=` na query, tratado em `questions.ts:154-163`) continua opcional, e os testes de `admin-questions.test.ts:302-380` que cobrem `year=ontem`, `year=1500`, `year=` e `year=%20` **são do filtro** — não os toque.
 
@@ -527,7 +644,7 @@ pré-visualização não, porque ele nunca salva."
 
 ---
 
-### Task 4: Gabarito comentado passa a ser opcional
+### Task 5: Gabarito comentado passa a ser opcional
 
 **Files:**
 - Modify: `api/src/routes/admin/questions.ts:63-70`
@@ -538,7 +655,7 @@ pré-visualização não, porque ele nunca salva."
 - Test: `api/test/questions-db.test.ts`, `api/test/admin-questions.test.ts`, `web/admin/e2e/validacao.spec.ts`
 
 **Interfaces:**
-- Consumes: `QuestionInput` como a Task 3 a deixou (`year: number`).
+- Consumes: `QuestionInput` como a Task 4 a deixou (`year: number`).
 - Produces: `QuestionInput.explanation` passa de `{ body: string; videoUrl?: string | null }` para `{ body: string; videoUrl?: string | null } | undefined` (campo opcional). `QuestionDetail.explanation` **não muda** — já é `| null`.
 
 **A decisão que governa esta task.** Gabarito ausente **não grava linha** em `explanations`. Não é string vazia. A coluna `body` continua `NOT NULL` e está certa: a ausência é representada pela ausência da linha. Consequência que o código precisa honrar: numa **edição** que apaga um gabarito que existia, a linha tem de ser **removida**, não atualizada para vazio.
@@ -742,13 +859,14 @@ descartado junto, porque o schema exige body quando explanation existe."
 
 ## Verificação final
 
-- [ ] `cd api && npx vitest run` — verde, com os testes novos das Tasks 3 e 4
+- [ ] `cd api && npx vitest run` — verde, com os testes novos das Tasks 4 e 5
 - [ ] `cd api && npx tsc --noEmit` — limpo
 - [ ] `cd web && npm run typecheck` — limpo
-- [ ] `cd web && npm run test -w admin` — verde
-- [ ] Safari, à mão: os três `<select>` sem sobreposição, com seta à direita
-- [ ] Chrome, à mão: a seta nova não desalinhou nada
+- [ ] `cd web && npm run test -w admin` — verde nos **dois** projetos, chromium e webkit
+- [ ] `npx playwright show-report` — conferir que o webkit realmente rodou, e não foi pulado em silêncio
+- [ ] Safari e Chrome, à olho: a seta nova centrada e sem encostar no texto
 - [ ] Login à mão: o widget do Turnstile aparece claro, mesmo com o macOS no escuro
+- [ ] Se a Task 2 catalogou falhas de WebKit alheias à rodada, elas estão reportadas ao dono e **não** foram consertadas por conta própria
 
 ## O que este plano deliberadamente não faz
 
@@ -756,5 +874,5 @@ descartado junto, porque o schema exige body quando explanation existe."
 |---|---|
 | Email fixo no login vindo do Access | O dono adiou para conversa própria. Mexe no modelo de identidade e no `/auth/login`, que o sub-projeto 4 vai herdar |
 | Dark theme | Decidido não fazer. A Task 1 fixa o claro justamente por isso |
-| `npx playwright install webkit` | Baixar binário de navegador exige autorização explícita. Sem ele, a Task 2 fica sem cobertura automatizada no navegador do bug |
+| Consertar falhas de WebKit alheias a esta rodada | A Task 2 as cataloga e reporta. Consertar bug de Safari desconhecido é escopo que ninguém aprovou |
 | Alinhar `DISPUTE`/`PROTEST` e `CANCELED`/`EXPIRED` | Divergências de rótulo de auditoria achadas na conferência dos payloads. Não afetam acesso; ficaram para uma próxima rodada |
