@@ -123,6 +123,18 @@ describe("rotas de questões", () => {
     expect(await res.json()).toEqual({ error: "invalid_request" });
   });
 
+  it("201 ao criar questão sem explanation — o gabarito é opcional", async () => {
+    const { explanation: _ignorado, ...semGabarito } = await payload();
+
+    const res = await app().request("/admin/questions", post(semGabarito), env);
+    expect(res.status).toBe(201);
+
+    const { id } = (await res.json()) as { id: string };
+    const busca = await app().request(`/admin/questions/${id}`, {}, env);
+    const body = (await busca.json()) as { question: { explanation: unknown } };
+    expect(body.question.explanation).toBeFalsy();
+  });
+
   it("busca por id devolve alternativas e gabarito", async () => {
     const id = await create();
     const res = await app().request(`/admin/questions/${id}`, {}, env);
