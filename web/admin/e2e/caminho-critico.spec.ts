@@ -57,6 +57,7 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await page.getByLabel("Enunciado").fill("Questão de rascunho para controle");
   await page.getByLabel("Assunto").selectOption({ label: "Português" });
   await page.getByLabel("Banca").selectOption({ label: "Cebraspe" });
+  await page.getByLabel("Ano").fill("2026");
   await page.getByRole("textbox", { name: "Alternativa A" }).fill("Primeira");
   await page.getByRole("textbox", { name: "Alternativa B" }).fill("Segunda");
   await page.getByRole("textbox", { name: "Alternativa C" }).fill("Terceira");
@@ -138,6 +139,7 @@ test("prepara taxonomias e uma questão para os testes de layout responsivo", as
   await page.getByLabel("Enunciado").fill(ENUNCIADO_RESPONSIVO);
   await page.getByLabel("Assunto").selectOption({ label: "Assunto Responsivo" });
   await page.getByLabel("Banca").selectOption({ label: "Banca Responsiva" });
+  await page.getByLabel("Ano").fill("2026");
   await page.getByRole("textbox", { name: "Alternativa A" }).fill("Primeira");
   await page.getByRole("textbox", { name: "Alternativa B" }).fill("Segunda");
   await page.getByRole("textbox", { name: "Alternativa C" }).fill("Terceira");

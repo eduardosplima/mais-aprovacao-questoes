@@ -70,6 +70,7 @@ test("sem alternativa correta, a tela explica antes de enviar", async ({
   await page.getByLabel("Enunciado").fill("Qual das alternativas está correta?");
   await page.getByLabel("Assunto").selectOption({ label: "Direito Administrativo" });
   await page.getByLabel("Banca").selectOption({ label: "Cespe" });
+  await page.getByLabel("Ano").fill("2024");
   await page.getByLabel("Gabarito comentado").fill("Porque sim.");
   for (const letra of ["A", "B", "C", "D"]) {
     await page.getByRole("textbox", { name: `Alternativa ${letra}` }).fill(letra);
@@ -96,6 +97,7 @@ test("vídeo sem esquema http é barrado antes de chegar na API", async ({
   await page.getByLabel("Enunciado").fill("Enunciado de teste.");
   await page.getByLabel("Assunto").selectOption({ label: "Direito Administrativo" });
   await page.getByLabel("Banca").selectOption({ label: "Cespe" });
+  await page.getByLabel("Ano").fill("2024");
   await page.getByLabel("Gabarito comentado").fill("Explicação.");
   await page.getByLabel("Vídeo do gabarito").fill("mailto:alguem@exemplo.com");
   for (const letra of ["A", "B", "C", "D"]) {
@@ -124,6 +126,7 @@ test("certo/errado: preenche, salva e aparece na lista", async ({ page }) => {
   await page.getByLabel("Banca").selectOption({ label: "Cespe" });
   await page.getByLabel("Tipo").selectOption("true_false");
   await page.getByRole("radio", { name: "Certo é a resposta" }).check();
+  await page.getByLabel("Ano").fill("2024");
   await page.getByLabel("Gabarito comentado").fill("A soma está correta.");
   await page.getByRole("button", { name: "Publicar" }).click();
 

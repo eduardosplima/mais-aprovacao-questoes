@@ -71,7 +71,12 @@ export function validarQuestao(entrada: {
   if (!entrada.subjectId) erros.subjectId = "Escolha o assunto.";
   if (!entrada.bancaId) erros.bancaId = "Escolha a banca.";
 
-  if (entrada.ano) {
+  // `vazio()` não serve aqui: ele existe para HTML de editor rico, remove
+  // tags e trata <img> como conteúdo. O ano é texto puro vindo de um input
+  // que já filtra não-dígitos (editar/page.tsx:289).
+  if (!entrada.ano.trim()) {
+    erros.ano = "Informe o ano da questão.";
+  } else {
     const n = Number(entrada.ano);
     if (n < 1900 || n > 2200) erros.ano = "Use um ano entre 1900 e 2200.";
   }

@@ -122,7 +122,9 @@ function Formulario() {
       bancaId,
       cargoId: cargoId || null,
       levelId: levelId || null,
-      year: ano ? Number(ano) : null,
+      // `ano` só chega aqui depois de validarQuestao aprovar (salvar() acima),
+      // que já garante que não está vazio.
+      year: Number(ano),
       alternatives: alternativas.map((a) => ({
         body: a.body,
         isCorrect: a.isCorrect,
@@ -278,7 +280,7 @@ function Formulario() {
               />
               <SeletorTaxonomia kind="cargo" valor={cargoId} aoMudar={setCargoId} />
               <SeletorTaxonomia kind="level" valor={levelId} aoMudar={setLevelId} />
-              <Campo rotulo="Ano" htmlFor="ano" dica="Opcional" erro={erros.ano}>
+              <Campo rotulo="Ano" htmlFor="ano" erro={erros.ano}>
                 <Controle icone={<IconeAno />}>
                   <input
                     id="ano"

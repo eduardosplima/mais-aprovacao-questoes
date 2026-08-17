@@ -10,7 +10,7 @@ const BASE = {
   enunciado: "<p>Enunciado.</p>",
   subjectId: "s1",
   bancaId: "b1",
-  ano: "",
+  ano: "2024",
   gabarito: "<p>Gabarito.</p>",
   videoUrl: "",
   alternativas: [
@@ -50,6 +50,18 @@ test.describe("validarQuestao: vídeo alinhado com isHttpUrl do servidor", () =>
   test("espaço no host — o servidor recusa, o cliente também", () => {
     const erros = validarQuestao({ ...BASE, videoUrl: "https://exa mple.com" });
     expect(erros.videoUrl).toBeDefined();
+  });
+});
+
+test.describe("validarQuestao: ano", () => {
+  test("vazio é erro — o ano é obrigatório", () => {
+    const erros = validarQuestao({ ...BASE, ano: "" });
+    expect(erros.ano).toBe("Informe o ano da questão.");
+  });
+
+  test("fora do intervalo continua sendo erro", () => {
+    const erros = validarQuestao({ ...BASE, ano: "1800" });
+    expect(erros.ano).toBe("Use um ano entre 1900 e 2200.");
   });
 });
 
@@ -110,6 +122,7 @@ test("corrigidos os campos, o resumo some", async ({ page }) => {
   await page.getByLabel("Enunciado").fill("Enunciado completo.");
   await page.getByLabel("Assunto").selectOption({ label: "Português" });
   await page.getByLabel("Banca").selectOption({ label: "Cespe" });
+  await page.getByLabel("Ano").fill("2024");
   await page.getByLabel("Gabarito comentado").fill("Explicação.");
   for (const letra of ["A", "B", "C", "D"]) {
     await page.getByRole("textbox", { name: `Alternativa ${letra}` }).fill(letra);

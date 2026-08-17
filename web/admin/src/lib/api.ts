@@ -102,7 +102,7 @@ export interface EntradaQuestao {
   bancaId: string;
   cargoId?: string | null;
   levelId?: string | null;
-  year?: number | null;
+  year: number;
   alternatives: { body: string; isCorrect: boolean }[];
   explanation: { body: string; videoUrl?: string | null };
 }
