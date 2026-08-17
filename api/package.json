@@ -11,7 +11,7 @@
     "db:migrate:local": "wrangler d1 migrations apply mais-aprovacao-db --local"
   },
   "dependencies": {
-    "hono": "4.12.28",
+    "hono": "4.12.34",
     "drizzle-orm": "0.45.2",
     "jose": "6.2.3",
     "zod": "4.4.3"
