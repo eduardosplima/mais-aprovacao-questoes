@@ -19,7 +19,7 @@ export interface QuestionInput {
   bancaId: string;
   cargoId?: string | null;
   levelId?: string | null;
-  year?: number | null;
+  year: number;
   alternatives: AlternativeInput[];
   explanation: { body: string; videoUrl?: string | null };
 }

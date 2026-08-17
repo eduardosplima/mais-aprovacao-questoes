@@ -59,7 +59,10 @@ const questionSchema = z.object({
   bancaId: z.string().min(1),
   cargoId: z.string().nullish(),
   levelId: z.string().nullish(),
-  year: z.number().int().min(MIN_YEAR).max(MAX_YEAR).nullish(),
+  // Obrigatório desde 2026-08-17, a pedido do cliente. Não confundir com o
+  // filtro `?year=` da listagem, que continua opcional — são duas regras
+  // diferentes sobre o mesmo nome.
+  year: z.number().int().min(MIN_YEAR).max(MAX_YEAR),
   alternatives: z.array(alternativeSchema).min(1).max(10),
   explanation: z.object({
     body: z.string().min(1),

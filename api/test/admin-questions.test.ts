@@ -114,6 +114,15 @@ describe("rotas de questões", () => {
     expect(res.status).toBe(400);
   });
 
+  it("400 ao criar questão sem year — o ano é obrigatório", async () => {
+    const { year: _ignorado, ...semAno } = await payload();
+
+    const res = await app().request("/admin/questions", post(semAno), env);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_request" });
+  });
+
   it("busca por id devolve alternativas e gabarito", async () => {
     const id = await create();
     const res = await app().request(`/admin/questions/${id}`, {}, env);
