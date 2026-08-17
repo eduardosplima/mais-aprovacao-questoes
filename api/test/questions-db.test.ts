@@ -54,6 +54,28 @@ describe("questions", () => {
     expect(detail?.explanation?.body).toBe("<p>Porque sim</p>");
   });
 
+  it("questão sem explanation não cria linha em explanations", async () => {
+    const { explanation: _fora, ...semGabarito } = await baseInput();
+
+    const res = await createQuestion(db(), semGabarito, null);
+
+    const id = (res as { id: string }).id;
+    expect(await getQuestion(db(), id).then((d) => d?.explanation)).toBeNull();
+  });
+
+  it("editar apagando o gabarito remove a linha que existia", async () => {
+    const res = await createQuestion(db(), await baseInput(), null);
+    const id = (res as { id: string }).id;
+    expect((await getQuestion(db(), id))?.explanation?.body).toBe(
+      "<p>Porque sim</p>",
+    );
+
+    const { explanation: _fora, ...semGabarito } = await baseInput();
+    await updateQuestion(db(), id, semGabarito);
+
+    expect((await getQuestion(db(), id))?.explanation).toBeNull();
+  });
+
   it("sanitiza o enunciado na escrita", async () => {
     const res = await createQuestion(
       db(),

@@ -64,13 +64,19 @@ const questionSchema = z.object({
   // diferentes sobre o mesmo nome.
   year: z.number().int().min(MIN_YEAR).max(MAX_YEAR),
   alternatives: z.array(alternativeSchema).min(1).max(10),
-  explanation: z.object({
-    body: z.string().min(1),
-    videoUrl: z
-      .string()
-      .refine(isHttpUrl, { message: "videoUrl precisa ser http ou https" })
-      .nullish(),
-  }),
+  // Opcional desde 2026-08-17, a pedido do cliente. Ausente significa
+  // ausente: writeChildren não grava linha em `explanations`, e a coluna
+  // body continua NOT NULL porque a ausência é a ausência da linha, não uma
+  // string vazia guardada.
+  explanation: z
+    .object({
+      body: z.string().min(1),
+      videoUrl: z
+        .string()
+        .refine(isHttpUrl, { message: "videoUrl precisa ser http ou https" })
+        .nullish(),
+    })
+    .optional(),
 });
 
 /**

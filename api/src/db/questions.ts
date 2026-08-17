@@ -21,7 +21,7 @@ export interface QuestionInput {
   levelId?: string | null;
   year: number;
   alternatives: AlternativeInput[];
-  explanation: { body: string; videoUrl?: string | null };
+  explanation?: { body: string; videoUrl?: string | null };
 }
 
 export interface QuestionDetail {
@@ -107,8 +107,17 @@ async function writeChildren(
   const altBodies = await Promise.all(
     input.alternatives.map((alt) => sanitizeHtml(alt.body)),
   );
-  const explanationBody = await sanitizeHtml(input.explanation.body);
-  const videoUrl = input.explanation.videoUrl ?? null;
+
+  // Sem gabarito, a linha é REMOVIDA, não atualizada para vazio. É o que
+  // mantém "sem gabarito" e "gabarito vazio" sendo a mesma coisa — e é o que
+  // faz uma edição que apaga o gabarito de fato apagá-lo, em vez de deixar
+  // uma explicação que existe e não explica.
+  const explanationRow = input.explanation
+    ? {
+        body: await sanitizeHtml(input.explanation.body),
+        videoUrl: input.explanation.videoUrl ?? null,
+      }
+    : null;
 
   await db.batch([
     db.delete(alternatives).where(eq(alternatives.questionId, questionId)),
@@ -121,13 +130,15 @@ async function writeChildren(
         isCorrect: alt.isCorrect ? 1 : 0,
       }),
     ),
-    db
-      .insert(explanations)
-      .values({ questionId, body: explanationBody, videoUrl })
-      .onConflictDoUpdate({
-        target: explanations.questionId,
-        set: { body: explanationBody, videoUrl },
-      }),
+    explanationRow
+      ? db
+          .insert(explanations)
+          .values({ questionId, ...explanationRow })
+          .onConflictDoUpdate({
+            target: explanations.questionId,
+            set: explanationRow,
+          })
+      : db.delete(explanations).where(eq(explanations.questionId, questionId)),
   ]);
 }
 
