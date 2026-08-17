@@ -171,15 +171,36 @@ npx wrangler r2 bucket create mais-aprovacao-media
 Esta é a fase que decide se comprador recebe email. Faça-a cedo: propagação de
 DNS e verificação de domínio levam tempo, e é o risco nº 1 da seção 10 da spec.
 
-- [ ] Dashboard → Email → **Email Sending** → onboarding do sending domain
-      (`maisaprovacao.com.br`).
-- [ ] Publicar os registros DNS pedidos. O SPF do return-path tem esta forma:
-      `TXT cf-bounce.maisaprovacao.com.br  "v=spf1 include:_spf.mx.cloudflare.net ~all"`
-      Somado ao DKIM que o dashboard gerar (seletor `cf-bounce`).
+O domínio onboardado é **`app.maisaprovacao.com.br`**, não o apex — é o hostname
+de onde o aluno recebe email, e é o que precisa casar com `EMAIL_FROM`.
+
+Os registros que o onboarding pede ficam todos em **subdomínios** do domínio
+onboardado. Isso importa porque `app.` já carrega o placeholder da fase 0 e vira
+Custom Domain do Pages no sub-projeto 4: nenhum destes é A/AAAA em `app.`, então
+não há colisão em momento nenhum.
+
+| Registro | Nome |
+|---|---|
+| `MX` ×3 (`route{1,2,3}.mx.cloudflare.net`) | `cf-bounce.app.maisaprovacao.com.br` |
+| `TXT` SPF (`v=spf1 include:_spf.mx.cloudflare.net ~all`) | `cf-bounce.app.maisaprovacao.com.br` |
+| `TXT` DKIM | `cf-bounce._domainkey.app.maisaprovacao.com.br` |
+| `TXT` DMARC | `_dmarc.app.maisaprovacao.com.br` |
+
+- [ ] Dashboard → Email → **Email Sending** → onboarding de
+      `app.maisaprovacao.com.br`.
+- [ ] Os quatro registros acima publicados. O dashboard os adiciona sozinho na
+      zona; conferir que aparecem como **Locked**, que é o estado em que o Email
+      Service gerencia o registro.
 - [ ] Aguardar o domínio aparecer como **onboarded**. Antes disso, envio só
       para destinatários verificados na conta.
-- [ ] `EMAIL_FROM` = `nao-responda@maisaprovacao.com.br`, dentro do domínio
-      onboarded.
+- [ ] `EMAIL_FROM` = `nao-responda@app.maisaprovacao.com.br`, dentro do domínio
+      onboardado.
+
+> **Onboardar o subdomínio autoriza só ele.** O apex `maisaprovacao.com.br` não
+> passa a poder enviar, e não precisa — nada no código envia de lá. O
+> alinhamento DMARC do `From:` vem do DKIM (`d=app.maisaprovacao.com.br`), e o
+> SPF cobre o return-path em `cf-bounce.`, que é o envelope que o SPF de fato
+> verifica.
 
 **Dois detalhes do binding para conferir na hora**, porque o produto está em
 beta e a documentação se move:
@@ -377,7 +398,7 @@ deixou passar e faltou apenas alguém do outro lado para atender — o que a fas
 |---|---|---|
 | `database_id` | id do D1 | 1 |
 | `MEDIA_PUBLIC_BASE` | `https://media.maisaprovacao.com.br` | 2 |
-| `EMAIL_FROM` | `nao-responda@maisaprovacao.com.br` | 3 |
+| `EMAIL_FROM` | `nao-responda@app.maisaprovacao.com.br` | 3 |
 | `ACCESS_TEAM_DOMAIN` | `<seutime>.cloudflareaccess.com` | 5 |
 | `ACCESS_AUD` | tag AUD | 5 |
 | `HOTMART_SUBSCRIPTION_UCODES` | ucodes, separados por vírgula | 11 |
@@ -434,13 +455,39 @@ npm run deploy
 - [ ] As duas migrações aplicadas no D1 **remoto**. O `npm run db:migrate:local`
       existente é `--local` e não serve aqui; não há script para o remoto.
 - [ ] Cron `0 3 * * *` aparece no dashboard do Worker (vem do `wrangler.jsonc`).
-- [ ] Smoke test depois da fase 8:
-      `curl https://admin.maisaprovacao.com.br/health` → `{"ok":true}`
-      (de dentro do Access, ou ele responde com o redirect do IdP).
+- [ ] O deploy imprime as **três rotas** da fase 8, e **não** uma URL
+      `*.workers.dev`. As três estão declaradas em `wrangler.jsonc:routes`, então
+      sobem com o deploy — a fase 8 só confere.
+- [ ] Verificação do deploy: `npx wrangler deployments list` mostra a versão nova
+      no topo. Para ver o Worker efetivamente atendendo, `npx wrangler tail` numa
+      aba e a fase 9 na outra.
+
+> **Um Worker precisa de pelo menos um trigger, ou o deploy falha.** Sem
+> `routes` e sem `workers.dev`, o `wrangler deploy` faz o upload, não tem onde
+> pendurar o Worker e aborta com *"You can either deploy your worker to one or
+> more routes… or register a workers.dev subdomain"*. As rotas em
+> `wrangler.jsonc` resolvem isso — é por isso que elas não podem esperar a
+> fase 8.
+
+> **Não existe smoke test por `curl` aqui, e a razão é dupla.** `/health`
+> (`api/src/app.ts:18`) é código nosso, público no nível do Hono — mas (1) não
+> há Worker Route que case `/health`, então em `admin.` ele cai no Pages e em
+> `app.` bate no `100::`; e (2) o Access cobre `admin.` inteiro, então o `curl`
+> receberia o redirect do IdP antes de qualquer coisa. Em produção `/health` é
+> inalcançável de fora **por construção**. Ele existe para o readiness probe do
+> Playwright em dev (`web/admin/e2e/playwright.config.ts:25`) — não apague.
+> Se um dia quiser uptime check externo, a solução é uma quarta rota,
+> `app.maisaprovacao.com.br/health`, e não uma exceção no Access.
 
 ---
 
-## Fase 8 — Worker Routes → três, em dois hostnames
+## Fase 8 — Worker Routes → conferir as três
+
+**As rotas moram em `api/wrangler.jsonc`, não no dashboard.** A documentação de
+deprecações do Wrangler é categórica: *rotas definidas no dashboard não são
+somadas às definidas no Wrangler; se as duas existem, só valem as do arquivo*.
+Criar rota pela tela com `routes` presente no arquivo é trabalho que o próximo
+`npm run deploy` desfaz.
 
 Uma Worker Route casa a URL e **não a reescreve**, então os padrões usam os
 caminhos que o Worker já serve, sem prefixo:
@@ -450,14 +497,22 @@ caminhos que o Worker já serve, sem prefixo:
 | `admin.maisaprovacao.com.br/admin/*` | Worker — conteúdo do painel |
 | `admin.maisaprovacao.com.br/auth/*` | Worker — login do painel |
 | `app.maisaprovacao.com.br/webhooks/*` | Worker — **webhook da Hotmart** |
-| `admin.maisaprovacao.com.br/*` | Pages — o painel |
+| `admin.maisaprovacao.com.br/*` | Pages — o painel (Custom Domain, fase 9 — **não** é Worker Route) |
 
-- [ ] As três rotas do Worker criadas, apontando para `mais-aprovacao-api`.
+- [ ] As três rotas aparecem em Workers → `mais-aprovacao-api` → Settings →
+      Domains & Routes, e **nenhuma outra**. Se sobrou alguma de tentativa
+      manual, apagar lá — o arquivo é a fonte da verdade.
 - [ ] **Os registros DNS da fase 0 precisam já existir.** Route exige registro
       proxied preexistente; sem ele a rota é aceita e as requisições nunca
-      alcançam o Worker, silenciosamente.
-- [ ] A do webhook é a que falta na documentação atual. Sem ela, o
+      alcançam o Worker, silenciosamente. Como as rotas sobem no deploy, isso
+      virou pré-requisito da **fase 7**.
+- [ ] A do webhook é a que falta na documentação do `web/README.md`. Sem ela, o
       `POST /webhooks/hotmart` devolve 404 para toda compra.
+- [ ] Nenhuma URL `*.workers.dev` listada. `workers_dev: false` e
+      `preview_urls: false` estão no `wrangler.jsonc` — os dois são necessários,
+      porque Preview URLs são hostnames `workers.dev` por versão e dariam um
+      caminho para `/admin/*` **sem passar pelo Access**. Desligar só pelo
+      dashboard não resolve: o próximo `wrangler deploy` religa.
 - [ ] Confirmar que o painel **não** tem página em `/admin` nem em `/auth` — as
       rotas do Worker capturam esses caminhos antes do Pages.
 
@@ -486,14 +541,124 @@ npx wrangler pages deploy admin/out --project-name=mais-aprovacao-admin
 
 ## Fase 10 — Rate Limiting Rules
 
-Proteção de borda, configuração e não código (spec §5).
+Proteção de borda, configuração e não código (spec §5). **Não vai no
+`wrangler.jsonc`** — rate limiting é regra de **zona**, não do Worker, e nenhum
+`npm run deploy` a toca ou a apaga.
 
-- [ ] Regra em `app.maisaprovacao.com.br/auth/*` — força bruta de login e
-      email-bombing na recuperação. É onde o aluno entra, sem Access na frente.
-- [ ] Regra em `app.maisaprovacao.com.br/webhooks/hotmart` — superfície pública
-      hostil.
-- [ ] Em `admin.`, o Access já filtra antes; regra ali é redundância barata,
-      não necessidade.
+**Onde:** Dashboard → zona `maisaprovacao.com.br` → **Security → Security
+rules** → **Create rule** → **Rate limiting rule**.
+
+### O que o plano Free permite
+
+A zona é Free, e isso não é detalhe de rodapé: quase todo campo da tela já vem
+decidido.
+
+| Campo | Free | O que existe acima |
+|---|---|---|
+| Regras na zona | **1** | Pro 2 · Business 5 · Enterprise 100 |
+| Período de contagem | **10 s**, fixo | Pro até 1 min · Business até 10 min |
+| Duração da mitigação | **10 s**, fixo | Pro até 1 h · Business até 1 dia |
+| Característica de contagem | **IP**, só | Business +NAT · Enterprise path, header, JA4… |
+| Counting expression (contar só 401/403) | **não** | Business+ |
+| Resposta customizada do bloqueio | **não** — 429 HTML da Cloudflare | Pro+ |
+
+Consequência direta: **as duas regras que esta fase pedia não cabem.** É uma só,
+e ela bloqueia por 10 segundos. Isso é quebra-molas, não muro — o valor está em
+tornar caro o loop trivial, não em deter alguém determinado.
+
+### A regra
+
+O alvo hoje é um só, e não é o que a versão anterior desta fase sugeria:
+**`app.maisaprovacao.com.br/auth/*` ainda não existe.** As Worker Routes são
+três (`api/wrangler.jsonc`), e nenhuma casa `/auth/*` no `app.` — o login do
+aluno é sub-projeto 4. A única superfície pública que hoje alcança o Worker é o
+webhook.
+
+Ainda assim, escreva a expressão **já cobrindo os dois caminhos**: cobrir um
+caminho inexistente custa zero (nada casa, nada é contado) e evita ter que
+voltar aqui quando o front do aluno subir.
+
+| Campo da tela | Valor |
+|---|---|
+| **Rule name** | `borda-app-publico` |
+| **If incoming requests match** | *Edit expression* → a expressão abaixo |
+| **With the same characteristics** | **IP** (único no Free) |
+| **When rate exceeds** | **20** requests / **10** seconds |
+| **Then take action** | **Block** |
+| **Duration** | 10 seconds (fixo no Free) |
+
+```
+(http.host eq "app.maisaprovacao.com.br" and
+ (starts_with(http.request.uri.path, "/auth/") or
+  http.request.uri.path eq "/webhooks/hotmart"))
+```
+
+- [ ] Regra criada e **Deploy** — não *Save as Draft*.
+- [ ] `admin.` deliberadamente fora da expressão (ver adiante).
+
+**De onde vem o 20.** O teto precisa ficar acima do pico legítimo e abaixo de
+qualquer coisa que mereça o nome de força bruta. O pico legítimo é o front do
+aluno: navegação chamando `GET /auth/me` algumas vezes em sequência. O ataque é
+`POST /auth/login`, e cada tentativa já custa Turnstile server-side
+(`api/src/routes/auth.ts:64`) mais PBKDF2 de 100 mil iterações — que roda
+**mesmo com email inexistente**, de propósito (`auth.ts:74`). A 20 por 10 s o
+atacante fica em 2 tentativas/s por IP; com o PBKDF2 no caminho, isso não é uma
+taxa de enumeração, é uma fila.
+
+Para o webhook o número é folgado por outro motivo: uma operação deste tamanho
+não recebe 20 eventos de compra em 10 segundos nem no melhor dia. Se receber, o
+que chega é lote de retentativa — e o handler é idempotente por `claimEvent`
+antes de qualquer efeito (`api/src/webhooks/hotmart.ts`), então um 429 no meio
+do lote não perde compra: a Hotmart retenta e o evento repetido é deduplicado.
+
+> **O contador é por data center, não global.** Todo rate limiting rule carrega
+> `cf.colo.id` como característica implícita. "20 por 10 s" é o teto **em cada
+> colo**; um atacante distribuído multiplica isso pelo número de PoPs que
+> alcança. É mais uma razão para não confundir esta regra com a defesa — a
+> defesa é o Turnstile, o PBKDF2 e o cooldown de recuperação
+> (`auth.ts:162`).
+
+> **O bloqueio devolve a página 429 da Cloudflare, em HTML.** No Free não há
+> resposta customizada. Para a Hotmart isso é uma falha de entrega como outra
+> qualquer e ela retenta; para um `fetch` do front do aluno, é uma resposta que
+> não é JSON — o cliente cai no `catch`. Aceitável a 20/10 s, mas é o motivo de
+> não apertar esse número.
+
+### Por que `admin.` fica fora
+
+Duas coisas já estão na frente: o Access exige identidade do IdP antes de
+qualquer requisição alcançar a origem, e o `/auth/login` do painel tem o mesmo
+Turnstile + PBKDF2 do aluno. Com **uma** regra disponível, gastá-la no hostname
+que exige login no IdP para ser sequer alcançado seria gastar a única bala no
+alvo mais protegido.
+
+### Como conferir que a regra está viva
+
+O webhook devolve 401 antes de tocar o banco quando o hottok não bate
+(`hotmart.ts:86`), então dá para exercitar a regra sem efeito colateral nenhum:
+
+```bash
+for i in $(seq 1 25); do
+  curl -s -o /dev/null -w "%{http_code} " \
+    -X POST https://app.maisaprovacao.com.br/webhooks/hotmart \
+    -H 'x-hotmart-hottok: invalido' -d '{}'
+done; echo
+```
+
+- [ ] A saída começa em `401` e vira `429` por volta da 20ª — se ficar tudo
+      `401`, a expressão não está casando.
+- [ ] O bloqueio some sozinho em ~10 s.
+- [ ] Security → **Events**, filtrando por serviço `ratelimit`, mostra os
+      eventos bloqueados.
+
+### O que muda quando o sub-projeto 4 subir
+
+`app./auth/*` passa a ser a superfície nº 1 — força bruta de login e
+email-bombing em `/auth/recover` — e você continuará com **uma** regra para dois
+alvos com perfis de tráfego diferentes. A expressão acima já cobre os dois, com
+o custo de um teto único. Quando esse teto único incomodar, o degrau é o plano
+Pro: duas regras, período até 1 min e bloqueio até 1 h, que é o que transforma
+o quebra-molas em contenção de verdade.
 
 ---
 
