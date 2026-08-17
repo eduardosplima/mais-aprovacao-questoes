@@ -233,7 +233,7 @@ erDiagram
     USER ||--o{ NOTE : cria
     USER ||--o{ FAVORITE : marca
     QUESTION ||--o{ ALTERNATIVE : tem
-    QUESTION ||--|| EXPLANATION : tem
+    QUESTION ||--o| EXPLANATION : tem
     QUESTION ||--o{ ATTEMPT : recebe
     QUESTION ||--o{ COMMENT : recebe
     QUESTION ||--o{ FAVORITE : recebe
