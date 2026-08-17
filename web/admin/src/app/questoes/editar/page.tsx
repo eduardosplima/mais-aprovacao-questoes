@@ -129,7 +129,9 @@ function Formulario() {
         body: a.body,
         isCorrect: a.isCorrect,
       })),
-      explanation: { body: gabarito, videoUrl: videoUrl || null },
+      ...(gabarito.trim()
+        ? { explanation: { body: gabarito, videoUrl: videoUrl || null } }
+        : {}),
     };
   }
 
@@ -315,7 +317,7 @@ function Formulario() {
           </Card>
 
           <Card className="p-5 flex flex-col gap-5">
-            <Campo rotulo="Gabarito comentado" erro={erros.gabarito}>
+            <Campo rotulo="Gabarito comentado" dica="Opcional" erro={erros.gabarito}>
               <Editor
                 valor={gabarito}
                 aoMudar={setGabarito}

@@ -63,11 +63,6 @@ export function validarQuestao(entrada: {
   if (vazio(entrada.enunciado)) {
     erros.enunciado = "Escreva o enunciado da questão.";
   }
-  // explanation.body é z.string().min(1) no servidor
-  // (api/src/routes/admin/questions.ts:65) — obrigatório, não opcional.
-  if (vazio(entrada.gabarito)) {
-    erros.gabarito = "Escreva o gabarito comentado.";
-  }
   if (!entrada.subjectId) erros.subjectId = "Escolha o assunto.";
   if (!entrada.bancaId) erros.bancaId = "Escolha a banca.";
 

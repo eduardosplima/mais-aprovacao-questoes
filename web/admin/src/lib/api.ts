@@ -104,7 +104,7 @@ export interface EntradaQuestao {
   levelId?: string | null;
   year: number;
   alternatives: { body: string; isCorrect: boolean }[];
-  explanation: { body: string; videoUrl?: string | null };
+  explanation?: { body: string; videoUrl?: string | null };
 }
 
 export interface FiltrosQuestao {

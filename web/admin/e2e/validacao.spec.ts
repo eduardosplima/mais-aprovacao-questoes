@@ -53,6 +53,13 @@ test.describe("validarQuestao: vídeo alinhado com isHttpUrl do servidor", () =>
   });
 });
 
+test.describe("validarQuestao: gabarito", () => {
+  test("vazio não é erro — o gabarito é opcional", () => {
+    const erros = validarQuestao({ ...BASE, gabarito: "" });
+    expect(erros.gabarito).toBeUndefined();
+  });
+});
+
 test.describe("validarQuestao: ano", () => {
   test("vazio é erro — o ano é obrigatório", () => {
     const erros = validarQuestao({ ...BASE, ano: "" });
