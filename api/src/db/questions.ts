@@ -163,7 +163,7 @@ export async function createQuestion(
       bancaId: input.bancaId,
       cargoId: input.cargoId ?? null,
       levelId: input.levelId ?? null,
-      year: input.year ?? null,
+      year: input.year,
       status,
       createdBy,
       createdAt: now,
@@ -243,7 +243,7 @@ export async function updateQuestion(
       bancaId: input.bancaId,
       cargoId: input.cargoId ?? null,
       levelId: input.levelId ?? null,
-      year: input.year ?? null,
+      year: input.year,
       updatedAt: new Date(),
     })
     .where(eq(questions.id, id))
