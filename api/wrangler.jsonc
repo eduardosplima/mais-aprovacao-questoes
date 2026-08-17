@@ -2,11 +2,18 @@
   "name": "mais-aprovacao-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-01",
+  "routes": [
+    { "pattern": "admin.maisaprovacao.com.br/admin/*", "zone_name": "maisaprovacao.com.br" },
+    { "pattern": "admin.maisaprovacao.com.br/auth/*", "zone_name": "maisaprovacao.com.br" },
+    { "pattern": "app.maisaprovacao.com.br/webhooks/*", "zone_name": "maisaprovacao.com.br" }
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "mais-aprovacao-db",
-      "database_id": "REPLACE_WITH_REAL_ID_BEFORE_DEPLOY",
+      "database_id": "d6054850-1b2d-41eb-aba1-84c19d2fa10f",
       "migrations_dir": "migrations"
     }
   ],
@@ -18,7 +25,8 @@
   ],
   "send_email": [
     {
-      "name": "EMAIL"
+      "name": "EMAIL",
+      "remote": true
     }
   ],
   "triggers": {
@@ -27,13 +35,13 @@
   "vars": {
     "HOTMART_SUBSCRIPTION_UCODES": "REPLACE_WITH_REAL_UCODES",
     "HOTMART_API_BASE_URL": "https://sandbox.hotmart.com",
-    "HOTMART_TOKEN_URL": "https://sandbox.hotmart.com/security/oauth/token",
+    "HOTMART_TOKEN_URL": "https://api-sec-vlc.hotmart.com/security/oauth/token",
     "HOTMART_CHECKOUT_URL": "https://pay.hotmart.com/REPLACE_ME",
-    "APP_BASE_URL": "http://localhost:3000",
-    "EMAIL_FROM": "nao-responda@REPLACE_ME",
-    "ADMIN_EMAILS": "",
-    "MEDIA_PUBLIC_BASE": "https://REPLACE_ME_MEDIA_HOST",
-    "ACCESS_TEAM_DOMAIN": "REPLACE_ME.cloudflareaccess.com",
-    "ACCESS_AUD": "REPLACE_ME_AUD"
+    "APP_BASE_URL": "https://app.maisaprovacao.com.br",
+    "EMAIL_FROM": "nao-responda@app.maisaprovacao.com.br",
+    "ADMIN_EMAILS": "dudu@zava.dev.br,elis.viana@maisaprovacao.com,prof.gisellydias@maisaprovacao.com",
+    "MEDIA_PUBLIC_BASE": "https://media.maisaprovacao.com.br",
+    "ACCESS_TEAM_DOMAIN": "holy-rain-d92c.cloudflareaccess.com",
+    "ACCESS_AUD": "b173e7b89eff0b5b9d8ffe76760bd681d029de1620e3ffdd90be47099f58f022"
   }
 }
