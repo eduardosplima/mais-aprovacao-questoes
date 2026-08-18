@@ -8,7 +8,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply mais-aprovacao-db --local"
+    "db:migrate:local": "wrangler d1 migrations apply mais-aprovacao-db --local",
+    "admin:senha": "node scripts/senha-admin.mjs"
   },
   "dependencies": {
     "hono": "4.12.34",

@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "allowJs": true
   },
   "include": ["src", "test", "worker-env.d.ts", "*.config.ts"]
 }
