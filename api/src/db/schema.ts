@@ -20,6 +20,19 @@ export const users = sqliteTable("users", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+/**
+ * O admin não é um usuário. Não tem `id` — a chave natural é o email, que é
+ * o que o token do Access carrega — e não tem `role`, porque a tabela inteira
+ * é o papel. Ter linha aqui só prova que existe senha; o direito de ser admin
+ * vem de `ADMIN_EMAILS`, que nenhum código escreve.
+ */
+export const admins = sqliteTable("admins", {
+  email: text("email").primaryKey(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const subscriptions = sqliteTable(
   "subscriptions",
   {
