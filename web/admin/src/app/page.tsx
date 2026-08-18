@@ -153,7 +153,7 @@ export default function PaginaLista() {
     },
     { titulo: "Assunto", celula: (l) => l.subjectName ?? "—" },
     { titulo: "Banca", celula: (l) => l.bancaName ?? "—" },
-    { titulo: "Ano", celula: (l) => l.year ?? "—" },
+    { titulo: "Ano", celula: (l) => l.year },
     {
       titulo: "Tipo",
       celula: (l) => (

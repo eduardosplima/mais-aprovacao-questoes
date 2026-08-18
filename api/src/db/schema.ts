@@ -122,7 +122,7 @@ export const questions = sqliteTable(
       .references(() => taxonomyTerms.id),
     cargoId: text("cargo_id").references(() => taxonomyTerms.id),
     levelId: text("level_id").references(() => taxonomyTerms.id),
-    year: integer("year"),
+    year: integer("year").notNull(),
     /** 'draft' | 'published' — o aluno só enxerga 'published'. */
     status: text("status").notNull().default("draft"),
     /** SET NULL: a questão é conteúdo da plataforma, não dado pessoal de quem

@@ -15,6 +15,13 @@
       "when": 1785690826697,
       "tag": "0001_optimal_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787018581490,
+      "tag": "0002_special_vertigo",
+      "breakpoints": true
     }
   ]
 }

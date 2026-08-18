@@ -32,7 +32,7 @@ export interface QuestionDetail {
   bancaId: string;
   cargoId: string | null;
   levelId: string | null;
-  year: number | null;
+  year: number;
   status: QuestionStatus;
   alternatives: { id: string; position: number; body: string; isCorrect: boolean }[];
   explanation: { body: string; videoUrl: string | null } | null;
@@ -43,7 +43,7 @@ export interface QuestionListRow {
   statement: string;
   type: QuestionType;
   status: QuestionStatus;
-  year: number | null;
+  year: number;
   subjectName: string | null;
   bancaName: string | null;
 }

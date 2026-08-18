@@ -31,6 +31,7 @@ async function question(): Promise<string> {
       statement: "<p>enunciado</p>",
       subjectId: await term("subject", "dir-adm-" + id),
       bancaId: await term("banca", "cespe-" + id),
+      year: 2023,
       status: "draft",
       createdAt: now,
       updatedAt: now,
@@ -71,6 +72,34 @@ describe("schema de conteúdo", () => {
       .all();
     expect(alts).toHaveLength(0);
     expect(exps).toHaveLength(0);
+  });
+
+  it("questão sem ano é recusada pelo banco", async () => {
+    const subject = await term("subject", "sem-ano-" + crypto.randomUUID());
+    const banca = await term("banca", "sem-ano-" + crypto.randomUUID());
+    const agora = Date.now();
+
+    // SQL cru de propósito: o tipo do drizzle já proíbe omitir o ano depois
+    // que a coluna virou notNull, então um insert pelo ORM provaria só o
+    // TypeScript. O que interessa aqui é a outra camada — que o banco
+    // recusa sozinho, mesmo que alguém escreva direto nele um dia.
+    await expect(
+      env.DB.prepare(
+        "INSERT INTO questions (id, type, statement, subject_id, banca_id, status, created_at, updated_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+        .bind(
+          crypto.randomUUID(),
+          "multiple_choice",
+          "<p>enunciado</p>",
+          subject,
+          banca,
+          "draft",
+          agora,
+          agora,
+        )
+        .run(),
+    ).rejects.toThrow();
   });
 
   it("o índice parcial permite recriar um slug soft-deletado", async () => {

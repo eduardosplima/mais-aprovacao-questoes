@@ -82,7 +82,7 @@ function Formulario() {
         setBancaId(q.bancaId);
         setCargoId(q.cargoId ?? "");
         setLevelId(q.levelId ?? "");
-        setAno(q.year ? String(q.year) : "");
+        setAno(String(q.year));
         setAlternativas(
           q.alternatives.map((a) => ({ body: a.body, isCorrect: a.isCorrect })),
         );

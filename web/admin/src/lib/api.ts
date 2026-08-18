@@ -68,7 +68,7 @@ export interface LinhaQuestao {
   statement: string;
   type: TipoQuestao;
   status: SituacaoQuestao;
-  year: number | null;
+  year: number;
   subjectName: string | null;
   bancaName: string | null;
 }
@@ -88,7 +88,7 @@ export interface Questao {
   bancaId: string;
   cargoId: string | null;
   levelId: string | null;
-  year: number | null;
+  year: number;
   status: SituacaoQuestao;
   alternatives: Required<Alternativa>[];
   explanation: { body: string; videoUrl: string | null } | null;
