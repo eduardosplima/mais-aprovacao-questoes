@@ -146,6 +146,7 @@ describe("POST /admin/auth/senha", () => {
 
   it("nova senha com menos de 12 caracteres é 400", async () => {
     const res = await trocar({ senhaAtual: SENHA, nova: "curta12345" });
+    expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "weak_password" });
   });
 

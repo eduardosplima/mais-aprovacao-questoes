@@ -137,6 +137,20 @@ describe("guardas de /admin", () => {
     expect(res.status).toBe(401);
   });
 
+  // Checagem 2 de requireSessaoAdmin: cookie presente, mas o JWT não é
+  // verificável (nem sequer bem formado). Access válido de propósito, para
+  // que o 401 só possa vir da camada de sessão, não da borda.
+  it("401 com Access válido e cookie de sessão que não é um JWT válido", async () => {
+    const token = await accessToken();
+    const cookie = "sessao_admin=isso-nao-e-um-jwt";
+    const res = await app.request(
+      "/admin/taxonomy?kind=banca",
+      { headers: { "cf-access-jwt-assertion": token, cookie } },
+      prod(),
+    );
+    expect(res.status).toBe(401);
+  });
+
   it("403 com Access válido e sessão de email fora da allowlist", async () => {
     const email = "fora-da-allowlist@test.com";
     const token = await accessToken(email);
