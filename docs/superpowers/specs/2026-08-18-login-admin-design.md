@@ -252,7 +252,7 @@ por `GET /admin/auth/contexto`:
 | `ehAdmin` | `temSenha` | O que aparece |
 |---|---|---|
 | `false` | — | "Você entrou pelo Access como `X`, mas este email não é administrador." Sem campo de senha. |
-| `true` | `false` | "Este email ainda não tem senha definida. Peça a criação pelo CLI." Sem campo de senha. |
+| `true` | `false` | "Este email ainda não tem senha definida. Entre em contato com o time de desenvolvimento." Sem campo de senha. |
 | `true` | `true` | Email como texto, campo de senha, botão Entrar. |
 
 A primeira linha substitui o `?motivo=forbidden` de hoje
