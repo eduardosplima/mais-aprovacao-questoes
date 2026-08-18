@@ -68,3 +68,106 @@ test("o mesmo nome em tipos diferentes é permitido", async ({ page }) => {
   await expect(page.locator("table").getByText("Analista")).toBeVisible();
   await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
 });
+
+// O campo perdeu o `required` de propósito: o balão nativo do navegador não
+// segue o padrão de erro do painel, e ele aceitava " " como preenchido. Estes
+// dois testes fixam o que entrou no lugar — mensagem inline e nenhuma
+// requisição — porque um `required` de volta passaria despercebido de outro
+// jeito.
+
+test("adicionar com o campo vazio mostra erro inline e não chama a API", async ({ page }) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  let posts = 0;
+  page.on("request", (req) => {
+    if (req.method() === "POST" && req.url().endsWith("/admin/taxonomy")) posts++;
+  });
+
+  await page.getByRole("button", { name: "Adicionar" }).click();
+
+  const campo = page.getByLabel("Nome", { exact: true });
+  await expect(page.locator("main").getByRole("alert")).toHaveText("Informe o nome do termo.");
+  await expect(campo).toHaveAttribute("aria-invalid", "true");
+  expect(posts).toBe(0);
+
+  // Digitar limpa o erro: o campo volta ao normal antes de haver novo envio.
+  await campo.fill("Vunesp");
+  await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+  await expect(campo).not.toHaveAttribute("aria-invalid", "true");
+});
+
+test("adicionar com só espaços é barrado no cliente", async ({ page }) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  let posts = 0;
+  page.on("request", (req) => {
+    if (req.method() === "POST" && req.url().endsWith("/admin/taxonomy")) posts++;
+  });
+
+  await page.getByLabel("Nome", { exact: true }).fill("   ");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+
+  await expect(page.locator("main").getByRole("alert")).toHaveText("Informe o nome do termo.");
+  expect(posts).toBe(0);
+});
+
+test("renomear com só espaços é barrado no modal, sem chamar a API", async ({ page }) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  await page.getByLabel("Nome", { exact: true }).fill("Fundatec");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Fundatec")).toBeVisible();
+
+  let patches = 0;
+  page.on("request", (req) => {
+    if (req.method() === "PATCH" && req.url().includes("/admin/taxonomy/")) patches++;
+  });
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Fundatec" })
+    .click();
+
+  const dialogo = page.getByRole("dialog");
+  const campo = dialogo.getByLabel("Novo nome");
+  await campo.fill("   ");
+  await dialogo.getByRole("button", { name: "Salvar" }).click();
+
+  // O modal continua aberto e explica no próprio campo.
+  await expect(dialogo.getByRole("alert")).toHaveText("Informe o nome do termo.");
+  await expect(campo).toHaveAttribute("aria-invalid", "true");
+  expect(patches).toBe(0);
+
+  // Corrigido, o mesmo modal conclui — o erro não deixa o formulário travado.
+  await campo.fill("Fundatec RS");
+  await expect(dialogo.getByRole("alert")).toHaveCount(0);
+  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await expect(page.locator("table").getByText("Fundatec RS")).toBeVisible();
+});
+
+test("renomear para um nome que já existe explica dentro do modal", async ({ page }) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  for (const nome of ["Quadrix", "Consulplan"]) {
+    await page.getByLabel("Nome", { exact: true }).fill(nome);
+    await page.getByRole("button", { name: "Adicionar" }).click();
+    await expect(page.locator("table").getByText(nome)).toBeVisible();
+  }
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Quadrix" })
+    .click();
+
+  const dialogo = page.getByRole("dialog");
+  await dialogo.getByLabel("Novo nome").fill("Consulplan");
+  await dialogo.getByRole("button", { name: "Salvar" }).click();
+
+  // O 409 aparece no campo que o causou, e não como toast atrás do overlay.
+  await expect(dialogo.getByRole("alert")).toHaveText(/já existe um termo ativo/i);
+  await expect(page.locator("table").getByText("Quadrix")).toBeVisible();
+});

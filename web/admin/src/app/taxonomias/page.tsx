@@ -7,6 +7,7 @@ import {
   Campo,
   Card,
   CONTROLE,
+  CONTROLE_INVALIDO,
   IconeAdicionar,
   IconeAssunto,
   IconeBanca,
@@ -46,6 +47,7 @@ export default function PaginaTaxonomias() {
   const [salvando, setSalvando] = useState(false);
   const [aRenomear, setARenomear] = useState<Termo | null>(null);
   const [novoNome, setNovoNome] = useState("");
+  const [erroRenomear, setErroRenomear] = useState<string | null>(null);
   const [aExcluir, setAExcluir] = useState<Termo | null>(null);
   const avisar = useToast();
   // Descarta respostas fora de ordem: trocar de aba rápido (Banca → Assunto →
@@ -76,10 +78,19 @@ export default function PaginaTaxonomias() {
 
   async function adicionar(evento: React.FormEvent) {
     evento.preventDefault();
+    // O `required` do HTML dava duas coisas erradas: o balão nativo do
+    // navegador, fora do padrão de erro do painel, e " " contado como
+    // preenchido. A regra aqui é a mesma do servidor
+    // (api/src/routes/admin/taxonomy.ts:21, `z.string().trim().min(1)`).
+    const limpo = nome.trim();
+    if (!limpo) {
+      setErro("Informe o nome do termo.");
+      return;
+    }
     setErro(null);
     setSalvando(true);
     try {
-      await api.criarTermo(aba, nome);
+      await api.criarTermo(aba, limpo);
       setNome("");
       avisar("Termo criado.");
       await carregar();
@@ -93,13 +104,25 @@ export default function PaginaTaxonomias() {
   async function renomear() {
     if (!aRenomear) return;
     const alvo = aRenomear;
+    // Mesma regra do formulário de cadastro, pelo mesmo motivo: o servidor
+    // apara o nome antes de validar, então " " chegaria lá só para voltar
+    // como erro genérico.
+    const limpo = novoNome.trim();
+    if (!limpo) {
+      setErroRenomear("Informe o nome do termo.");
+      return;
+    }
+    setErroRenomear(null);
     try {
-      await api.renomearTermo(alvo.id, novoNome);
+      await api.renomearTermo(alvo.id, limpo);
       setARenomear(null);
       avisar("Termo renomeado.");
       await carregar();
     } catch (falha) {
-      avisar(mensagemDe(falha), "erro");
+      // Inline, e não em toast: o toast fica acima do overlay e é fácil de
+      // não notar com o modal ainda aberto na frente. O erro pertence ao
+      // campo que o causou — é o mesmo tratamento que o cadastro dá ao 409.
+      setErroRenomear(mensagemDe(falha));
     }
   }
 
@@ -128,6 +151,7 @@ export default function PaginaTaxonomias() {
             onClick={() => {
               setARenomear(t);
               setNovoNome(t.name);
+              setErroRenomear(null);
             }}
           />
           <BotaoIcone
@@ -174,11 +198,14 @@ export default function PaginaTaxonomias() {
             <Campo rotulo="Nome" htmlFor="novo-termo" erro={erro ?? undefined}>
               <input
                 id="novo-termo"
-                className={CONTROLE}
+                className={`${CONTROLE} ${erro ? CONTROLE_INVALIDO : ""}`}
+                aria-invalid={erro ? true : undefined}
                 value={nome}
-                required
                 maxLength={120}
-                onChange={(e) => setNome(e.target.value)}
+                onChange={(e) => {
+                  setNome(e.target.value);
+                  if (erro) setErro(null);
+                }}
               />
             </Campo>
           </div>
@@ -211,15 +238,26 @@ export default function PaginaTaxonomias() {
         titulo="Renomear termo"
         rotuloConfirmar="Salvar"
         aoConfirmar={() => void renomear()}
-        aoCancelar={() => setARenomear(null)}
+        aoCancelar={() => {
+          setARenomear(null);
+          setErroRenomear(null);
+        }}
       >
-        <Campo rotulo="Novo nome" htmlFor="novo-nome">
+        <Campo
+          rotulo="Novo nome"
+          htmlFor="novo-nome"
+          erro={erroRenomear ?? undefined}
+        >
           <input
             id="novo-nome"
-            className={CONTROLE}
+            className={`${CONTROLE} ${erroRenomear ? CONTROLE_INVALIDO : ""}`}
+            aria-invalid={erroRenomear ? true : undefined}
             value={novoNome}
             maxLength={120}
-            onChange={(e) => setNovoNome(e.target.value)}
+            onChange={(e) => {
+              setNovoNome(e.target.value);
+              if (erroRenomear) setErroRenomear(null);
+            }}
           />
         </Campo>
       </Modal>
