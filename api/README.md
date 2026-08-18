@@ -47,9 +47,15 @@ os seis segredos vão via `wrangler secret put <NOME>`; as vars continuam em
 `wrangler.jsonc`.
 
 Das três últimas: `MEDIA_PUBLIC_BASE` é o hostname **sem cookies** que serve o
-bucket R2 (um SVG malicioso não pode executar com a sessão do admin);
-`ACCESS_TEAM_DOMAIN` e `ACCESS_AUD` são o domínio do time no Zero Trust e a tag
-`aud` da aplicação Access, usados para validar o JWT da borda.
+bucket R2 (um SVG malicioso não pode executar com a sessão do admin) — em
+produção é o Custom Domain `media.maisaprovacao.com.br`, e **em
+desenvolvimento você precisa sobrepô-lo** com `MEDIA_PUBLIC_BASE=http://localhost:8787`
+no `.dev.vars`, ou as imagens que você subir localmente ganham URL de
+produção, onde elas não existem, e não carregam. Quem as serve em 8787 é
+`GET /media/:key` (`src/routes/media.ts`), que não é roteada na borda e por
+isso não existe em produção. `ACCESS_TEAM_DOMAIN` e `ACCESS_AUD` são o
+domínio do time no Zero Trust e a tag `aud` da aplicação Access, usados para
+validar o JWT da borda.
 
 Opcional e só de desenvolvimento: `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula
 a verificação do Cloudflare Access em `/admin/*` (ver seção "Painel

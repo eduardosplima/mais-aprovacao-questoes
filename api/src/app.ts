@@ -6,6 +6,7 @@ import { webhooks } from "./webhooks/hotmart";
 import { adminTaxonomy } from "./routes/admin/taxonomy";
 import { adminQuestions } from "./routes/admin/questions";
 import { adminMedia } from "./routes/admin/media";
+import { media } from "./routes/media";
 import { requireAccess } from "./middleware/access";
 import { requireSession } from "./middleware/session";
 import { requireAdmin } from "./middleware/rbac";
@@ -20,6 +21,10 @@ app.route("/auth", auth);
 // Fora do Access de propósito: quem chama é a Hotmart, que não tem identidade
 // no nosso IdP.
 app.route("/webhooks", webhooks);
+
+// Só alcançável em desenvolvimento: nenhuma Worker Route casa /media/*.
+// Ver o comentário em routes/media.ts.
+app.route("/media", media);
 
 /**
  * Duas camadas independentes, nesta ordem:
