@@ -83,7 +83,10 @@ async function accessToken(): Promise<string> {
       throw new Error("fetch inesperado: " + String(input));
     }),
   );
-  return new SignJWT({})
+  // A partir da Task 2, requireAccess barra qualquer JWT sem email — este
+  // helper não testa identidade do Access, só a camada de sessão/D1 abaixo
+  // dele, então o valor em si é irrelevante.
+  return new SignJWT({ email: "access@test.com" })
     .setProtectedHeader({ alg: "RS256", kid: "k-guards" })
     .setIssuer(`https://${TEAM}`)
     .setAudience(AUD)

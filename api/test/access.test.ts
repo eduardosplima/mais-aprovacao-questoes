@@ -4,7 +4,11 @@ import { Hono } from "hono";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import type { Env } from "../src/config/env";
 import { envWith } from "./helpers";
-import { requireAccess, __resetJwksCache } from "../src/middleware/access";
+import {
+  requireAccess,
+  emailDoAccess,
+  __resetJwksCache,
+} from "../src/middleware/access";
 
 const TEAM = "equipe-test.cloudflareaccess.com";
 const AUD = "aud-de-teste";
@@ -38,9 +42,9 @@ async function withJwks() {
 
 async function token(
   privateKey: CryptoKey,
-  over: { iss?: string; aud?: string } = {},
+  over: { iss?: string; aud?: string; email?: string } = {},
 ): Promise<string> {
-  return new SignJWT({})
+  return new SignJWT(over.email ? { email: over.email } : {})
     .setProtectedHeader({ alg: "RS256", kid: "k1" })
     .setIssuer(over.iss ?? `https://${TEAM}`)
     .setAudience(over.aud ?? AUD)
@@ -104,7 +108,11 @@ describe("requireAccess", () => {
     const key = await withJwks();
     const res = await buildApp().request(
       "/admin/ping",
-      { headers: { "cf-access-jwt-assertion": await token(key) } },
+      {
+        headers: {
+          "cf-access-jwt-assertion": await token(key, { email: "user@test.com" }),
+        },
+      },
       base(),
     );
     expect(res.status).toBe(200);
@@ -118,6 +126,7 @@ describe("requireAccess", () => {
         ACCESS_TEAM_DOMAIN: TEAM,
         ACCESS_AUD: AUD,
         ACCESS_DEV_BYPASS: "true",
+        ACCESS_DEV_EMAIL: "admin@dev.local",
       }),
     );
     expect(res.status).toBe(200);
@@ -139,4 +148,69 @@ describe("requireAccess", () => {
       expect(res.status).toBe(401);
     },
   );
+});
+
+describe("emailDoAccess", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    __resetJwksCache();
+  });
+
+  function appComEco() {
+    const app = new Hono<{
+      Bindings: Env;
+      Variables: { accessEmail: string };
+    }>();
+    app.get("/admin/eco", requireAccess, (c) => c.text(emailDoAccess(c)));
+    return app;
+  }
+
+  it("devolve o email do JWT, normalizado", async () => {
+    const key = await withJwks();
+    const jwt = await new SignJWT({ email: "Fulano@Test.com " })
+      .setProtectedHeader({ alg: "RS256", kid: "k1" })
+      .setIssuer(`https://${TEAM}`)
+      .setAudience(AUD)
+      .setExpirationTime("5m")
+      .sign(key);
+    const res = await appComEco().request(
+      "/admin/eco",
+      { headers: { "cf-access-jwt-assertion": jwt } },
+      base(),
+    );
+    expect(await res.text()).toBe("fulano@test.com");
+  });
+
+  it("401 quando o JWT é válido mas não traz email", async () => {
+    const key = await withJwks();
+    const res = await appComEco().request(
+      "/admin/eco",
+      { headers: { "cf-access-jwt-assertion": await token(key) } },
+      base(),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("no bypass de dev, usa ACCESS_DEV_EMAIL", async () => {
+    const res = await appComEco().request(
+      "/admin/eco",
+      {},
+      envWith({
+        ACCESS_DEV_BYPASS: "true",
+        ACCESS_DEV_EMAIL: "admin@dev.local",
+      }),
+    );
+    expect(await res.text()).toBe("admin@dev.local");
+  });
+
+  // Fail-closed: bypass ligado sem email não pode virar string vazia, que
+  // casaria com uma allowlist vazia mais adiante.
+  it("401 com bypass ligado e ACCESS_DEV_EMAIL ausente", async () => {
+    const res = await appComEco().request(
+      "/admin/eco",
+      {},
+      envWith({ ACCESS_DEV_BYPASS: "true", ACCESS_DEV_EMAIL: "" }),
+    );
+    expect(res.status).toBe(401);
+  });
 });

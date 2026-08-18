@@ -43,6 +43,11 @@ export interface Env {
    * — inclusive ausência — significa exigir o JWT do Access.
    */
   ACCESS_DEV_BYPASS?: string;
+  /**
+   * Só existe em `.dev.vars`, e só é lida quando o bypass está ligado. É o
+   * email que faz as vezes do que o Access injetaria na borda.
+   */
+  ACCESS_DEV_EMAIL?: string;
   /** Bucket das imagens de questão. Servido por um hostname sem cookies. */
   MEDIA: R2Bucket;
   /** Base pública do bucket, ex.: "https://media.exemplo.com". Sem barra final. */

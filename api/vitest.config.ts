@@ -28,6 +28,7 @@ export default defineConfig({
           ACCESS_TEAM_DOMAIN: "equipe-test.cloudflareaccess.com",
           ACCESS_AUD: "aud-de-teste",
           ACCESS_DEV_BYPASS: "",
+          ACCESS_DEV_EMAIL: "",
           MEDIA_PUBLIC_BASE: "https://media.test",
         },
       },
