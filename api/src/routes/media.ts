@@ -12,7 +12,9 @@ export const media = new Hono<{ Bindings: Env }>();
  * rota nunca é alcançada lá: nenhuma das três Worker Routes de
  * `wrangler.jsonc` casa /media/*, e workers_dev e preview_urls estão ambos em
  * false. É o mesmo arranjo do /health — existe no Hono, não é roteada na
- * borda.
+ * borda. Isso é invariante do deploy, não do código: uma Worker Route nova
+ * que case /media/* revive a rota em produção — ver a nota na Fase 8 de
+ * docs/runbook-deploy-producao.md.
  *
  * Fica fora do app.use("/admin/*") de propósito: um <img> não manda o JWT do
  * Access, e o conteúdo aqui é o mesmo que o bucket já serve publicamente em
@@ -30,6 +32,13 @@ media.get("/:key", async (c) => {
   return new Response(obj.body, {
     headers: {
       "content-type": obj.httpMetadata?.contentType ?? "application/octet-stream",
+      // O fallback application/octet-stream existe para um objeto que o
+      // upload nunca validou (ex.: gravado fora da banda com
+      // `wrangler r2 object put`). Em desenvolvimento localhost:8787 e
+      // localhost:3000 compartilham cookie jar, e é lá que mora a sessão do
+      // admin — nosniff fecha a questão de sniffing em vez de deixá-la
+      // apoiada só no argumento acima.
+      "x-content-type-options": "nosniff",
     },
   });
 });

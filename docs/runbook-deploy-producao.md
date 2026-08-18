@@ -553,6 +553,17 @@ caminhos que o Worker já serve, sem prefixo:
 - [x] Confirmar que o painel **não** tem página em `/admin` nem em `/auth` — as
       rotas do Worker capturam esses caminhos antes do Pages.
 
+> **Nenhuma rota nova pode casar `/media/*`, incluindo as do sub-projeto 4.**
+> `GET /media/:key` (`api/src/routes/media.ts`) existe no Hono só para o
+> desenvolvimento local — a segurança dela depende inteiramente de nenhuma
+> Worker Route alcançá-la em produção, e hoje nenhuma alcança porque nenhuma
+> das três casa esse caminho. O risco concreto é o sub-projeto 4: se a rota
+> dele em `app.maisaprovacao.com.br` vier ampla (`/*`) em vez de restrita a
+> `/auth/*` e `/webhooks/*`, `/media/*` passa a responder também nesse
+> hostname — que carrega o cookie de sessão do aluno — e anula em silêncio o
+> motivo de `MEDIA_PUBLIC_BASE` apontar para `media.maisaprovacao.com.br`,
+> hostname sem cookies. Novas rotas continuam path-scoped, nunca um `/*`.
+
 ---
 
 ## Fase 9 — Pages → o painel

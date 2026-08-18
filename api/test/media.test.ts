@@ -26,10 +26,11 @@ describe("GET /media/:key", () => {
   it("responde sem o JWT do Cloudflare Access", async () => {
     // Este é o teste que sustenta a premissa da rota inteira: ela é
     // inalcançável em produção porque nenhuma das três Worker Routes casa
-    // /media/*, e isso só continua verdade enquanto o prefixo for /media/ e
-    // ela ficar fora do app.use("/admin/*", ...). Se alguém mover a rota
-    // para dentro de /admin ou empurrá-la para baixo do middleware, o
-    // requireAccess responde 401 aqui e este caso quebra.
+    // /media/*, e isso só continua verdade enquanto o prefixo do mount for
+    // /media e não virar /admin/algo. (O app.use("/admin/*", ...) é
+    // escopado por padrão de caminho, não por ordem de registro — mover o
+    // app.route("/media", media) para depois dele em app.ts não mudaria
+    // nada, porque /media/x nunca casa /admin/*.)
     //
     // Note que o app real é usado de propósito, e não uma mini-app montada
     // à mão como em admin-media.test.ts — montar à mão contornaria
