@@ -175,6 +175,41 @@ deixa a tabela num estado parcial. Convenção adotada a partir da Task 4;
 módulos futuros (tentativas, comentários, anotações) devem seguir o mesmo
 padrão.
 
+### Migrações que reconstroem tabela — leia antes de gerar uma
+
+O SQLite não faz `ALTER COLUMN`, então qualquer mudança de tipo, de
+nulabilidade ou de constraint faz o `drizzle-kit generate` emitir uma
+**reconstrução de tabela**: cria `__new_<tabela>`, copia, `DROP TABLE`,
+renomeia, recria os índices. Duas armadilhas, nesta ordem:
+
+1. **O `PRAGMA foreign_keys=OFF` / `=ON` que o drizzle-kit gera, o D1 recusa.**
+   Troque o `=OFF` por `PRAGMA defer_foreign_keys = true;` e apague o `=ON`.
+   Sem isso o `wrangler d1 migrations apply` falha. Ver
+   `migrations/0002_special_vertigo.sql`, que já está no formato correto.
+
+2. **`defer_foreign_keys` não é equivalente ao que você tirou.** Ele adia a
+   *verificação* de constraint até o commit; ele **não** suprime as *ações*
+   `ON DELETE CASCADE`. E o `DROP TABLE` do SQLite faz um `DELETE` implícito
+   quando FK está ligada. Como `alternatives` e `explanations` referenciam
+   `questions` com `ON DELETE cascade`, reconstruir `questions` **com linhas
+   dentro** apagaria as alternativas e os gabaritos delas, enquanto as questões
+   sobrevivem na tabela nova — perda silenciosa, e migração no D1 é de mão
+   única. O `foreign_keys=OFF` original é justamente o que impediria isso; o
+   substituto exigido pelo D1 não impede.
+
+Consequência prática: **confira a contagem no remoto imediatamente antes de
+aplicar**, não no dia anterior.
+
+```bash
+npx wrangler d1 execute mais-aprovacao-db --remote \
+  --command "SELECT COUNT(*) FROM <tabela>"
+```
+
+Se não voltar zero, pare: a reconstrução deixa de ser trivial e precisa de um
+plano de backfill que preserve as filhas. A `0002` foi aplicada em 2026-08-17
+com `questions`, `alternatives` e `explanations` todas em zero, que era a
+janela em que isso era seguro sem cerimônia.
+
 ## Painel administrativo
 
 `/admin/*` tem **duas camadas independentes**, e nenhuma confia na outra:
