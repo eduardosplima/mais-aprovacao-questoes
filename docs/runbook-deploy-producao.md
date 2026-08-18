@@ -44,6 +44,14 @@ correção do `<select>` no Safari, `questions.year` agora `NOT NULL` no banco
 painel foi conferido no Safari depois da publicação e os `<select>` estão
 corretos. Nada mudou nas fases 0-6 nem 8-13.
 
+> **`master` está à frente do que está publicado, desde 2026-08-18.** Depois
+> daquela republicação entraram dois consertos no painel (commit `67eb803`):
+> o preview deixou de apresentar como link um vídeo que a API recusaria, e o
+> `SeletorTaxonomia` passou a avisar quando a carga de termos falha. **São só
+> de `web/admin` — o Worker não mudou**, então levá-los ao ar é o deploy do
+> Pages sozinho, sem tocar na fase 7. Não há urgência: nenhum dos dois é
+> defeito de caminho feliz.
+
 ## Leia isto antes de começar
 
 Três coisas que este runbook descobriu e que mudam o que dá para prometer ao

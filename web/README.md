@@ -126,8 +126,11 @@ bem-comportados, não uma proteção.
 Política em `~/.claude/CLAUDE.md` §5: nenhum pacote novo sem aprovação
 explícita, cooldown de 14 dias, `ignore-scripts=true`, `npm ci` sempre.
 
-`web/package.json` carrega dois `overrides` — `postcss` e `sharp` —, os mesmos
-de `api/package.json`, porque as mesmas vulnerabilidades chegam pelo Next.
+`web/package.json` carrega três `overrides` — `postcss`, `sharp` e `undici` —,
+os mesmos de `api/package.json`, porque as mesmas vulnerabilidades chegam pelo
+Next. O `undici` entrou em 2026-08-17; era transitiva do miniflare
+(`@cloudflare/vitest-pool-workers → miniflare → undici`), e fechá-la exigia
+justamente o override.
 
 Contagem real desta árvore, medida em darwin-arm64 (entradas de lockfile entre
 parênteses): 23 (52) com next+react, 48 (98) com Tailwind. A diferença entre os
