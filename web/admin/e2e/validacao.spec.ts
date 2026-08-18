@@ -148,7 +148,7 @@ test("corrigidos os campos, o resumo some", async ({ page }) => {
   await page.getByRole("radio", { name: "Alternativa A é a correta" }).check();
   await page.getByRole("button", { name: "Salvar rascunho" }).click();
 
-  await expect(page).toHaveURL("http://localhost:3000/");
+  await expect(page).toHaveURL("/");
 });
 
 test("salvar com pendências durante a pré-visualização não falha em silêncio", async ({

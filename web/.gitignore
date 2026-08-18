@@ -6,3 +6,5 @@ playwright-report
 *.tsbuildinfo
 .env*.local
 next-env.d.ts
+# certificado local do e2e (gerado por admin/e2e/certificado.mjs)
+admin/e2e/certs/

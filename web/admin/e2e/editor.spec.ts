@@ -130,7 +130,7 @@ test("certo/errado: preenche, salva e aparece na lista", async ({ page }) => {
   await page.getByLabel("Gabarito comentado").fill("A soma está correta.");
   await page.getByRole("button", { name: "Publicar" }).click();
 
-  await expect(page).toHaveURL("http://localhost:3000/");
+  await expect(page).toHaveURL("/");
   await expect(
     page.locator("table").getByText("Verdadeiro ou falso: 2 + 2 = 4."),
   ).toBeVisible();

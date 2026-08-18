@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { EMAIL, SENHA } from "./credenciais.mjs";
-import { entrar } from "./entrar";
+import { aguardarFormularioVivo, entrar } from "./entrar";
 import { semear } from "./seed.mjs";
 
 test.beforeAll(semear);
@@ -8,10 +8,11 @@ test.beforeAll(semear);
 test("login → cadastrar → publicar → aparece na lista", async ({ page }) => {
   // 1. Login
   await page.goto("/login");
+  await aguardarFormularioVivo(page);
   await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Senha").fill(SENHA);
   await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
+  await expect(page).toHaveURL("/");
 
   // 2. Taxonomias mínimas
   await page.getByRole("link", { name: "Taxonomias" }).click();
@@ -45,7 +46,7 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await page.getByRole("button", { name: "Publicar" }).click();
 
   // 4. Aparece na lista, já publicada
-  await expect(page).toHaveURL("http://localhost:3000/");
+  await expect(page).toHaveURL("/");
   await expect(page.locator("table").getByText("Assinale a alternativa correta.")).toBeVisible();
   await expect(page.locator("table").getByText("Publicada")).toBeVisible();
 
@@ -65,7 +66,7 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   await page.getByRole("radio", { name: "Alternativa A é a correta" }).check();
   await page.getByLabel("Gabarito comentado").fill("Rascunho, não publicado.");
   await page.getByRole("button", { name: "Salvar rascunho" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
+  await expect(page).toHaveURL("/");
 
   // 6. O filtro de publicadas encontra a publicada e não o rascunho.
   await page.getByLabel("Situação").selectOption("published");
@@ -147,7 +148,7 @@ test("prepara taxonomias e uma questão para os testes de layout responsivo", as
   await page.getByRole("radio", { name: "Alternativa A é a correta" }).check();
   await page.getByLabel("Gabarito comentado").fill("Explicação.");
   await page.getByRole("button", { name: "Salvar rascunho" }).click();
-  await expect(page).toHaveURL("http://localhost:3000/");
+  await expect(page).toHaveURL("/");
 });
 
 for (const largura of LARGURAS) {

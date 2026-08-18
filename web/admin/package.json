@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3000",
+    "dev:e2e": "node e2e/certificado.mjs && next dev -p 3000 --experimental-https --experimental-https-key e2e/certs/localhost-key.pem --experimental-https-cert e2e/certs/localhost.pem",
     "build": "next build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
     "seed": "node e2e/seed.mjs",
