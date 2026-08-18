@@ -355,8 +355,7 @@ o painel não olha mais para lá.
 | Camada | O que entra |
 |---|---|
 | `api/test/admins.test.ts` | novo módulo de banco |
-| `api/test/admin-auth.test.ts` | contexto nos três estados, login certo e errado, troca de senha, senha curta, senha atual errada |
-| `api/test/admin-auth-invariante.test.ts` | email no corpo não muda resultado nenhum |
+| `api/test/admin-auth.test.ts` | contexto nos três estados, login certo e errado, troca de senha, senha curta, senha atual errada, e o caso da invariante: email no corpo não muda resultado nenhum |
 | `api/test/access.test.ts` | `emailDoAccess`; bypass sem `ACCESS_DEV_EMAIL` devolve 401 |
 | `api/test/admin-guards.test.ts` | as cinco checagens de `requireSessaoAdmin`, uma a uma |
 | `api/test/users.test.ts`, `webhook-purchase.test.ts`, `reconcile.test.ts` | poda de `role` |
