@@ -5,10 +5,10 @@
 > por engano o que foi fechado de propósito. Os detalhes moram nos runbooks e
 > nos planos linkados; aqui fica só o que orienta a decisão.
 >
-> Atualizado em **2026-08-18**. O título anterior era "Próxima fase — o
-> WebKit", o que enganava: o WebKit é o item **menos** urgente da lista, e o
-> próprio dossiê dele (mantido íntegro mais abaixo) diz que nada fica
-> bloqueado por ele.
+> Atualizado em **2026-08-18**. O WebKit, que já deu nome a este documento,
+> saiu da lista de pendências nessa data: a suíte e2e roda verde em chromium e
+> WebKit. O registro do que era e do que foi encontrado ficou mais abaixo,
+> porque duas coisas que ele afirmava estavam erradas e vale saber por quê.
 
 ## Estado — 2026-08-18
 
@@ -22,11 +22,13 @@
 
 Duas ressalvas que mudam o que dá para prometer:
 
-- **`master` está à frente do que está publicado.** O commit `67eb803` traz
-  dois consertos de painel (preview de vídeo, aviso de falha no seletor de
-  taxonomia) que ainda não subiram. São só de `web/admin` — publicá-los é o
-  deploy do Pages sozinho, sem tocar no Worker. Nenhum é defeito de caminho
-  feliz, então não corre.
+- **`master` está à frente do que está publicado.** Dois lotes de conserto de
+  painel esperam deploy: o `67eb803` (preview de vídeo, aviso de falha no
+  seletor de taxonomia) e o erro de preenchimento no cadastro de taxonomia, de
+  2026-08-18 — que trocou o balão nativo do navegador pelo padrão de erro do
+  painel e passou a barrar nome só com espaços no cliente. Todos são de
+  `web/admin`: publicá-los é o deploy do Pages sozinho, sem tocar no Worker.
+  Nenhum é defeito de caminho feliz, então não corre.
 - **O fluxo do aluno não fecha.** `api/src/lib/email.ts:48` monta o link
   mágico apontando para `/definir-senha`, que é tela do sub-projeto 4 e não
   existe. Um comprador real recebe o email e cai num 404. O que fecha hoje é
@@ -78,96 +80,69 @@ pela primeira vez. Não bloqueia nada e não exige decisão — só a data.
 
 ---
 
-## Não é o próximo passo: WebKit na suíte e2e — 35 falhas sem causa confirmada
+## Fechado em 2026-08-18: WebKit na suíte e2e
 
-**Estado:** o binário do WebKit está instalado (`webkit-2311` em
-`~/Library/Caches/ms-playwright/`). A mudança de configuração foi **revertida**
-— comitar uma config que deixa a suíte vermelha é pior que não comitar.
+A suíte roda em **chromium e WebKit**, 54 testes em cada, verde nos dois. O
+catálogo de 35 falhas que este documento carregava está obsoleto — e estava
+errado em dois pontos, que só apareceram quando a medição foi refeita.
 
-### O que se sabe
+**Eram 38 falhas, não 35** (a suíte cresceu desde a contagem antiga), e **todas
+tinham a mesma causa**, não várias. A nota de que `visual.spec.ts` falhava
+"depois do login ter funcionado" lia o sintoma errado: aquele teste falhava
+porque a página era o `/login`, e `getByRole('link', { name: 'Nova questão' })`
+devolvia zero elementos.
 
-Uma rodada completa com os dois navegadores deu **chromium 100% verde, WebKit
-com 35 falhas**:
+### Causa 1 — o cookie `Secure` sobre http
 
-| Spec | Falhas |
-|---|---|
-| `caminho-critico` | 11 |
-| `editor` | 6 |
-| `lista` | 5 |
-| `visual` | 4 |
-| `taxonomias` | 3 |
-| `validacao` | 3 |
-| `login` | 2 |
-| `preview` | 1 |
+Provado com o pote de cookies do navegador: o Worker responde
+`Set-Cookie: session=…; HttpOnly; Secure; SameSite=Lax`, o WebKit descarta, o
+Chromium guarda. O WebKit não aceita cookie `Secure` por http nem em
+`localhost`; o Chromium trata `localhost` como origem confiável.
 
-Este catálogo é anterior às mudanças que a rodada Safari/ano/mídia fez em
-`visual.spec.ts` (um teste alterado, um acrescentado) — a linha `visual | 4` é
-um piso, não a contagem atual do arquivo. **Em 2026-08-18 a suíte cresceu de
-novo**: `preview` e `editor` ganharam um teste cada (`67eb803`), então as
-linhas `editor | 6` e `preview | 1` também viraram piso. O catálogo precisa ser
-regenerado de qualquer jeito; estes números servem só para dimensionar o
-trabalho.
+**Saída escolhida: TLS só no servidor que o Playwright sobe.**
+`api/src/lib/cookies.ts` ficou **intocado** — nenhum ramo de desenvolvimento
+entrou no código de segurança, e o `secure: true` que os testes exercitam é
+exatamente o de produção. `npm run dev` continua em http.
 
-Duas amostras foram lidas antes de o catálogo detalhado se perder:
+As outras duas saídas que este documento listava foram descartadas com motivo:
+tornar `secure` condicional faria a suíte inteira, chromium incluído, deixar de
+exercitar o cookie real; recortar o WebKit a um subconjunto entrega menos
+cobertura justamente onde o cliente trabalha.
 
-- `login.spec.ts` — o teste expira esperando um elemento de pós-login, com a
-  página ainda mostrando o formulário de login.
-- `visual.spec.ts` → "os botões de inserção e o rodapé do editor exibem
-  ícone junto do texto" — falha **depois** do login ter funcionado, num
-  `toHaveCount` de `svg` que volta 0.
+O certificado é auto-assinado, gerado sob demanda por
+`web/admin/e2e/certificado.mjs` com o `openssl` do sistema. Nada é baixado — o
+`--experimental-https` do Next só busca o mkcert quando não recebe um par de
+chave e certificado, e aqui ele recebe.
 
-**Há mais de uma causa.** A hipótese inicial — `api/src/lib/cookies.ts:8` marca
-o cookie de sessão como `secure: true`, e o WebKit recusa cookie `Secure` sobre
-`http://localhost`, ao contrário do Chromium — explica no máximo parte do
-conjunto, porque em `visual.spec.ts` o login funcionou.
+### Causa 2 — hidratação do React
 
-### Como refazer
+Só apareceu depois que a primeira caiu, e é a que explicava o resíduo
+intermitente. Preencher o formulário antes de o React hidratar faz a hidratação
+restaurar o input controlado para `""` — **só o primeiro campo**, porque o
+segundo já é preenchido depois. O `required` do email vazio então faz a
+validação nativa do navegador cancelar o submit **em silêncio**: nenhuma
+requisição sai, nenhuma mensagem aparece, e o teste só acusa que continuou em
+`/login`.
 
-Acrescentar um projeto ao lado do `chromium` em
-`web/admin/e2e/playwright.config.ts`:
+A correção é `aguardarFormularioVivo()` em `web/admin/e2e/entrar.ts`, chamada
+antes de qualquer preenchimento: espera o botão "Entrar" habilitar, que é o
+único sinal que depende das duas condições — React vivo (o botão só liga por
+estado) e token do Turnstile presente.
 
-```ts
-{ name: "webkit", use: { ...devices["Desktop Safari"] } },
-```
+**Isto vale para o chromium também.** Ele nunca expôs a falha porque hidrata
+rápido o bastante, mas a corrida sempre esteve lá.
 
-**Não mexer em `workers: 1` nem em `fullyParallel: false`.** Há um D1 local só e
-cada spec chama `semear()` no `beforeAll`, que apaga tabelas; paralelismo entre
-dois projetos vira corrida entre o seed de um e os testes do outro.
+### O que continua sendo verdade
 
-Regenerar o catálogo: `cd web && npm run test -w admin -- --project=webkit`.
-**Copiar `web/admin/test-results/` para fora antes de rodar qualquer outra
-coisa** — o Playwright limpa esse diretório no início de cada rodada, e foi
-assim que o catálogo se perdeu da primeira vez.
+`visual.spec.ts` ainda afirma a *causa* (`appearance: none`) em vez do
+*sintoma* (`padding-left`). Com o WebKit na suíte, dá para apertar isso: agora
+existe um navegador onde o `padding-left` de fato distingue o código corrigido
+do quebrado. É melhoria de teste, não lacuna — a correção do `<select>` já foi
+entregue e conferida a olho no Safari.
 
-### As saídas, e por que nenhuma foi tomada
-
-| Saída | O que pesa contra |
-|---|---|
-| Tornar `secure` condicional ao protocolo em `cookies.ts` | Altera código sensível a segurança para acomodar teste. Vai contra a postura fail-closed do projeto |
-| Servir o dev em HTTPS (`next dev --experimental-https`) | Muda o ferramental de desenvolvimento de todos. Só `:3000` precisaria de TLS — o proxy interno para o `wrangler dev` em `:8787` pode seguir em http |
-| Recortar o WebKit a um subconjunto de specs | Entrega menos cobertura do que se pretendia. E o spec que mais interessa (`visual.spec.ts`) está entre os vermelhos |
-
-### O que isto ainda mudaria
-
-**Nada fica bloqueado.** A correção da sobreposição de ícone e texto nos
-`<select>` do Safari foi entregue em 2026-08-17: `appearance-none` mais uma
-seta desenhada pelo projeto (`IconeSeta` e a prop `seta` do `Controle`).
-
-O que o WebKit mudaria agora é só a **qualidade do teste**. Hoje
-`visual.spec.ts` afirma a *causa* — `appearance: none` — porque o *sintoma* não
-é observável no chromium: lá o `padding-left` é honrado com ou sem
-`appearance-none`, então afirmá-lo passaria dos dois jeitos e não seria
-regressão nenhuma. Com o WebKit na suíte, o teste passaria a afirmar
-`padding-left` = `44px` num navegador onde isso de fato distingue o código
-corrigido do quebrado.
-
-É cobertura melhor, não cobertura ausente. Por isso este item deixou de ter
-urgência.
-
-**A verificação visual foi feita e passou.** Em 2026-08-18, com o Worker e o
-Pages já publicados, o painel foi aberto no Safari e os `<select>` apareceram
-corretos. Isso fecha a única parte que a suíte não alcançava — o teste prova a
-causa (`appearance: none`), e um humano confirmou o resultado.
+Cinco testes de rolagem horizontal de `caminho-critico.spec.ts` passavam
+**vazios** durante o período vermelho: sem sessão, eles mediam a tela de login
+em vez da tela que dizem medir. Agora medem a certa.
 
 ---
 

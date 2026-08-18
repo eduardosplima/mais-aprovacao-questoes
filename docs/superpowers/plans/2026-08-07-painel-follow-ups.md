@@ -45,7 +45,7 @@ isso —, mas o empacotamento tem três arestas:
 | Item | Efeito |
 |---|---|
 | A linha da `Tabela` responde só a mouse (`onClick` em `<tr>`/`<li>`, sem `tabIndex` nem `role`) | Mitigado: a coluna Ações agora tem "Editar", então o teclado tem caminho. A linha continua sendo atalho de mouse |
-| Um 409 ao renomear taxonomia aparece como toast enquanto o modal segue aberto, em vez de inline no campo | O toast fica acima do overlay e é visível, mas é fácil de não notar. Junto disso: falta guarda de duplo clique no botão Salvar do modal |
+| ~~Um 409 ao renomear taxonomia aparece como toast enquanto o modal segue aberto, em vez de inline no campo~~ **Resolvido em 2026-08-18** | O erro do servidor passou a cair no próprio campo do modal, junto com a validação de nome vazio que entrou na mesma rodada. Coberto por `taxonomias.spec.ts`. **Continua aberto:** falta guarda de duplo clique no botão Salvar do modal |
 
 ## Qualidade de erro no editor
 

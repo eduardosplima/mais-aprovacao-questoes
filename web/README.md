@@ -25,7 +25,7 @@ para o `src` do pacote.
 ```bash
 cd web
 npm ci
-npx playwright install chromium   # só na primeira vez
+npx playwright install chromium webkit   # só na primeira vez
 ```
 
 Criar `web/admin/.env.development.local`:
@@ -61,6 +61,21 @@ cd web && npm run typecheck   # os dois workspaces
 cd web && npm test            # Playwright (sobe os dois servidores sozinho)
 cd web && npm run audit       # OSV.dev contra a árvore instalada
 ```
+
+A suíte roda em **chromium e WebKit** — o cliente trabalha em macOS, então o
+Safari é navegador de primeira classe aqui, não cobertura extra.
+
+Por causa do WebKit, o servidor que o Playwright sobe serve **https**, e só
+ele: `npm run dev` continua em http. O motivo é o cookie de sessão, que é
+`Secure` (`api/src/lib/cookies.ts`) — o WebKit descarta cookie `Secure` que
+chegue por http, mesmo em `localhost`, ao contrário do Chromium. Servir a
+suíte por TLS deixa o `secure: true` exercitado nos testes ser exatamente o de
+produção, sem ramo de desenvolvimento no código de segurança.
+
+O certificado é auto-assinado e gerado sob demanda por
+`admin/e2e/certificado.mjs`, com o `openssl` que já existe no sistema — nada é
+baixado, e `admin/e2e/certs/` não é versionado. Para apagá-lo e refazer, basta
+remover o diretório.
 
 ## Um hostname para o painel, duas origens de conteúdo
 
