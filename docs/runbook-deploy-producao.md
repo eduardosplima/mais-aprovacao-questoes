@@ -798,7 +798,6 @@ Só depois da fase 12 passar inteira.
 | `/definir-senha` não existe — link mágico cai em 404 | sub-projeto 4 |
 | Sem script para migração remota nem para deploy do Pages | `package.json` |
 | Sem CI — nada roda a suíte antes de publicar | — |
-| `hono@4.12.28` marcado — **cooldown vencido em 2026-08-17, já dá para subir** | `api/package.json` |
 | `nanoid` marcado nos dois workspaces, 3.3.18 em 2026-08-21 | `api/`, `web/` |
 | e2e do upload depende de `MEDIA_PUBLIC_BASE=http://localhost:8787` em `api/.dev.vars`, não versionado — cada dev precisa adicionar à mão | "upload de imagem: insere a tag `<img>` no enunciado" |
 | `HOTMART_SUBSCRIPTION_UCODES` ainda é placeholder | `api/wrangler.jsonc` |
