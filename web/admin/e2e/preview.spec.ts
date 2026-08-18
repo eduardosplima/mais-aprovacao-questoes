@@ -29,3 +29,25 @@ test("o preview mostra enunciado, letras e a alternativa correta", async ({
   await page.getByRole("button", { name: "Voltar a editar" }).click();
   await expect(page.getByRole("textbox", { name: "Alternativa A" })).toBeVisible();
 });
+
+test("o preview não apresenta como link um vídeo que a API recusaria", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/questoes/editar");
+
+  await page.getByLabel("Enunciado").fill("Enunciado de teste.");
+  await page.getByLabel("Gabarito comentado").fill("Explicação.");
+  await page.getByLabel("Vídeo do gabarito").fill("mailto:alguem@exemplo.com");
+
+  await page.getByRole("button", { name: "Pré-visualizar" }).click();
+
+  // O endereço continua à vista — quem confere precisa ver o que digitou.
+  // O que não pode é vir como link: `validarQuestao` recusa este valor no
+  // salvamento (ver editor.spec.ts), então um link funcional aqui promete um
+  // vídeo que nunca vai existir.
+  await expect(page.getByText("mailto:alguem@exemplo.com")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "mailto:alguem@exemplo.com" }),
+  ).toHaveCount(0);
+});

@@ -39,7 +39,7 @@ export function vazio(html: string): boolean {
  * contraditória (barrar o que a API aceitaria) ou a genérica (deixar passar
  * o que a API recusaria).
  */
-function isHttpUrl(value: string): boolean {
+export function isHttpUrl(value: string): boolean {
   let parsed: URL;
   try {
     parsed = new URL(value);

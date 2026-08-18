@@ -3,7 +3,7 @@
 import { Card } from "@mais/ui";
 import type { AlternativaForm } from "./ListaAlternativas";
 import type { TipoQuestao } from "@/lib/api";
-import { vazio } from "@/lib/validacao";
+import { isHttpUrl, vazio } from "@/lib/validacao";
 
 const LETRAS = "ABCDEFGHIJ";
 
@@ -67,14 +67,21 @@ export function Preview({
           {videoUrl && (
             <p className="mb-3 text-[14px]">
               Vídeo:{" "}
-              <a
-                href={videoUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-roxo underline"
-              >
-                {videoUrl}
-              </a>
+              {/* Endereço que `validarQuestao` recusa no salvamento não vira
+                  link: o preview existe para responder "é isto que vai ser
+                  publicado?", e um link funcional aqui responderia errado. */}
+              {isHttpUrl(videoUrl) ? (
+                <a
+                  href={videoUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-roxo underline"
+                >
+                  {videoUrl}
+                </a>
+              ) : (
+                <span className="text-txt-2">{videoUrl}</span>
+              )}
             </p>
           )}
           <div className="prosa" dangerouslySetInnerHTML={{ __html: gabarito }} />

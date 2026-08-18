@@ -169,3 +169,21 @@ test("upload de imagem: insere a tag <img> no enunciado", async ({ page }) => {
 
   await expect(page.getByLabel("Enunciado").locator("img")).toBeVisible();
 });
+
+test("select de taxonomia avisa quando a carga falha, em vez de ficar vazio", async ({
+  page,
+}) => {
+  await entrar(page);
+  // Abortar só depois do login: a rota de taxonomia não participa da entrada,
+  // mas registrar o intercepto antes tornaria o teste dependente disso.
+  await page.route(
+    (url) => url.pathname === "/admin/taxonomy",
+    (rota) => rota.abort(),
+  );
+  await page.goto("/questoes/editar");
+
+  // Sem o aviso, um select vazio por falha de rede é indistinguível de um
+  // select vazio por taxonomia sem termo cadastrado — e o operador conclui a
+  // segunda coisa, que é a errada.
+  await expect(page.locator("main")).toContainText(/não foi possível carregar/i);
+});

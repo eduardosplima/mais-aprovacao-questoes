@@ -44,27 +44,41 @@ export function SeletorTaxonomia({
   erro?: string;
 }) {
   const [termos, setTermos] = useState<Termo[]>([]);
+  const [falhou, setFalhou] = useState(false);
 
   useEffect(() => {
     let vivo = true;
     api
       .termos(kind)
-      .then((t) => vivo && setTermos(t))
-      .catch(() => vivo && setTermos([]));
+      .then((t) => {
+        if (!vivo) return;
+        setTermos(t);
+        setFalhou(false);
+      })
+      .catch(() => {
+        if (!vivo) return;
+        setTermos([]);
+        setFalhou(true);
+      });
     return () => {
       vivo = false;
     };
   }, [kind]);
 
+  // A falha de carga tem precedência sobre o erro de validação: com a lista
+  // vazia o operador não consegue escolher nada, e "Escolha o assunto." o
+  // culparia por algo que não é dele.
+  const mensagem = falhou ? "Não foi possível carregar os termos." : erro;
+
   const id = `taxonomia-${kind}`;
   const Icone = ICONE[kind];
   return (
-    <Campo rotulo={rotulo ?? ROTULO[kind]} htmlFor={id} erro={erro}>
+    <Campo rotulo={rotulo ?? ROTULO[kind]} htmlFor={id} erro={mensagem}>
       <Controle icone={<Icone />} seta>
         <select
           id={id}
-          className={`${CONTROLE} appearance-none pl-11 pr-11 ${erro ? CONTROLE_INVALIDO : ""}`}
-          aria-invalid={erro ? true : undefined}
+          className={`${CONTROLE} appearance-none pl-11 pr-11 ${mensagem ? CONTROLE_INVALIDO : ""}`}
+          aria-invalid={mensagem ? true : undefined}
           value={valor}
           required={obrigatorio}
           onChange={(e) => aoMudar(e.target.value)}
