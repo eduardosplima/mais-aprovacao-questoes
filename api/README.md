@@ -27,7 +27,8 @@ npm install
 ### Segredos (`.dev.vars`)
 
 Crie `api/.dev.vars` (já no `.gitignore` — **nunca** commitar) com os seis
-segredos abaixo, valores do **sandbox da Hotmart** onde aplicável:
+segredos abaixo, valores do **sandbox da Hotmart** onde aplicável, mais a
+sobreposição não-secreta de `MEDIA_PUBLIC_BASE` (explicada logo depois):
 
 ```
 JWT_SECRET=<segredo forte para assinar o cookie de sessão>
@@ -36,6 +37,10 @@ HOTMART_CLIENT_ID=<client_id da API de dados do sandbox>
 HOTMART_CLIENT_SECRET=<client_secret da API de dados do sandbox>
 DOCUMENT_HMAC_KEY=<segredo forte — pepper do HMAC de CPF e do email da tombstone>
 TURNSTILE_SECRET_KEY=<secret key do Turnstile (par com a site key do frontend)>
+
+# Não é segredo — sobrepõe para dev local o valor de produção que vem de
+# wrangler.jsonc (ver explicação abaixo)
+MEDIA_PUBLIC_BASE=http://localhost:8787
 ```
 
 As demais variáveis, não-secretas, já vêm de `wrangler.jsonc` (bloco `vars`):
@@ -100,6 +105,7 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | POST | `/admin/questions/:id/publish` · `/unpublish` | Alterna o `status` |
 | DELETE | `/admin/questions/:id` | Soft delete |
 | POST | `/admin/media` | `multipart/form-data` com `file` → `{ url }` no R2 |
+| GET | `/media/:key` | Só em desenvolvimento. Lê o objeto do R2 sem autenticação; nenhuma Worker Route casa `/media/*`, então em produção a rota não existe. Ver `src/routes/media.ts` e a Fase 8 de `docs/runbook-deploy-producao.md` |
 
 ### Códigos de erro
 
@@ -148,8 +154,9 @@ explícitos revogam.
 
 - `DB` — D1 (`mais-aprovacao-db`), migrações em `migrations/`.
 - `EMAIL` — `send_email`, usado para o link mágico (primeiro acesso e recuperação).
-- `MEDIA` — R2, bucket das imagens de questão (`POST /admin/media`). A chave é
-  plana (`media/{uuid}.{ext}`): questão não sofre hard delete, então prefixo por
+- `MEDIA` — R2, bucket das imagens de questão. Gravado por `POST /admin/media`
+  e lido em desenvolvimento por `GET /media/:key`. A chave é plana
+  (`media/{uuid}.{ext}`): questão não sofre hard delete, então prefixo por
   questão não serviria para apagar nada.
 - `triggers.crons` — `0 3 * * *`, dispara a reconciliação diária.
 

@@ -31,11 +31,16 @@ com 35 falhas**:
 | `login` | 2 |
 | `preview` | 1 |
 
+Este catálogo é anterior às mudanças que esta rodada fez em `visual.spec.ts`
+(um teste alterado, um acrescentado) — a linha `visual | 4` é um piso, não a
+contagem atual do arquivo.
+
 Duas amostras foram lidas antes de o catálogo detalhado se perder:
 
 - `login.spec.ts` — o teste expira esperando um elemento de pós-login, com a
   página ainda mostrando o formulário de login.
-- `visual.spec.ts:77` — falha **depois** do login ter funcionado, num
+- `visual.spec.ts` → "os botões de inserção e o rodapé do editor exibem
+  ícone junto do texto" — falha **depois** do login ter funcionado, num
   `toHaveCount` de `svg` que volta 0.
 
 **Há mais de uma causa.** A hipótese inicial — `api/src/lib/cookies.ts:8` marca

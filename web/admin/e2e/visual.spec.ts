@@ -115,6 +115,9 @@ test("o <select> abre mão da aparência nativa, e o <input> não ganha seta", a
 
   await page.goto("/questoes/editar");
   await expect(page.getByLabel("Tipo")).toHaveCSS("appearance", "none");
+  await expect(
+    page.getByLabel("Tipo").locator("xpath=..").locator("svg"),
+  ).toHaveCount(2);
   await expect(page.getByLabel("Assunto")).toHaveCSS("appearance", "none");
 
   // O campo Ano é <input> dentro do mesmo Controle e NÃO leva seta: um campo

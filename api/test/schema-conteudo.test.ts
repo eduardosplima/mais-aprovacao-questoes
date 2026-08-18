@@ -99,7 +99,7 @@ describe("schema de conteúdo", () => {
           agora,
         )
         .run(),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/NOT NULL/);
   });
 
   it("o índice parcial permite recriar um slug soft-deletado", async () => {

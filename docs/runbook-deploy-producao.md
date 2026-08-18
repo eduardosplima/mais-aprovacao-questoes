@@ -183,10 +183,14 @@ npx wrangler r2 bucket create mais-aprovacao-media
 - [x] `MEDIA_PUBLIC_BASE` = `https://media.maisaprovacao.com.br` — **sem barra
       final**.
 
-> Preencher isto também conserta um teste: o e2e `editor.spec.ts:136` ("upload
-> de imagem") falha hoje porque o `<img>` inserido recebe
-> `src="https://REPLACE_ME_MEDIA_HOST/…"`, não carrega, fica com altura zero e
-> o Playwright o considera invisível. O upload em si funciona.
+> Isto aqui é só a variável de **produção** — não confundir com o que faz
+> passar o e2e `editor.spec.ts` ("upload de imagem: insere a tag `<img>` no
+> enunciado") localmente. Esse teste depende de `MEDIA_PUBLIC_BASE=http://localhost:8787`
+> em `api/.dev.vars` (ver `api/README.md`), servido por `GET /media/:key`.
+> Preencher este valor de produção em desenvolvimento é o que **quebra** o
+> upload local, não o que conserta: o objeto vai para o R2 local, mas o
+> enunciado recebe uma URL de produção onde o uuid não existe, e a imagem não
+> carrega para ninguém.
 
 ---
 
@@ -796,5 +800,5 @@ Só depois da fase 12 passar inteira.
 | Sem CI — nada roda a suíte antes de publicar | — |
 | `hono@4.12.28` marcado — **cooldown vencido em 2026-08-17, já dá para subir** | `api/package.json` |
 | `nanoid` marcado nos dois workspaces, 3.3.18 em 2026-08-21 | `api/`, `web/` |
-| e2e do upload depende de `MEDIA_PUBLIC_BASE` real | `editor.spec.ts:136` |
+| e2e do upload depende de `MEDIA_PUBLIC_BASE=http://localhost:8787` em `api/.dev.vars`, não versionado — cada dev precisa adicionar à mão | "upload de imagem: insere a tag `<img>` no enunciado" |
 | `HOTMART_SUBSCRIPTION_UCODES` ainda é placeholder | `api/wrangler.jsonc` |

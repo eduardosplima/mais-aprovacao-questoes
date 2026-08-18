@@ -22,9 +22,8 @@ export const media = new Hono<{ Bindings: Env }>();
  *
  * A chave gravada no upload é `media/<uuid>.<ext>` (routes/admin/media.ts) e
  * a URL persistida repete esse segmento, então ele é reconstruído aqui.
- * Travessia de caminho não se aplica: o `:key` do Hono casa um segmento só,
- * então `/` não passa, e chave de R2 é string plana, sem semântica de
- * diretório.
+ * Travessia de caminho não se aplica: chave de R2 é string plana, sem
+ * semântica de diretório — não há "acima" para escapar.
  */
 media.get("/:key", async (c) => {
   const obj = await c.env.MEDIA.get(`media/${c.req.param("key")}`);
