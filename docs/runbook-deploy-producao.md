@@ -485,8 +485,12 @@ npx wrangler d1 migrations apply mais-aprovacao-db --remote   # note o --remote
 npm run deploy
 ```
 
-- [x] As duas migrações aplicadas no D1 **remoto**. O `npm run db:migrate:local`
-      existente é `--local` e não serve aqui; não há script para o remoto.
+- [x] As **três** migrações aplicadas no D1 **remoto**. O `npm run
+      db:migrate:local` existente é `--local` e não serve aqui; não há script
+      para o remoto. A `0002` (2026-08-17) tornou `questions.year` NOT NULL —
+      aplicada com o acervo ainda vazio, que era a única janela em que a
+      reconstrução da tabela era trivial. Conferido depois com
+      `pragma_table_info('questions')`: `notnull = 1`.
 - [x] Cron `0 3 * * *` aparece no dashboard do Worker (vem do `wrangler.jsonc`).
 - [x] O deploy imprime as **três rotas** da fase 8, e **não** uma URL
       `*.workers.dev`. As três estão declaradas em `wrangler.jsonc:routes`, então
