@@ -10,7 +10,6 @@ export interface Entitlement {
   userId: string;
   email: string;
   name: string | null;
-  role: "admin" | "user";
   tier: Tier;
 }
 
@@ -36,7 +35,8 @@ export function findUserById(db: Db, id: string): Promise<UserRow | undefined> {
  * Cria ou atualiza o usuário a partir de uma compra.
  *
  * Regras:
- * - `role` vem SÓ da allowlist. O webhook nunca concede admin.
+ * - Não existe papel aqui. Admin é outro sistema (`db/admins.ts`), e uma
+ *   compra com email de admin cria uma conta de aluno como outra qualquer.
  * - `name`/`documentHash` nulos no payload não sobrescrevem valores já gravados
  *   (a Hotmart só envia campos do comprador que o checkout solicitou).
  * - `documentHash` já gravado (não nulo) NUNCA é sobrescrito, mesmo por um
@@ -48,9 +48,7 @@ export function findUserById(db: Db, id: string): Promise<UserRow | undefined> {
 export async function upsertUserFromPurchase(
   db: Db,
   identity: PurchaseIdentity,
-  adminEmails: string[],
 ): Promise<string> {
-  const role = adminEmails.includes(identity.email) ? "admin" : "user";
   const now = new Date();
   const existing = await findUserByEmail(db, identity.email);
 
@@ -58,7 +56,6 @@ export async function upsertUserFromPurchase(
     await db
       .update(users)
       .set({
-        role,
         name: identity.name ?? existing.name,
         documentHash: existing.documentHash ?? identity.documentHash,
         updatedAt: now,
@@ -76,7 +73,6 @@ export async function upsertUserFromPurchase(
       email: identity.email,
       name: identity.name,
       documentHash: identity.documentHash,
-      role,
       createdAt: now,
       updatedAt: now,
     })
@@ -124,7 +120,6 @@ export async function loadEntitlement(
     userId: user.id,
     email: user.email,
     name: user.name,
-    role: user.role as "admin" | "user",
     tier: active ? "assinante" : "gratuito",
   };
 }

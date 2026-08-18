@@ -16,7 +16,7 @@ async function seedUser(id: string, email: string) {
   const now = new Date();
   await db()
     .insert(users)
-    .values({ id, email, role: "user", createdAt: now, updatedAt: now })
+    .values({ id, email, createdAt: now, updatedAt: now })
     .run();
   return id;
 }
@@ -32,7 +32,6 @@ describe("schema", () => {
         name: "Aluno Um",
         documentHash: "deadbeef",
         passwordHash: "pbkdf2$sha256$1$a$b",
-        role: "user",
         createdAt: now,
         updatedAt: now,
       })

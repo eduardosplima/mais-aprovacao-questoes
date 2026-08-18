@@ -52,11 +52,11 @@ async function assinaturaNoBanco(
   accessUntil: Date | null,
   status = "ACTIVE",
 ) {
-  const userId = await upsertUserFromPurchase(
-    db(),
-    { email, name: "Aluno", documentHash: null },
-    [],
-  );
+  const userId = await upsertUserFromPurchase(db(), {
+    email,
+    name: "Aluno",
+    documentHash: null,
+  });
   await upsertSubscription(db(), {
     subscriberCode: code,
     userId,

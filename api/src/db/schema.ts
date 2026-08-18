@@ -15,7 +15,6 @@ export const users = sqliteTable("users", {
   documentHash: text("document_hash"),
   /** NULL = o aluno nunca definiu senha. */
   passwordHash: text("password_hash"),
-  role: text("role").notNull().default("user"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });

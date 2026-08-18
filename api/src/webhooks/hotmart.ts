@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../config/env";
-import { getSubscriptionUcodes, getAdminEmails } from "../config/env";
+import { getSubscriptionUcodes } from "../config/env";
 import { getDb } from "../db/client";
 import { claimEvent, markProcessed, markIgnored } from "../db/webhookEvents";
 import { equalStrings } from "../lib/constantTime";
@@ -163,11 +163,11 @@ async function handlePurchaseApproved(
     : null;
 
   const rawName = event.data?.buyer?.name;
-  const userId = await upsertUserFromPurchase(
-    db,
-    { email, name: rawName ? sanitizeName(rawName) : null, documentHash },
-    getAdminEmails(env),
-  );
+  const userId = await upsertUserFromPurchase(db, {
+    email,
+    name: rawName ? sanitizeName(rawName) : null,
+    documentHash,
+  });
 
   const nextCharge = event.data?.purchase?.date_next_charge;
   const accessUntil = nextCharge

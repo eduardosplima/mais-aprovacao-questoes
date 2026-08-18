@@ -38,7 +38,6 @@ describe("PURCHASE_APPROVED", () => {
     const user = await findUserByEmail(db(), "novo-aluno@test.com");
     expect(user).toBeDefined();
     expect(user?.name).toBe("Aluno Novo");
-    expect(user?.role).toBe("user");
     expect(user?.passwordHash).toBeNull();
 
     const sub = await findSubscriptionByCode(db(), "SUB-P1");
@@ -138,7 +137,7 @@ describe("PURCHASE_APPROVED", () => {
     expect(delta).toBeLessThanOrEqual(7 * 86400000);
   });
 
-  it("concede admin pela allowlist, nunca pelo payload", async () => {
+  it("compra com email de admin cria uma conta de aluno comum, sem privilégio nenhum", async () => {
     const { env: e } = testEnv();
     await postWebhook(
       app,
@@ -147,7 +146,8 @@ describe("PURCHASE_APPROVED", () => {
     );
 
     const user = await findUserByEmail(db(), "admin@test.com");
-    expect(user?.role).toBe("admin");
+    expect(user).toBeDefined();
+    expect(user).not.toHaveProperty("role");
   });
 
   it("renovação (recurrence_number=2) estende o acesso sem reenviar email", async () => {

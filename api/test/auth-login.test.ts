@@ -14,11 +14,11 @@ afterEach(() => {
 });
 
 async function alunoComSenha(email: string, senha: string): Promise<string> {
-  const id = await upsertUserFromPurchase(
-    db(),
-    { email, name: "Aluno", documentHash: null },
-    [],
-  );
+  const id = await upsertUserFromPurchase(db(), {
+    email,
+    name: "Aluno",
+    documentHash: null,
+  });
   await setPasswordHash(db(), id, await hashPassword(senha));
   return id;
 }
@@ -76,11 +76,11 @@ describe("POST /auth/login", () => {
 
   it("401 para usuário que nunca definiu senha", async () => {
     stubTurnstile(true);
-    await upsertUserFromPurchase(
-      db(),
-      { email: "sem-senha@test.com", name: null, documentHash: null },
-      [],
-    );
+    await upsertUserFromPurchase(db(), {
+      email: "sem-senha@test.com",
+      name: null,
+      documentHash: null,
+    });
 
     const res = await login("sem-senha@test.com", "qualquer-senha");
     expect(res.status).toBe(401);
@@ -163,9 +163,27 @@ describe("GET /auth/me", () => {
       id,
       email: "me1@test.com",
       name: "Aluno",
-      role: "user",
       tier: "assinante",
     });
+  });
+
+  // Uma compra com email de admin cria uma conta de ALUNO, e é só isso que
+  // ela cria (spec §3). O painel não olha para `users`.
+  it("/auth/me não devolve role", async () => {
+    stubTurnstile(true);
+    await alunoComSenha("admin@test.com", "senha-correta");
+
+    const session = cookieFrom(
+      await login("admin@test.com", "senha-correta"),
+      "session",
+    )!;
+    const res = await app.request(
+      "/auth/me",
+      { headers: { cookie: session } },
+      env,
+    );
+
+    expect(await res.json()).not.toHaveProperty("role");
   });
 });
 

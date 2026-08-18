@@ -13,11 +13,11 @@ import { cookieFrom } from "./helpers";
 const db = () => getDb(env);
 
 async function userComToken(email: string): Promise<{ id: string; token: string }> {
-  const id = await upsertUserFromPurchase(
-    db(),
-    { email, name: "Aluno", documentHash: null },
-    [],
-  );
+  const id = await upsertUserFromPurchase(db(), {
+    email,
+    name: "Aluno",
+    documentHash: null,
+  });
   return { id, token: await createToken(db(), id, FIRST_ACCESS_TTL_MS) };
 }
 
@@ -60,7 +60,6 @@ describe("POST /auth/set-password", () => {
     expect(me.status).toBe(200);
     expect(await me.json()).toMatchObject({
       email: "sp2@test.com",
-      role: "user",
       tier: "gratuito",
     });
   });
@@ -125,11 +124,11 @@ describe("POST /auth/set-password", () => {
   });
 
   it("usar um token invalida os demais do mesmo usuário", async () => {
-    const id = await upsertUserFromPurchase(
-      db(),
-      { email: "sp6@test.com", name: null, documentHash: null },
-      [],
-    );
+    const id = await upsertUserFromPurchase(db(), {
+      email: "sp6@test.com",
+      name: null,
+      documentHash: null,
+    });
     const antigo = await createToken(db(), id, FIRST_ACCESS_TTL_MS);
     const novo = await createToken(db(), id, FIRST_ACCESS_TTL_MS);
 

@@ -19,11 +19,11 @@ function buildApp() {
 }
 
 async function sessionCookieFor(email: string): Promise<string> {
-  const id = await upsertUserFromPurchase(
-    getDb(env),
-    { email, name: null, documentHash: null },
-    ["admin@test.com"],
-  );
+  const id = await upsertUserFromPurchase(getDb(env), {
+    email,
+    name: null,
+    documentHash: null,
+  });
   const token = await signSession(id, env.JWT_SECRET);
   return `session=${token}`;
 }

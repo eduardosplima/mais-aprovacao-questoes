@@ -31,7 +31,6 @@ auth.get("/me", requireSession, (c) => {
     id: ent.userId,
     email: ent.email,
     name: ent.name,
-    role: ent.role,
     tier: ent.tier,
   });
 });

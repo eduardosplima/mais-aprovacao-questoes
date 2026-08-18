@@ -25,11 +25,11 @@ async function createTerm(...args: Parameters<typeof createTermRaw>) {
 let adminUserId: string | null = null;
 async function ensureAdminUser(): Promise<string> {
   if (adminUserId) return adminUserId;
-  adminUserId = await upsertUserFromPurchase(
-    getDb(env),
-    { email: "admin@test.com", name: null, documentHash: null },
-    ["admin@test.com"],
-  );
+  adminUserId = await upsertUserFromPurchase(getDb(env), {
+    email: "admin@test.com",
+    name: null,
+    documentHash: null,
+  });
   return adminUserId;
 }
 
@@ -41,7 +41,6 @@ function app() {
       userId: await ensureAdminUser(),
       email: "admin@test.com",
       name: null,
-      role: "admin",
       tier: "gratuito",
     });
     await next();

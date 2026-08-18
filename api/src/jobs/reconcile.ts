@@ -1,5 +1,5 @@
 import type { Env } from "../config/env";
-import { getSubscriptionUcodes, getAdminEmails } from "../config/env";
+import { getSubscriptionUcodes } from "../config/env";
 import { getDb } from "../db/client";
 import { upsertUserFromPurchase, findUserByEmail } from "../db/users";
 import {
@@ -111,11 +111,11 @@ async function provision(
 
   // A API de dados não devolve o documento do assinante, então o usuário nasce
   // com documentHash nulo — o recover dele valida só o email.
-  const userId = await upsertUserFromPurchase(
-    db,
-    { email, name: sub.name ? sanitizeName(sub.name) : null, documentHash: null },
-    getAdminEmails(env),
-  );
+  const userId = await upsertUserFromPurchase(db, {
+    email,
+    name: sub.name ? sanitizeName(sub.name) : null,
+    documentHash: null,
+  });
 
   await upsertSubscription(db, {
     subscriberCode: sub.subscriberCode,

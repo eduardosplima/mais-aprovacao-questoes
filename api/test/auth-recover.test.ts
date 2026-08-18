@@ -34,17 +34,13 @@ function stubCaptcha(success = true) {
 }
 
 async function alunoComDocumento(email: string, doc: string | null) {
-  return upsertUserFromPurchase(
-    db(),
-    {
-      email,
-      name: "Aluno",
-      documentHash: doc
-        ? await hmacHex(normalizeDocument(doc), env.DOCUMENT_HMAC_KEY)
-        : null,
-    },
-    [],
-  );
+  return upsertUserFromPurchase(db(), {
+    email,
+    name: "Aluno",
+    documentHash: doc
+      ? await hmacHex(normalizeDocument(doc), env.DOCUMENT_HMAC_KEY)
+      : null,
+  });
 }
 
 function recover(

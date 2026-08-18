@@ -13,11 +13,7 @@ import {
 const db = () => getDb(env);
 
 async function aUser(email: string): Promise<string> {
-  return upsertUserFromPurchase(
-    db(),
-    { email, name: null, documentHash: null },
-    [],
-  );
+  return upsertUserFromPurchase(db(), { email, name: null, documentHash: null });
 }
 
 describe("upsertSubscription", () => {
