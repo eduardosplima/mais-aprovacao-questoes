@@ -36,6 +36,14 @@ mora no `wrangler.jsonc` da fase 6 e é o que bloqueia a seção 7 (reconciliaç
 da fase 12. Enquanto for `REPLACE_WITH_REAL_UCODES`, o cron roda todo dia às
 3h, percorre a listagem inteira e não casa com nada.
 
+**Republicação em 2026-08-18.** Worker e Pages subiram de novo carregando a
+rodada Safari/ano/mídia ([plano](superpowers/plans/2026-08-17-safari-ano-midia.md)):
+correção do `<select>` no Safari, `questions.year` agora `NOT NULL` no banco
+(migração `0002`, aplicada no remoto na véspera — fase 7) e a rota
+`GET /media/:key`, que existe no Hono mas nenhuma Worker Route alcança. O
+painel foi conferido no Safari depois da publicação e os `<select>` estão
+corretos. Nada mudou nas fases 0-6 nem 8-13.
+
 ## Leia isto antes de começar
 
 Três coisas que este runbook descobriu e que mudam o que dá para prometer ao

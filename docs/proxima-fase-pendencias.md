@@ -91,10 +91,10 @@ corrigido do quebrado.
 É cobertura melhor, não cobertura ausente. Por isso este item deixou de ter
 urgência.
 
-**Verificação ainda pendente, fora da suíte:** ninguém abriu o painel no
-Safari de verdade para olhar o `<select>` corrigido. O teste automatizado
-prova a causa (`appearance: none`), não o resultado visual — essa checagem
-manual segue em aberto.
+**A verificação visual foi feita e passou.** Em 2026-08-18, com o Worker e o
+Pages já publicados, o painel foi aberto no Safari e os `<select>` apareceram
+corretos. Isso fecha a única parte que a suíte não alcançava — o teste prova a
+causa (`appearance: none`), e um humano confirmou o resultado.
 
 ---
 
