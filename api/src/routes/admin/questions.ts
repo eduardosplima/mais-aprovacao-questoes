@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../../config/env";
-import type { Entitlement } from "../../db/users";
 import { getDb } from "../../db/client";
 import {
   createQuestion,
@@ -16,7 +15,7 @@ import {
 
 export const adminQuestions = new Hono<{
   Bindings: Env;
-  Variables: { entitlement: Entitlement };
+  Variables: { accessEmail: string };
 }>();
 
 /**
@@ -193,7 +192,9 @@ adminQuestions.post("/", async (c) => {
   const res = await createQuestion(
     getDb(c.env),
     parsed.data as QuestionInput,
-    c.get("entitlement")?.userId ?? null,
+    // `created_by` referencia `users.id`, e admin não é mais uma linha de
+    // `users` (Task 1). Não há id de usuário para gravar aqui.
+    null,
     parsed.data.status,
   );
   if ("error" in res) return c.json({ error: res.error }, statusFor(res.error));

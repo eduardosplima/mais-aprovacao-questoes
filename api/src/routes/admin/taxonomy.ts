@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../../config/env";
-import type { Entitlement } from "../../db/users";
 import { getDb } from "../../db/client";
 import {
   TERM_KINDS,
@@ -14,7 +13,7 @@ import {
 
 export const adminTaxonomy = new Hono<{
   Bindings: Env;
-  Variables: { entitlement: Entitlement };
+  Variables: { accessEmail: string };
 }>();
 
 const kindSchema = z.enum(TERM_KINDS as unknown as [TermKind, ...TermKind[]]);

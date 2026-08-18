@@ -5,8 +5,8 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { app } from "../src/app";
 import { getDb } from "../src/db/client";
-import { upsertUserFromPurchase } from "../src/db/users";
-import { signSession } from "../src/lib/jwt";
+import { deleteAdmin, upsertAdmin } from "../src/db/admins";
+import { signAdminSession } from "../src/lib/jwt";
 import { envWith } from "./helpers";
 import { __resetJwksCache } from "../src/middleware/access";
 
@@ -66,7 +66,11 @@ function stripJsonComments(text: string): string {
 const TEAM = "equipe-test.cloudflareaccess.com";
 const AUD = "aud-de-teste";
 
-async function accessToken(): Promise<string> {
+// A partir da Task 3, requireSessaoAdmin compara este email com o do cookie
+// de sessão (checagem 3) — por isso o default é o mesmo de ADMIN_EMAILS no
+// vitest.config, e casos que testam sessão precisam passar o mesmo email aqui
+// e em cookieAdmin/signAdminSession.
+async function accessToken(email = "admin@test.com"): Promise<string> {
   const { publicKey, privateKey } = await generateKeyPair("RS256", {
     extractable: true,
   });
@@ -83,10 +87,7 @@ async function accessToken(): Promise<string> {
       throw new Error("fetch inesperado: " + String(input));
     }),
   );
-  // A partir da Task 2, requireAccess barra qualquer JWT sem email — este
-  // helper não testa identidade do Access, só a camada de sessão/D1 abaixo
-  // dele, então o valor em si é irrelevante.
-  return new SignJWT({ email: "access@test.com" })
+  return new SignJWT({ email })
     .setProtectedHeader({ alg: "RS256", kid: "k-guards" })
     .setIssuer(`https://${TEAM}`)
     .setAudience(AUD)
@@ -94,13 +95,9 @@ async function accessToken(): Promise<string> {
     .sign(privateKey);
 }
 
-async function sessionCookie(email: string): Promise<string> {
-  const id = await upsertUserFromPurchase(
-    getDb(env),
-    { email, name: null, documentHash: null },
-    ["admin@test.com"],
-  );
-  return `session=${await signSession(id, env.JWT_SECRET)}`;
+async function cookieAdmin(email: string): Promise<string> {
+  await upsertAdmin(getDb(env), email, "hash-nao-usado-neste-teste");
+  return `sessao_admin=${await signAdminSession(email, env.JWT_SECRET)}`;
 }
 
 /** Bypass desligado: é assim que produção se comporta. */
@@ -131,7 +128,7 @@ describe("guardas de /admin", () => {
 
   // Nem a da aplicação substitui a da borda.
   it("401 com sessão de admin mas sem Access", async () => {
-    const cookie = await sessionCookie("admin@test.com");
+    const cookie = await cookieAdmin("admin@test.com");
     const res = await app.request(
       "/admin/taxonomy?kind=banca",
       { headers: { cookie } },
@@ -140,9 +137,22 @@ describe("guardas de /admin", () => {
     expect(res.status).toBe(401);
   });
 
-  it("403 com Access válido e sessão de usuário comum", async () => {
+  it("403 com Access válido e sessão de email fora da allowlist", async () => {
+    const email = "fora-da-allowlist@test.com";
+    const token = await accessToken(email);
+    const cookie = await cookieAdmin(email);
+    const res = await app.request(
+      "/admin/taxonomy?kind=banca",
+      { headers: { "cf-access-jwt-assertion": token, cookie } },
+      prod(),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("403 quando o email está na allowlist mas não tem senha", async () => {
     const token = await accessToken();
-    const cookie = await sessionCookie("comum-admin@test.com");
+    const cookie = `sessao_admin=${await signAdminSession("admin@test.com", env.JWT_SECRET)}`;
+    await deleteAdmin(getDb(env), "admin@test.com");
     const res = await app.request(
       "/admin/taxonomy?kind=banca",
       { headers: { "cf-access-jwt-assertion": token, cookie } },
@@ -153,7 +163,7 @@ describe("guardas de /admin", () => {
 
   it("200 com Access válido e sessão de admin", async () => {
     const token = await accessToken();
-    const cookie = await sessionCookie("admin@test.com");
+    const cookie = await cookieAdmin("admin@test.com");
     const res = await app.request(
       "/admin/taxonomy?kind=banca",
       { headers: { "cf-access-jwt-assertion": token, cookie } },
@@ -167,7 +177,7 @@ describe("guardas de /admin", () => {
   // sem perder a asserção de 200 nas outras duas.
   it("as rotas de taxonomy e questions estão montadas", async () => {
     const token = await accessToken();
-    const cookie = await sessionCookie("admin@test.com");
+    const cookie = await cookieAdmin("admin@test.com");
     const headers = { "cf-access-jwt-assertion": token, cookie };
     for (const path of ["/admin/taxonomy?kind=banca", "/admin/questions"]) {
       const res = await app.request(path, { headers }, prod());
@@ -181,13 +191,40 @@ describe("guardas de /admin", () => {
   // em /admin/taxonomy — senão a proteção que existe hoje deixaria de ser
   // pega por regressão.
   it("401 em /admin/media com sessão de admin mas sem Access", async () => {
-    const cookie = await sessionCookie("admin@test.com");
+    const cookie = await cookieAdmin("admin@test.com");
     const res = await app.request(
       "/admin/media",
       { method: "POST", headers: { cookie }, body: new FormData() },
       prod(),
     );
     expect(res.status).toBe(401);
+  });
+
+  // A ordem de montagem em app.ts: o login não pode exigir a sessão que ele
+  // mesmo cria. Um 401 aqui significaria que o guarda vazou para /admin/auth.
+  it("o login não fica atrás da sessão", async () => {
+    const token = await accessToken();
+    const res = await app.request(
+      "/admin/auth/login",
+      {
+        method: "POST",
+        headers: { "cf-access-jwt-assertion": token },
+        body: JSON.stringify({ senha: "qualquer-coisa" }),
+      },
+      prod(),
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "invalid_credentials" });
+  });
+
+  it("o login continua atrás do Access", async () => {
+    const res = await app.request(
+      "/admin/auth/login",
+      { method: "POST", body: JSON.stringify({ senha: "qualquer-coisa" }) },
+      prod(),
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
   });
 
   // O webhook vem da Hotmart e não pode ficar atrás de identidade. Envia o

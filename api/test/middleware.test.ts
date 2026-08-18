@@ -7,7 +7,6 @@ import { getDb } from "../src/db/client";
 import { upsertUserFromPurchase } from "../src/db/users";
 import { signSession } from "../src/lib/jwt";
 import { requireSession } from "../src/middleware/session";
-import { requireAdmin } from "../src/middleware/rbac";
 
 type App = { Bindings: Env; Variables: { entitlement: Entitlement } };
 
@@ -16,7 +15,6 @@ function buildApp() {
   app.get("/protegido", requireSession, (c) =>
     c.json(c.get("entitlement")),
   );
-  app.get("/admin", requireSession, requireAdmin, (c) => c.text("admin-ok"));
   return app;
 }
 
@@ -45,25 +43,5 @@ describe("middlewares", () => {
     );
     expect(res.status).toBe(200);
     expect(((await res.json()) as { email: unknown }).email).toBe("m1@test.com");
-  });
-
-  it("403 em rota admin para usuário comum", async () => {
-    const cookie = await sessionCookieFor("comum@test.com");
-    const res = await buildApp().request(
-      "/admin",
-      { headers: { cookie } },
-      env,
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it("200 em rota admin para admin da allowlist", async () => {
-    const cookie = await sessionCookieFor("admin@test.com");
-    const res = await buildApp().request(
-      "/admin",
-      { headers: { cookie } },
-      env,
-    );
-    expect(res.status).toBe(200);
   });
 });
