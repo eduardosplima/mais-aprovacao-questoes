@@ -241,10 +241,10 @@ export default function PaginaLista() {
             aoMudar={(v) => mudarFiltro("levelId", v)}
           />
           <Campo rotulo="Situação" htmlFor="filtro-situacao">
-            <Controle icone={<IconeSituacao />}>
+            <Controle icone={<IconeSituacao />} seta>
               <select
                 id="filtro-situacao"
-                className={`${CONTROLE} pl-11`}
+                className={`${CONTROLE} appearance-none pl-11 pr-11`}
                 value={filtros.status ?? ""}
                 onChange={(e) => mudarFiltro("status", e.target.value)}
               >

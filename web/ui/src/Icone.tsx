@@ -114,6 +114,20 @@ export function IconeTipo(p: PropsIcone) {
   );
 }
 
+/**
+ * A seta do `<select>`. Existe porque `appearance-none` apaga a nativa, e
+ * `appearance-none` existe porque o Safari descarta o padding do autor
+ * enquanto a aparência nativa valer. Não é enfeite: sem ela o campo não se
+ * anuncia como lista.
+ */
+export function IconeSeta(p: PropsIcone) {
+  return (
+    <Svg {...p}>
+      <polyline points="6 9 12 15 18 9" />
+    </Svg>
+  );
+}
+
 // ---- ações ----
 
 export function IconeEditar(p: PropsIcone) {

@@ -258,10 +258,10 @@ function Formulario() {
           <Card className="p-5 flex flex-col gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               <Campo rotulo="Tipo" htmlFor="tipo">
-                <Controle icone={<IconeTipo />}>
+                <Controle icone={<IconeTipo />} seta>
                   <select
                     id="tipo"
-                    className={`${CONTROLE} pl-11`}
+                    className={`${CONTROLE} appearance-none pl-11 pr-11`}
                     value={tipo}
                     onChange={(e) => trocarTipo(e.target.value as TipoQuestao)}
                   >

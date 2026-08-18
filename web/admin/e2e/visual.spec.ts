@@ -22,11 +22,16 @@ test("os campos de escolha e as abas exibem ícone sem afetar o nome acessível"
 }) => {
   await entrar(page);
 
-  // O Controle envolve o select num div; o ícone fica num <span> irmão, então
-  // o svg está a dois níveis do select — subir ao pai e descer é o caminho.
+  // O Controle envolve o select num div; o ícone semântico fica num <span>
+  // irmão à esquerda e a seta noutro à direita, então os dois svg estão a
+  // dois níveis do select — subir ao pai e descer é o caminho.
+  //
+  // São dois e não um porque `appearance-none` apaga a seta nativa: se
+  // alguém aplicar a correção do Safari e esquecer a seta, esta contagem cai
+  // para 1 e o campo fica sem indicar que é uma lista.
   const situacao = page.getByLabel("Situação");
   await expect(situacao).toBeVisible();
-  await expect(situacao.locator("xpath=..").locator("svg")).toHaveCount(1);
+  await expect(situacao.locator("xpath=..").locator("svg")).toHaveCount(2);
 
   // O aria-hidden do ícone preserva o nome acessível da aba — sem ele,
   // getByRole("tab", { name: "Cargo" }) deixaria de casar.
@@ -93,4 +98,29 @@ test("os botões de inserção e o rodapé do editor exibem ícone junto do text
       page.getByRole("button", { name: nome }).locator("svg"),
     ).toHaveCount(1);
   }
+});
+
+test("o <select> abre mão da aparência nativa, e o <input> não ganha seta", async ({
+  page,
+}) => {
+  await entrar(page);
+
+  // Afirma a CAUSA, não o sintoma. O sintoma — o Safari descartar o
+  // padding-left do autor enquanto `appearance: auto` valer — só é
+  // observável no WebKit, que esta suíte ainda não roda (ver
+  // docs/proxima-fase-pendencias.md, item 1). No chromium o padding é
+  // honrado dos dois jeitos, então `padding-left: 44px` passaria mesmo sem a
+  // correção e não serviria de regressão nenhuma.
+  await expect(page.getByLabel("Situação")).toHaveCSS("appearance", "none");
+
+  await page.goto("/questoes/editar");
+  await expect(page.getByLabel("Tipo")).toHaveCSS("appearance", "none");
+  await expect(page.getByLabel("Assunto")).toHaveCSS("appearance", "none");
+
+  // O campo Ano é <input> dentro do mesmo Controle e NÃO leva seta: um campo
+  // de texto com seta de lista mentiria sobre o que ele é. Um svg só — o
+  // ícone de calendário.
+  await expect(
+    page.getByLabel("Ano").locator("xpath=..").locator("svg"),
+  ).toHaveCount(1);
 });

@@ -19,6 +19,7 @@ export {
   IconeNivel,
   IconeSituacao,
   IconeTipo,
+  IconeSeta,
   IconeEditar,
   IconeExcluir,
   IconePublicar,

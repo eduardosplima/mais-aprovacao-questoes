@@ -60,10 +60,10 @@ export function SeletorTaxonomia({
   const Icone = ICONE[kind];
   return (
     <Campo rotulo={rotulo ?? ROTULO[kind]} htmlFor={id} erro={erro}>
-      <Controle icone={<Icone />}>
+      <Controle icone={<Icone />} seta>
         <select
           id={id}
-          className={`${CONTROLE} pl-11 ${erro ? CONTROLE_INVALIDO : ""}`}
+          className={`${CONTROLE} appearance-none pl-11 pr-11 ${erro ? CONTROLE_INVALIDO : ""}`}
           aria-invalid={erro ? true : undefined}
           value={valor}
           required={obrigatorio}
