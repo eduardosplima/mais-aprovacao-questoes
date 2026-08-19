@@ -170,10 +170,20 @@ test("a paginação leva a seta do lado para onde aponta", async ({ page }) => {
   // O ícone é vetor, não rótulo: ele diz para onde a ação vai, então precisa
   // estar do lado para onde aponta. Fosse rótulo, viria antes do texto como
   // em todos os outros botões.
+  //
+  // A comparação usa childNodes, não firstElementChild/lastElementChild: o
+  // Botao renderiza os filhos crus, então "Anterior"/"Próxima" viram nó de
+  // texto ao lado do <svg> — cada botão só tem UM filho que é Element.
+  // first/lastElementChild ignoram nós de texto, então achariam o mesmo
+  // <svg> nos dois lados não importa a ordem entre ícone e texto — a
+  // checagem passaria mesmo com a seta do lado errado. childNodes inclui o
+  // nó de texto e preserva a posição real entre os dois.
   expect(
-    await anterior.evaluate((b) => b.firstElementChild?.tagName.toLowerCase()),
+    await anterior.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
   ).toBe("svg");
   expect(
-    await proxima.evaluate((b) => b.lastElementChild?.tagName.toLowerCase()),
+    await proxima.evaluate(
+      (b) => b.childNodes[b.childNodes.length - 1]?.nodeName.toLowerCase(),
+    ),
   ).toBe("svg");
 });
