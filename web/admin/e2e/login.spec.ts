@@ -79,9 +79,9 @@ test("contexto que falha mostra a orientação de recarregar", async ({
   await page.route("**/admin/auth/contexto", (rota) => rota.abort());
   await page.goto("/login");
   // main, como nos casos abaixo: fora dele o Next tem um role="alert" próprio.
-  await expect(page.locator("main").getByRole("alert")).toContainText(
-    /recarregue a página/i,
-  );
+  const alerta = page.locator("main").getByRole("alert");
+  await expect(alerta).toBeVisible();
+  await expect(alerta).toContainText(/recarregue a página/i);
 });
 
 // Os dois estados abaixo dependem do que o Access mandaria, que em
@@ -98,9 +98,9 @@ test("email fora da allowlist vê a recusa, sem campo de senha", async ({
   await page.goto("/login");
   // main, como em "senha errada": fora dele o Next também tem um role="alert"
   // próprio (o anunciador de rota), sempre presente e sem relação com a tela.
-  await expect(page.locator("main").getByRole("alert")).toContainText(
-    /não é administrador/i,
-  );
+  const alerta = page.locator("main").getByRole("alert");
+  await expect(alerta).toBeVisible();
+  await expect(alerta).toContainText(/não é administrador/i);
   await expect(page.getByLabel("Senha")).toHaveCount(0);
 });
 
