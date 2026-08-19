@@ -138,12 +138,22 @@ test("depois de excluir o único item da última página, a lista recua para a p
   // Idem: o botão de ação existe duas vezes (linha desktop e mobile).
   await page.locator("table").getByRole("button", { name: "Excluir" }).click();
   const dialogo = page.getByRole("dialog");
-  await expect(
-    dialogo.getByRole("button", { name: "Cancelar" }).locator("svg"),
-  ).toHaveCount(1);
-  await expect(
-    dialogo.getByRole("button", { name: "Excluir", exact: true }).locator("svg"),
-  ).toHaveCount(1);
+  const cancelarDialogo = dialogo.getByRole("button", { name: "Cancelar" });
+  const excluirDialogo = dialogo.getByRole("button", {
+    name: "Excluir",
+    exact: true,
+  });
+  await expect(cancelarDialogo.locator("svg")).toHaveCount(1);
+  await expect(excluirDialogo.locator("svg")).toHaveCount(1);
+  // Ícone é rótulo, não vetor: vem antes do texto — childNodes[0] prova a
+  // ordem, e não só a presença (raciocínio completo no teste da paginação
+  // em visual.spec.ts).
+  expect(
+    await cancelarDialogo.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  expect(
+    await excluirDialogo.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Excluir" })

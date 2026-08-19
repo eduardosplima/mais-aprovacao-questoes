@@ -178,11 +178,18 @@ test("os botões do modal de senha têm ícone junto do texto", async ({
   page,
 }) => {
   const modal = await abrirTrocarSenha(page);
+  const cancelar = modal.getByRole("button", { name: "Cancelar" });
+  const salvar = modal.getByRole("button", { name: "Salvar" });
 
-  await expect(
-    modal.getByRole("button", { name: "Cancelar" }).locator("svg"),
-  ).toHaveCount(1);
-  await expect(
-    modal.getByRole("button", { name: "Salvar" }).locator("svg"),
-  ).toHaveCount(1);
+  await expect(cancelar.locator("svg")).toHaveCount(1);
+  await expect(salvar.locator("svg")).toHaveCount(1);
+  // Ícone é rótulo, não vetor: vem antes do texto — childNodes[0] prova a
+  // ordem, e não só a presença (raciocínio completo no teste da paginação
+  // em visual.spec.ts).
+  expect(
+    await cancelar.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  expect(
+    await salvar.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
 });

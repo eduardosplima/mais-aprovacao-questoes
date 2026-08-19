@@ -202,13 +202,20 @@ test("os botões dos diálogos seguem o padrão de ícone junto do texto", async
     .getByRole("button", { name: "Renomear Vunesp" })
     .click();
   const renomear = page.getByRole("dialog");
-  await expect(
-    renomear.getByRole("button", { name: "Cancelar" }).locator("svg"),
-  ).toHaveCount(1);
-  await expect(
-    renomear.getByRole("button", { name: "Salvar" }).locator("svg"),
-  ).toHaveCount(1);
-  await renomear.getByRole("button", { name: "Cancelar" }).click();
+  const cancelarRenomear = renomear.getByRole("button", { name: "Cancelar" });
+  const salvarRenomear = renomear.getByRole("button", { name: "Salvar" });
+  await expect(cancelarRenomear.locator("svg")).toHaveCount(1);
+  await expect(salvarRenomear.locator("svg")).toHaveCount(1);
+  // Aqui o ícone é rótulo, não vetor: por isso vem antes do texto nos dois
+  // botões — childNodes[0] prova a ordem, não só a presença (ver o teste da
+  // paginação acima, que é onde o raciocínio completo mora).
+  expect(
+    await cancelarRenomear.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  expect(
+    await salvarRenomear.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  await cancelarRenomear.click();
 
   // O de excluir: confirmar é "Excluir", e leva lixeira — não o mesmo ícone
   // do salvar, que é justamente por isso que o ícone vem do chamador.
@@ -217,10 +224,17 @@ test("os botões dos diálogos seguem o padrão de ícone junto do texto", async
     .getByRole("button", { name: "Excluir Vunesp" })
     .click();
   const excluir = page.getByRole("dialog");
-  await expect(
-    excluir.getByRole("button", { name: "Cancelar" }).locator("svg"),
-  ).toHaveCount(1);
-  await expect(
-    excluir.getByRole("button", { name: "Excluir", exact: true }).locator("svg"),
-  ).toHaveCount(1);
+  const cancelarExcluir = excluir.getByRole("button", { name: "Cancelar" });
+  const confirmarExcluir = excluir.getByRole("button", {
+    name: "Excluir",
+    exact: true,
+  });
+  await expect(cancelarExcluir.locator("svg")).toHaveCount(1);
+  await expect(confirmarExcluir.locator("svg")).toHaveCount(1);
+  expect(
+    await cancelarExcluir.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  expect(
+    await confirmarExcluir.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
 });
