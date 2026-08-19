@@ -14,6 +14,7 @@ export function Modal({
   perigo = false,
   iconeConfirmar,
   carregando = false,
+  erro,
   idFormulario,
 }: {
   aberto: boolean;
@@ -36,6 +37,19 @@ export function Modal({
   iconeConfirmar?: ReactNode;
   /** Desabilita o confirmar e troca o texto por "Aguarde…" — a guarda de duplo clique. */
   carregando?: boolean;
+  /**
+   * Erro sem campo responsável, exibido dentro do próprio diálogo. Enquanto
+   * há diálogo aberto o erro pertence a ele: toast fica na borda da tela,
+   * acima do overlay, e é fácil de não ver com o modal na frente.
+   *
+   * Quando existe campo culpado — o 409 de renomear, por exemplo — o erro vai
+   * no campo, não aqui.
+   *
+   * `role="alert"` é o papel certo aqui, e não contradiz o `aviso` do Campo:
+   * isto é resposta a uma ação que a pessoa acabou de disparar e que falhou,
+   * que é exatamente o caso de uso de um alerta assertivo.
+   */
+  erro?: string;
   /**
    * Id de um <form> renderizado dentro de `children`. Com ele o confirmar
    * vira o submit desse formulário, e Enter num campo envia — que é o que
@@ -92,6 +106,11 @@ export function Modal({
       >
         <h2 className="font-display text-lg font-bold">{titulo}</h2>
         {children && <div className="text-[14.5px] text-txt-2">{children}</div>}
+        {erro && (
+          <p role="alert" className="text-[13.5px] font-semibold text-erro">
+            {erro}
+          </p>
+        )}
         <div className="flex gap-3 justify-end">
           <Botao variante="secundario" onClick={aoCancelar}>
             <IconeCancelar />

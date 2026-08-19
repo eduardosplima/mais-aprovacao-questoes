@@ -50,6 +50,7 @@ export default function PaginaTaxonomias() {
   const [novoNome, setNovoNome] = useState("");
   const [erroRenomear, setErroRenomear] = useState<string | null>(null);
   const [aExcluir, setAExcluir] = useState<Termo | null>(null);
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
   const [renomeando, setRenomeando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const avisar = useToast();
@@ -135,6 +136,7 @@ export default function PaginaTaxonomias() {
   async function excluir() {
     if (!aExcluir) return;
     const alvo = aExcluir;
+    setErroExcluir(null);
     setExcluindo(true);
     try {
       await api.excluirTermo(alvo.id);
@@ -142,7 +144,9 @@ export default function PaginaTaxonomias() {
       avisar("Termo excluído.");
       await carregar();
     } catch (falha) {
-      avisar(mensagemDe(falha), "erro");
+      // Dentro do diálogo, e não em toast: o modal continua aberto no caminho
+      // de falha, então a mensagem precisa estar onde os olhos já estão.
+      setErroExcluir(mensagemDe(falha));
     } finally {
       setExcluindo(false);
     }
@@ -167,7 +171,10 @@ export default function PaginaTaxonomias() {
             variante="perigo"
             rotulo={`Excluir ${t.name}`}
             icone={<IconeExcluir />}
-            onClick={() => setAExcluir(t)}
+            onClick={() => {
+              setAExcluir(t);
+              setErroExcluir(null);
+            }}
           />
         </div>
       ),
@@ -280,8 +287,12 @@ export default function PaginaTaxonomias() {
         rotuloConfirmar="Excluir"
         iconeConfirmar={<IconeExcluir />}
         carregando={excluindo}
+        erro={erroExcluir ?? undefined}
         aoConfirmar={() => void excluir()}
-        aoCancelar={() => setAExcluir(null)}
+        aoCancelar={() => {
+          setAExcluir(null);
+          setErroExcluir(null);
+        }}
       >
         O termo some das listas de escolha, mas as questões já cadastradas
         continuam exibindo o nome dele.

@@ -213,3 +213,40 @@ test("renomear para um nome que já existe explica dentro do modal", async ({ pa
   await expect(dialogo.getByRole("alert")).toHaveText(/já existe um termo ativo/i);
   await expect(page.locator("table").getByText("Quadrix")).toBeVisible();
 });
+
+// O modal de excluir fica aberto quando a exclusão falha — `aExcluir` só zera
+// no sucesso. Mandar a mensagem para o toast, na borda da tela, é falar para
+// alguém que está olhando para o centro.
+test("a falha ao excluir explica dentro do próprio diálogo", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  await page.getByLabel("Nome", { exact: true }).fill("Cesgranrio");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Cesgranrio")).toBeVisible();
+
+  // Corrida real: outra pessoa excluiu o termo antes. Interceptado para ser
+  // determinístico.
+  await page.route("**/admin/taxonomy/**", async (rota) => {
+    if (rota.request().method() === "DELETE") {
+      return rota.fulfill({ status: 404, json: { error: "not_found" } });
+    }
+    return rota.fallback();
+  });
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Excluir Cesgranrio" })
+    .click();
+  const dialogo = page.getByRole("dialog");
+  await dialogo.getByRole("button", { name: "Excluir", exact: true }).click();
+
+  await expect(dialogo.getByRole("alert")).toBeVisible();
+  await expect(dialogo.getByRole("alert")).toContainText(
+    /não encontrado/i,
+  );
+  // E o diálogo continua aberto, que é a razão de a mensagem morar nele.
+  await expect(dialogo).toBeVisible();
+});
