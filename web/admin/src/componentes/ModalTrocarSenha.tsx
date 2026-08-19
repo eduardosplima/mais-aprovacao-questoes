@@ -87,6 +87,12 @@ export function ModalTrocarSenha({
   async function enviar(evento: React.FormEvent) {
     evento.preventDefault();
 
+    // A marca diz qual é a origem do erro que está na tela agora: um envio
+    // novo invalida a origem anterior sempre, tenha ele passado na validação
+    // local ou não — por isso o reset vem antes do retorno antecipado da
+    // validação, não depois.
+    novaDoServidor.current = false;
+
     // Conferência local: mandar duas senhas para o servidor comparar seria
     // uma ida à rede para descobrir o que já dá para saber aqui.
     const encontrados: Erros = {};
@@ -107,7 +113,6 @@ export function ModalTrocarSenha({
     setErros({});
     setEnviando(true);
     const id = ++idRequisicao.current;
-    novaDoServidor.current = false;
     try {
       await api.trocarSenha(atual, nova);
       if (id !== idRequisicao.current) return;

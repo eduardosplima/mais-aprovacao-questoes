@@ -372,3 +372,31 @@ test("a exigência de tamanho do servidor sobrevive à digitação", async ({
   await modal.getByLabel("Nova senha", { exact: true }).fill("curta123456");
   await expect(exigencia).toBeVisible();
 });
+
+// A marca de origem do erro pertence ao envio, não sobrevive a ele: depois
+// de um weak_password do servidor, esvaziar "Nova senha" e reenviar troca a
+// origem do erro para local — e um erro local precisa voltar a sumir ao
+// digitar, mesmo com a marca do envio anterior ainda no ref.
+test("depois do weak_password, um novo erro local volta a sumir ao digitar", async ({
+  page,
+}) => {
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill(SENHA);
+  await modal.getByLabel("Nova senha", { exact: true }).fill("curta12345");
+  await modal.getByLabel("Confirme a nova senha").fill("curta12345");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+  await expect(
+    modal.getByText("A senha precisa ter pelo menos 12 caracteres."),
+  ).toBeVisible();
+
+  // Esvazia "Nova senha" e reenvia: a validação local barra antes de ir ao
+  // servidor, e o erro que aparece agora é de origem local.
+  await modal.getByLabel("Nova senha", { exact: true }).fill("");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+  const erroLocal = modal.getByText("Informe a nova senha.");
+  await expect(erroLocal).toBeVisible();
+
+  // Digitar é o que corrige um erro local — precisa sumir.
+  await modal.getByLabel("Nova senha", { exact: true }).fill("q");
+  await expect(erroLocal).toHaveCount(0);
+});
