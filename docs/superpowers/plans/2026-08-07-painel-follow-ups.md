@@ -267,6 +267,39 @@ Levantadas na revisão desta rodada e deixadas de fora de propósito — nenhuma
   arquivo, não regressão desta rodada. A paginação, essa sim, prova posição
   (compara contra o texto, não elemento com elemento).
 
+## Ícone nos botões de diálogo e no login — **execução futura, decidida**
+
+> Decidido pelo dono em **2026-08-19**, ao fechar a rodada de ajustes. Vai
+> ser disparado em sessão própria — está aqui para não se perder, não para
+> ser feito de passagem.
+
+A regra 2 do `web/README.md` diz que toda ação fora de linha de tabela é
+`Botao` com ícone + texto, **sem exceção**. Três botões ainda não cumprem:
+
+| Onde | Botão |
+|---|---|
+| `web/ui/src/Modal.tsx` | o `Cancelar`, presente nos três diálogos do painel |
+| `web/ui/src/Modal.tsx` | o confirmar (`Salvar` / `Excluir` / o rótulo que o chamador passar) |
+| `web/admin/src/app/login/page.tsx` | o `Entrar` |
+
+**O que fazer:** dar ao `Modal` um slot de ícone para cada um dos dois botões
+— o de confirmar precisa aceitar o ícone que o chamador escolher, porque
+`Excluir` e `Salvar` não são a mesma ação —, e criar um `IconeEntrar` para o
+login. Os ícones de cancelar e salvar já existem (`IconeCancelar`,
+`IconeSalvar`, `IconeExcluir`).
+
+**Por que não foi feito na rodada de ajustes.** A revisão final ofereceu duas
+saídas: qualificar a regra com uma cláusula de exceção, ou dar o slot ao
+`Modal`. Eu (Claude) escolhi a cláusula para não parar a rodada, e o dono
+recusou: a cláusula legitimava como desenho o que é dívida. A cláusula foi
+removida do `README` na mesma decisão, e o texto de lá passou a dizer que os
+três botões são o contraexemplo da regra — inclusive avisando quem for
+consumir o `web/ui` para não copiar o `Modal` como exemplo.
+
+**Prioridade:** antes de o sub-projeto 4 começar a consumir o `web/ui`. O
+risco não é estético — é que o frontend do aluno copie o `Modal` e nasça
+divergindo da regra que herdou por escrito.
+
 ## Auto-submit do Apple Passwords — para a sessão dedicada
 
 Registrado em `docs/superpowers/specs/2026-08-19-ajustes-painel-design.md`
