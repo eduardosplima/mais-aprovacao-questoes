@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Botao } from "@mais/ui";
+import { ModalTrocarSenha } from "@/componentes/ModalTrocarSenha";
 import { api } from "@/lib/api";
 import { FALHA_DE_REDE } from "@/lib/erros";
 import { useSessao } from "@/lib/sessao";
@@ -17,6 +19,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { carregando, admin, falhaDeRede } = useSessao();
   const caminho = usePathname();
   const router = useRouter();
+  const [trocandoSenha, setTrocandoSenha] = useState(false);
 
   if (carregando) {
     return <main className="p-8 text-txt-2">Carregando…</main>;
@@ -79,12 +82,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="hidden sm:inline text-[15px] font-semibold">
               {admin.email}
             </span>
-            <Link
-              href="/senha"
-              className="hidden sm:inline text-[15px] font-semibold text-txt-2"
-            >
+            <Botao variante="secundario" onClick={() => setTrocandoSenha(true)}>
               Trocar senha
-            </Link>
+            </Botao>
             <Botao variante="secundario" onClick={sair}>
               Sair
             </Botao>
@@ -92,6 +92,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="max-w-[1320px] mx-auto px-4 md:px-6 py-6">{children}</main>
+      <ModalTrocarSenha
+        aberto={trocandoSenha}
+        aoFechar={() => setTrocandoSenha(false)}
+      />
     </>
   );
 }
