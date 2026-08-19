@@ -280,10 +280,14 @@ beta e a documentação se move:
 
 ## Fase 5 — Zero Trust Access → produz `ACCESS_TEAM_DOMAIN` e `ACCESS_AUD`
 
-O Access é a **camada 1 de duas**, e as duas são independentes de propósito: o
-email do JWT do Access **não** identifica o usuário na aplicação. Se
-identificasse, o Access viraria fonte de identidade e as camadas deixariam de
-ser duas. É por isso que o admin autentica duas vezes.
+O Access é a **camada 1 de duas**. As duas continuam sendo fatores
+independentes — o IdP com MFA, depois a senha —, mas desde a separação do
+login do admin (spec
+[`2026-08-18-login-admin-design.md`](superpowers/specs/2026-08-18-login-admin-design.md)
+§5) o email do JWT do Access **é** o mesmo que identifica o admin na
+aplicação — ver "O email do Access e o email do painel", mais abaixo. É por
+isso que o admin autentica duas vezes: não para provar dois emails
+diferentes, e sim duas provas independentes do mesmo email.
 
 Fail-closed em `api/src/middleware/access.ts`: sem o header
 `Cf-Access-Jwt-Assertion`, `/admin/*` devolve 401 antes de qualquer consulta ao
@@ -398,19 +402,57 @@ não funcionar.
 > provedor*, não *se houve segundo fator*; com um método só habilitado, não
 > acrescenta nada.
 
-### Duas identidades que não se misturam
-
-O email da política do Access **não** é a conta do painel:
+### O email do Access e o email do painel
 
 | | Prova o quê | De onde vem |
 |---|---|---|
 | **Access** | que você pode *alcançar* `admin.` | sua conta Google/GitHub |
-| **Painel** | que você é *admin da aplicação* | email em `ADMIN_EMAILS`, com senha, nascido de uma compra |
+| **Painel** | que você é *admin da aplicação* | email em `ADMIN_EMAILS` **e** senha em `admins`, criada pelo CLI |
 
-Podem ser emails diferentes, e está certo. É o motivo de existirem duas
-camadas: o Worker ignora o email do JWT do Access de propósito
-(`api/src/middleware/access.ts`). Se o usasse, o Access viraria fonte de
-identidade e a segunda camada perderia sentido.
+Os dois **precisam ser o mesmo email**. `requireSessaoAdmin`
+(`api/src/middleware/adminSession.ts`) confere `sub === emailDoAccess(c)` a
+cada requisição — o email da sessão do painel tem que bater com o que veio do
+JWT verificado do Access —, e `POST /admin/auth/login` faz a mesma checagem
+antes de emitir o cookie. Continuam sendo **dois fatores independentes**: o
+IdP com MFA, e a senha guardada em `admins`. Nenhum dos dois sozinho abre o
+painel; o que mudou é que agora os dois provam a mesma identidade, em vez de
+duas soltas.
+
+### Configuração da aplicação Access
+
+**Zero Trust → Access controls → Applications →** aplicação de
+`admin.maisaprovacao.com.br` **→ Configure**. Só um campo sai do padrão.
+
+| Campo | Valor | Por quê |
+|---|---|---|
+| **Session Duration** | 24 horas (padrão) | O Worker revalida o JWT a cada requisição; o que limita o estrago de um token roubado é a revalidação, não a validade. Com a sessão do painel em 12 h, dá no máximo duas digitações de senha e uma ida ao IdP por dia. |
+| **HTTP Only** | ON (padrão) | Nada lê o `CF_Authorization` por JavaScript — o Worker lê o header `Cf-Access-Jwt-Assertion`. |
+| **SameSite Attribute** | Lax | `Strict` causa `ERR_TOO_MANY_REDIRECTS`, pela própria documentação da Cloudflare. |
+| **Eager redirect cookie** | ON (padrão) | Só afeta aplicação multi-domínio; aqui há um hostname só e a cadeia de redirects tem comprimento um. |
+| **Enable Binding Cookie** | **ON** — única mudança | Emite o `CF_Binding`, que amarra o `CF_Authorization` àquele navegador: cookie roubado não é reutilizável. As exceções documentadas (SSH/RDP, Zaraz, cliente WARP) não se aplicam. |
+
+- [ ] Os cinco campos conferidos, o *Binding Cookie* ligado e **Save**.
+- [ ] **Global session duration** (Access settings) deixado como está — a
+      hierarquia é global > aplicação > política, e mexer no global afetaria
+      qualquer aplicação futura.
+- [ ] **401 Response for Service Auth policies** ignorado: não usamos service
+      tokens.
+
+> **A política do Access e o `ADMIN_EMAILS` são listas separadas e precisam ser
+> mantidas em sincronia.** A política é o portão externo (quem alcança o
+> hostname); o `ADMIN_EMAILS` é o interno (quem é admin). Email só na política
+> vê a tela dizendo que não é administrador; email só no `ADMIN_EMAILS` não
+> chega nem lá.
+
+> **Não adicionar hostname a esta aplicação Access.** Ela cobre `admin.` e só.
+> Incluir `app.` quebraria o webhook da Hotmart, que precisa ser alcançável sem
+> identidade; incluir muitos faria a cadeia do *Eager redirect cookie* virar
+> loop de login.
+
+Outros cookies que o Access emite e que não configuramos, para ninguém os
+confundir com cookie da aplicação ao ler um `wrangler tail`: `CF_Session`
+(CSRF no team domain, 4 h), `CF_AppSession` (CSRF por aplicação, 24 h) e
+`CF_Device` (anti-abuso de PIN e MFA, 30 dias).
 
 ### Testar agora, com o painel ainda inexistente
 
@@ -584,26 +626,35 @@ caminhos que o Worker já serve, sem prefixo:
 > motivo de `MEDIA_PUBLIC_BASE` apontar para `media.maisaprovacao.com.br`,
 > hostname sem cookies. Novas rotas continuam path-scoped, nunca um `/*`.
 
+> `/admin/auth/*` é servido pela mesma Worker Route `/admin/*`. É de propósito:
+> o login do painel fica dentro do prefixo coberto pelo Access, e por
+> construção inalcançável de `app.<domínio>`, onde não há rota que o case.
+
 ---
 
 ## Fase 9 — Pages → o painel
 
-O build é estático (`output: 'export'`) e a site key entra **no build**:
+O build é estático (`output: 'export'`):
 
 ```bash
 cd web
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site key da fase 4> npm run build
+npm run build
 npx wrangler pages deploy admin/out --project-name=mais-aprovacao-admin
 ```
+
+> A separação do login do admin (spec
+> [`2026-08-18-login-admin-design.md`](superpowers/specs/2026-08-18-login-admin-design.md)
+> §6, §9) tirou o Turnstile do painel, junto com
+> `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — o build não depende mais de nenhuma
+> variável de ambiente.
 
 - [x] Projeto Pages criado e ligado a `admin.maisaprovacao.com.br`. Ao
       confirmar o Custom Domain, o Pages **assume o registro placeholder** da
       fase 0 — o `100::` some e o 5xx da fase 5 vira o painel de verdade.
-- [x] Se usar build automático pelo Git, cadastrar
-      `NEXT_PUBLIC_TURNSTILE_SITE_KEY` nas variáveis de build do projeto.
 - [x] Abrir `https://admin.maisaprovacao.com.br/login` — passando primeiro pelo
-      IdP — e confirmar que o widget do Turnstile **renderiza** (se a site key
-      faltou, ele não aparece).
+      IdP — e confirmar que a tela mostra o email vindo do Access (sem campo
+      de email, sem Turnstile) e o campo de senha, para quem já tem senha em
+      `admins`.
 
 ---
 
@@ -695,10 +746,11 @@ do lote não perde compra: a Hotmart retenta e o evento repetido é deduplicado.
 ### Por que `admin.` fica fora
 
 Duas coisas já estão na frente: o Access exige identidade do IdP antes de
-qualquer requisição alcançar a origem, e o `/auth/login` do painel tem o mesmo
-Turnstile + PBKDF2 do aluno. Com **uma** regra disponível, gastá-la no hostname
-que exige login no IdP para ser sequer alcançado seria gastar a única bala no
-alvo mais protegido.
+qualquer requisição alcançar a origem, e `POST /admin/auth/login` mantém o
+PBKDF2 de 100 mil iterações — só não tem Turnstile, porque nenhum bot anônimo
+alcança um hostname que já exige login no Google ou GitHub com MFA. Com
+**uma** regra disponível, gastá-la no hostname que exige login no IdP para ser
+sequer alcançado seria gastar a única bala no alvo mais protegido.
 
 ### Como conferir que a regra está viva
 
@@ -745,23 +797,99 @@ o quebra-molas em contenção de verdade.
 - [ ] Anotar os **ucodes** dos produtos de assinatura →
       `HOTMART_SUBSCRIPTION_UCODES`.
 
-**O primeiro admin — problema do ovo e da galinha.** `role=admin` só é
-concedido em dois lugares (`webhooks/hotmart.ts:169` e `jobs/reconcile.ts:117`),
-os dois exigindo uma compra cujo email esteja em `ADMIN_EMAILS`. Não existe
-cadastro de admin. Duas saídas:
+**O primeiro admin.** Não existe mais problema do ovo e da galinha: admin não
+nasce de compra nenhuma. São dois passos, os dois manuais por decisão.
 
-- **Compra de teste no sandbox** com o email que está em `ADMIN_EMAILS` — cria
-  a conta com `role=admin` e envia o link mágico. Mas o link cai em
-  `app.maisaprovacao.com.br/definir-senha`, que não existe: pegue o token na
-  query string e chame `POST /auth/set-password` direto (curl), definindo a
-  senha.
-- **Inserção manual** no D1 remoto, via `npx wrangler d1 execute
-  mais-aprovacao-db --remote --command "…"`, no mesmo formato que o
-  `web/admin/e2e/seed.mjs` usa: hash `pbkdf2$sha256$100000$<salt>$<hash>`.
+- [ ] O email está em `ADMIN_EMAILS` (`api/wrangler.jsonc`) e o Worker foi
+      publicado depois disso. Sem publicar, a allowlist em produção é a antiga.
+- [ ] `cd api && npm run admin:senha -- <email>` — pede a senha duas vezes, sem
+      eco, e grava em `admins` no D1 remoto. Mínimo de 12 caracteres.
+- [ ] Entrar em `https://admin.maisaprovacao.com.br/login`, passando **duas
+      vezes** por identidade: o Access primeiro, a senha depois. A tela não
+      pede email — ela mostra o que veio do token do Access.
 
-- [x] Admin de produção criado e login em
-      `https://admin.maisaprovacao.com.br/login` funcionando — passando **duas
-      vezes** por identidade: Access, depois senha.
+Para rotacionar, o mesmo comando. Para revogar: tirar o email de
+`ADMIN_EMAILS` e publicar (derruba a sessão na requisição seguinte), e depois
+`npm run admin:senha -- <email> --remover` para não deixar senha órfã.
+
+---
+
+## Publicar a separação do login do admin
+
+Execução única desta migração de arquitetura — spec
+[`2026-08-18-login-admin-design.md`](superpowers/specs/2026-08-18-login-admin-design.md)
+§10-§11. Não é uma fase da lista 0-13 (essas descrevem o provisionamento
+inicial, já concluído): é o roteiro de publicação desta mudança específica,
+para rodar uma vez.
+
+A ordem existe porque uma das três migrações pendentes é destrutiva e o
+Worker que está em produção agora lê a coluna que ela apaga.
+
+- [ ] **1.** `cd api && npm run deploy` — o Worker primeiro.
+- [ ] **2.** `npx wrangler d1 migrations apply mais-aprovacao-db --remote` —
+      aplica as **três** migrações pendentes juntas: `0003_military_praxagora`
+      (`CREATE TABLE admins`), `0004_flippant_lilandra`
+      (`ALTER TABLE users DROP COLUMN role`) e `0005_safe_vampiro`
+      (reconstrói `questions` para `created_by` referenciar `admins.email`
+      em vez de `users.id`). O `wrangler d1 migrations apply` aplica **tudo**
+      que estiver pendente — não dá para aplicar só a primeira sem tirar
+      arquivo da pasta, e isso é frágil demais para produção. É por isso que a
+      ordem certa é publicar o Worker antes, não separar as migrações.
+- [ ] **3.** `npm run admin:senha -- <email>` para cada um dos três emails —
+      depende da tabela `admins`, criada no passo 2.
+- [ ] **4.** Deploy do Pages (fase 9) com o painel novo.
+- [ ] **5.** Configuração do Access — subseção "Configuração da aplicação
+      Access", na fase 5.
+- [ ] **6.** Conferência: janela anônima → IdP → a tela de login mostra o
+      email certo; uma identidade fora do `ADMIN_EMAILS` vê "não é
+      administrador"; `npm run admin:senha -- <email> --remover` derruba a
+      sessão viva na requisição seguinte (e depois recriar a senha de quem foi
+      removido por engano).
+
+> **Por que o Worker vai antes das migrações — parece ao contrário, mas não
+> é.** O Worker novo nunca seleciona `users.role`: o Drizzle lista as colunas
+> do schema, e a coluna já saiu do schema antes deste deploy. Entre o passo 1
+> e o passo 2, o `INSERT` do webhook da Hotmart ainda não sabe que a coluna
+> vai sumir — mas ela ainda existe no banco (a migração `0004` só a dropa no
+> passo 2), então o `INSERT` cai no `DEFAULT` dela. Resultado: o **login e o
+> cadastro do aluno não têm janela de quebra**. O que fica quebrado nesses
+> minutos é só o painel admin — que já está em transição e no qual ninguém
+> consegue entrar mesmo, até o passo 4 publicar o painel novo. Inverter a
+> ordem (migrar antes de publicar o Worker) é o erro perigoso: o Worker *em
+> produção*, o antigo, ainda seleciona `role` por nome, e a coluna já teria
+> sumido.
+
+> **`0005` é destrutiva por dentro, mesmo sendo "só" um rebuild — leia antes
+> de aplicar.** Em D1, `PRAGMA foreign_keys=OFF` não desliga nada: toda query
+> já roda dentro de uma transação implícita, e o SQLite ignora essa PRAGMA em
+> transação (o que o drizzle-kit gera para desligar a FK durante o rebuild é
+> um no-op em produção — funciona só localmente, no Miniflare, o que esconde o
+> problema). Sem a FK desligada de verdade, o `DROP TABLE questions` do
+> rebuild dispara **de verdade** o `ON DELETE CASCADE` de `alternatives` e
+> `explanations`, as duas filhas de `questions`. A migração `0005` salva as
+> duas tabelas antes do `DROP` e as restaura depois do `RENAME` — tem
+> comentário no próprio arquivo (`api/migrations/0005_safe_vampiro.sql`)
+> dizendo isso. **Qualquer migração futura que reconstrua uma tabela com
+> filhas em cascata precisa fazer o mesmo**; gerar uma com `drizzle-kit` e
+> aplicar sem ler o SQL é assim que o acervo se perde.
+>
+> Vale registrar, não como alarme: a migração `0002` (fase 7, já aplicada em
+> produção) fez o mesmo tipo de rebuild de `questions`, **sem** essa proteção
+> de salvar e restaurar — mas a própria fase 7 já registra que o acervo estava
+> **vazio** naquele momento (era a única janela em que a NOT NULL de `year`
+> era trivial de aplicar), então não há alternativa nem explicação perdida por
+> causa dela. O risco é só para trás no tempo se essa premissa estiver errada:
+> se alguma vez o acervo não estava vazio quando uma migração assim rodou sem
+> a proteção, vale conferir `SELECT COUNT(*) FROM alternatives` e
+> `SELECT COUNT(*) FROM explanations` contra o número de questões antes de
+> assumir que o acervo está íntegro.
+
+Entre os passos 1 e 4 o painel publicado (o antigo, ainda no ar) chama rotas
+que já deixaram de existir no Worker novo: janela de minutos, sem usuário fora
+das três pessoas do time. Inverter 1 e 4 — publicar o painel novo antes do
+Worker novo — é pior, não igual: o painel novo chamaria `/admin/auth/*` num
+Worker que nunca teve essas rotas, e nem a tela de "não é administrador" (que
+depende de `GET /admin/auth/contexto`) funcionaria.
 
 ---
 
