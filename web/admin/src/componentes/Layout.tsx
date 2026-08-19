@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Botao } from "@mais/ui";
+import { Botao, IconeChave, IconeSair } from "@mais/ui";
 import { ModalTrocarSenha } from "@/componentes/ModalTrocarSenha";
 import { api } from "@/lib/api";
 import { FALHA_DE_REDE } from "@/lib/erros";
@@ -51,10 +51,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           decide se cabe — cabe sempre, por construção, em vez de depender de
           uma soma de larguras específicas caber num viewport específico.
           order-* só muda a posição visual, não a ordem do DOM, então a ordem
-          de tab (Logo → Questões → Taxonomias → Sair) não muda em nenhum
-          tamanho de tela.
+          de tab (Logo → Questões → Taxonomias → Trocar senha → Sair) não
+          muda em nenhum tamanho de tela.
         */}
-        <div className="max-w-[1320px] mx-auto px-4 md:px-6 flex flex-wrap items-center gap-x-4 gap-y-3 py-3 md:py-0 md:h-[84px]">
+        <div className="max-w-[1320px] mx-auto px-4 md:px-6 flex flex-wrap items-center gap-x-4 md:gap-x-6 gap-y-3 py-3 md:py-0 md:h-[84px]">
           <Link href="/" className="shrink-0">
             <Image
               src="/logo.png"
@@ -83,9 +83,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {admin.email}
             </span>
             <Botao variante="secundario" onClick={() => setTrocandoSenha(true)}>
+              <IconeChave />
               Trocar senha
             </Botao>
             <Botao variante="secundario" onClick={sair}>
+              <IconeSair />
               Sair
             </Botao>
           </div>

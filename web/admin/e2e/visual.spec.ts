@@ -100,6 +100,16 @@ test("os botões de inserção e o rodapé do editor exibem ícone junto do text
   }
 });
 
+test("o cabeçalho segue o padrão de ícone junto do texto", async ({ page }) => {
+  await entrar(page);
+
+  for (const nome of ["Trocar senha", "Sair"]) {
+    await expect(
+      page.getByRole("button", { name: nome }).locator("svg"),
+    ).toHaveCount(1);
+  }
+});
+
 test("o <select> abre mão da aparência nativa, e o <input> não ganha seta", async ({
   page,
 }) => {
