@@ -1,14 +1,20 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 import type { Env } from "../src/config/env";
 import type { Entitlement } from "../src/db/users";
 import { getDb } from "../src/db/client";
+import { questions } from "../src/db/schema";
 import { createTerm as createTermRaw } from "../src/db/taxonomy";
 import { upsertUserFromPurchase } from "../src/db/users";
+import { deleteAdmin, upsertAdmin } from "../src/db/admins";
 import { adminQuestions } from "../src/routes/admin/questions";
 
-type App = { Bindings: Env; Variables: { entitlement: Entitlement } };
+type App = {
+  Bindings: Env;
+  Variables: { entitlement: Entitlement; accessEmail: string };
+};
 
 // Fixture: os nomes usados neste arquivo são únicos por chamada, então nunca
 // colidem de verdade — `createTerm` devolvendo `Failure` numa duplicata é
@@ -35,8 +41,12 @@ async function ensureAdminUser(): Promise<string> {
 
 function app() {
   const a = new Hono<App>();
-  // A rota lê c.get("entitlement") para gravar created_by; injetamos um fixo.
+  // A rota grava emailDoAccess(c) em created_by (Task 11), que referencia
+  // admins.email — a linha precisa existir para a FK, e o email precisa
+  // estar no contexto como requireAccess faria em produção.
   a.use("*", async (c, next) => {
+    await upsertAdmin(getDb(env), "admin@test.com", "hash-nao-usado-neste-teste");
+    c.set("accessEmail", "admin@test.com");
     c.set("entitlement", {
       userId: await ensureAdminUser(),
       email: "admin@test.com",
@@ -87,6 +97,34 @@ describe("rotas de questões", () => {
     const res = await app().request("/admin/questions", post(await payload()), env);
     expect(res.status).toBe(201);
     expect((await res.json()) as { id: string }).toHaveProperty("id");
+  });
+
+  it("grava o email do Access em created_by", async () => {
+    const res = await app().request("/admin/questions", post(await payload()), env);
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+
+    const linha = await getDb(env)
+      .select({ createdBy: questions.createdBy })
+      .from(questions)
+      .where(eq(questions.id, id))
+      .get();
+    expect(linha?.createdBy).toBe("admin@test.com");
+  });
+
+  it("apagar o admin deixa a questão sem autoria, não apaga a questão", async () => {
+    const res = await app().request("/admin/questions", post(await payload()), env);
+    const { id } = (await res.json()) as { id: string };
+
+    await deleteAdmin(getDb(env), "admin@test.com");
+
+    const linha = await getDb(env)
+      .select({ createdBy: questions.createdBy })
+      .from(questions)
+      .where(eq(questions.id, id))
+      .get();
+    expect(linha).toBeDefined();
+    expect(linha?.createdBy).toBeNull();
   });
 
   it("422 com o código do erro quando não há exatamente uma correta", async () => {

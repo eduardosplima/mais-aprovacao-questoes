@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Env } from "../../config/env";
+import { emailDoAccess } from "../../middleware/access";
 import { getDb } from "../../db/client";
 import {
   createQuestion,
@@ -192,9 +193,9 @@ adminQuestions.post("/", async (c) => {
   const res = await createQuestion(
     getDb(c.env),
     parsed.data as QuestionInput,
-    // `created_by` referencia `users.id`, e admin não é mais uma linha de
-    // `users` (Task 1). Não há id de usuário para gravar aqui.
-    null,
+    // A autoria é o email do token do Access, que é a chave de `admins`.
+    // A rota está atrás de `requireSessaoAdmin`, então a linha existe.
+    emailDoAccess(c),
     parsed.data.status,
   );
   if ("error" in res) return c.json({ error: res.error }, statusFor(res.error));

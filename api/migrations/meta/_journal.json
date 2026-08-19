@@ -36,6 +36,13 @@
       "when": 1787094159842,
       "tag": "0004_flippant_lilandra",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787098144788,
+      "tag": "0005_safe_vampiro",
+      "breakpoints": true
     }
   ]
 }

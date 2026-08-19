@@ -138,8 +138,10 @@ export const questions = sqliteTable(
     /** 'draft' | 'published' — o aluno só enxerga 'published'. */
     status: text("status").notNull().default("draft"),
     /** SET NULL: a questão é conteúdo da plataforma, não dado pessoal de quem
-     *  a cadastrou. Se o admin excluir a conta, a questão fica sem autoria. */
-    createdBy: text("created_by").references(() => users.id, {
+     *  a cadastrou. Apagar a linha do admin — pelo `--remover` do CLI, ou
+     *  porque ele saiu — deixa as questões dele sem autoria, e isso é
+     *  aceitável: o acervo sobrevive à pessoa. */
+    createdBy: text("created_by").references(() => admins.email, {
       onDelete: "set null",
     }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
