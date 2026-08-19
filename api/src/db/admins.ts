@@ -13,7 +13,11 @@ export function findAdmin(db: Db, email: string): Promise<AdminRow | undefined> 
     .get();
 }
 
-/** Cria ou rotaciona. Chamado só pelo CLI — nenhuma rota escreve aqui. */
+/**
+ * Cria ou rotaciona. Só o CLI faz uma linha *nascer* — nenhuma rota cadastra
+ * admin; `POST /admin/auth/senha` chama aqui para rotacionar a senha de uma
+ * linha que já existe.
+ */
 export async function upsertAdmin(
   db: Db,
   email: string,
