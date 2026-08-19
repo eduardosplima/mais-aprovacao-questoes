@@ -95,17 +95,31 @@ repetido N vezes vira parede. Fora da tabela, o botão aparece uma vez — e uma
 ação que aparece uma vez precisa se explicar sem hover, porque `title` não
 existe em toque e não é descoberto por quem não passa o mouse.
 
+**Onde o ícone fica, na forma 2:** à esquerda do texto, sempre — **exceto em
+ação direcional, onde ele vai do lado para onde aponta.** "Próxima" leva a
+seta à direita; "Anterior", à esquerda.
+
+A exceção não é gosto. Nos outros botões o ícone é um *rótulo* — diz que tipo
+de ação é aquela (disquete = salvar, olho = publicar) — e rótulo antecede o
+que nomeia. Numa ação direcional o ícone é um *vetor*: ele não diz o que a
+ação é, diz para onde ela vai. Pôr a seta de "Próxima" à esquerda a faria
+apontar para fora do próprio botão, contra o sentido da leitura e contra o
+sentido do movimento. É a mesma razão pela qual "voltar" fica à esquerda em
+toda barra de navegação do mundo.
+
 ### Consequência que esta spec assume
 
 **A paginação da lista de questões passa a ter ícone.** Os botões "Anterior" e
 "Próxima" (`page.tsx:280-296`) são `Botao` sem ícone e, pela regra 2, ficariam
 fora do padrão no dia seguinte ao de ela ser escrita. Recebem uma seta cada,
-apontando para o lado do movimento.
+pela cláusula de posição acima: `<IconeAnterior />Anterior` e
+`Próxima<IconeProxima />`.
 
-A alternativa — declarar paginação uma exceção, por ser navegação e não ação —
-foi considerada e recusada: exceção é coisa que se decora, e o custo de decorar
-é maior do que o de dois ícones. **Isto é mudança visível que ninguém pediu**,
-e está aqui explicitamente para poder ser vetada na revisão.
+A alternativa — declarar paginação uma exceção inteira à regra 2, por ser
+navegação e não ação — foi considerada e recusada: a exceção que se justifica
+é a da *posição* do ícone, não a da presença dele. Nenhuma mudança no `Botao`
+é necessária; ele já é `inline-flex` com `gap-2`, então a ordem dos filhos
+decide o lado.
 
 Ícones novos no `web/ui`, no mesmo traço dos existentes (contorno 2px, viewBox
 24, sem preenchimento): `IconeChave` (trocar senha), `IconeSair`,
@@ -329,7 +343,11 @@ do painel nunca aparece — o teste falha antes da correção e passa depois, qu
 - **Marcar o obrigatório com asterisco, ou marcar o opcional no rótulo.**
   Recusados em favor de replicar o editor, que põe "Opcional" **abaixo** do
   campo. Decisão do dono.
-- **Paginação como exceção à regra dos botões.** Recusado; ver §3.
+- **Paginação como exceção inteira à regra dos botões.** Recusado. O que se
+  aceitou, por pedido do dono na revisão do desenho, foi a exceção de
+  **posição**: em ação direcional o ícone fica do lado para onde aponta. Virou
+  cláusula da regra 2, e não caso particular da paginação, para valer no
+  próximo par direcional que aparecer. Ver §3.
 - **`tabIndex` na linha da tabela.** Recusado; ver §7.
 - **Item 4 do pedido (auto-submit do Apple Passwords).** Retirado do escopo
   pelo dono depois da pesquisa, para sessão dedicada. O apurado fica no §7.
