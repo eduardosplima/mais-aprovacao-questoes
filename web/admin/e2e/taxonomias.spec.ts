@@ -250,3 +250,33 @@ test("a falha ao excluir explica dentro do próprio diálogo", async ({
   // E o diálogo continua aberto, que é a razão de a mensagem morar nele.
   await expect(dialogo).toBeVisible();
 });
+
+// Regra única dos quatro diálogos: o fundo não fecha. O que motivou foi o
+// modal de senha, onde um clique por engano descarta três senhas digitadas —
+// mas uma prop por chamador obrigaria todo consumidor futuro do web/ui a
+// descobrir que ela existe e decidir certo.
+test("clicar no fundo escuro não fecha o diálogo; Escape fecha", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  await page.getByLabel("Nome", { exact: true }).fill("Quadrix");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Quadrix")).toBeVisible();
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Quadrix" })
+    .click();
+  const dialogo = page.getByRole("dialog");
+  await expect(dialogo).toBeVisible();
+
+  // O canto superior esquerdo é fundo: o diálogo é centralizado e tem largura
+  // máxima de 28rem.
+  await page.mouse.click(5, 5);
+  await expect(dialogo).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(dialogo).toHaveCount(0);
+});

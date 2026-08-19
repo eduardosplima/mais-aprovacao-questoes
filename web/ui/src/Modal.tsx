@@ -92,16 +92,16 @@ export function Modal({
 
   if (!aberto) return null;
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={aoCancelar}
-    >
+    // O fundo não fecha o diálogo. Um clique fora é acidente com a mesma
+    // frequência que é intenção, e no modal de trocar senha o acidente custa
+    // três senhas digitadas. Escape e Cancelar continuam sendo as saídas — e
+    // Escape é a que leitor de tela anuncia como contrato de diálogo.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
         ref={dialogoRef}
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md bg-card rounded-card shadow-card-2 p-6 flex flex-col gap-4"
       >
         <h2 className="font-display text-lg font-bold">{titulo}</h2>
