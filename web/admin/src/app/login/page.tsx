@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Botao, Campo, Card, CONTROLE } from "@mais/ui";
+import { Botao, Campo, Card, CONTROLE, CONTROLE_INVALIDO } from "@mais/ui";
 import { api, type ContextoAdmin } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
@@ -20,6 +20,7 @@ export default function PaginaLogin() {
   const [contexto, setContexto] = useState<ContextoAdmin | null>(null);
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const router = useRouter();
 
@@ -41,6 +42,15 @@ export default function PaginaLogin() {
   async function enviar(evento: React.FormEvent) {
     evento.preventDefault();
     setErro(null);
+    // O `required` saiu do input: a validação nativa mostra um balão que o
+    // projeto não controla — sem tradução, fora da tipografia do painel, e
+    // que some sozinho. Quem chega tarde ao campo não descobre por que o
+    // envio não aconteceu.
+    if (!senha) {
+      setErroSenha("Informe a senha.");
+      return;
+    }
+    setErroSenha(null);
     setEnviando(true);
     try {
       await api.entrar(senha);
@@ -101,16 +111,20 @@ export default function PaginaLogin() {
         )}
 
         {pronto && (
-          <form onSubmit={enviar} className="flex flex-col gap-4">
-            <Campo rotulo="Senha" htmlFor="senha">
+          <form onSubmit={enviar} noValidate className="flex flex-col gap-4">
+            <Campo rotulo="Senha" htmlFor="senha" erro={erroSenha ?? undefined}>
               <input
                 id="senha"
                 type="password"
                 autoComplete="current-password"
-                required
-                className={CONTROLE}
+                aria-required
+                aria-invalid={erroSenha ? true : undefined}
+                className={`${CONTROLE} ${erroSenha ? CONTROLE_INVALIDO : ""}`}
                 value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+                onChange={(e) => {
+                  setSenha(e.target.value);
+                  if (erroSenha) setErroSenha(null);
+                }}
               />
             </Campo>
 
@@ -125,7 +139,7 @@ export default function PaginaLogin() {
           href="/cdn-cgi/access/logout"
           className="text-[12.5px] text-txt-3 text-center"
         >
-          Encerrar também a sessão do Access
+          Encerrar sessão do Cloudflare Access
         </a>
       </Card>
     </main>

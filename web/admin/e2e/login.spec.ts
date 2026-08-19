@@ -116,3 +116,32 @@ test("admin sem senha é mandado ao time de desenvolvimento", async ({
   );
   await expect(page.getByLabel("Senha")).toHaveCount(0);
 });
+
+// A prova de que o balão nativo saiu. Com `required` no lugar, o navegador
+// cancela o envio em silêncio: nenhuma requisição sai E nenhuma mensagem
+// nossa aparece — então a asserção da mensagem é o que distingue os dois
+// mundos, e a da requisição é o que garante que não trocamos um silêncio
+// por um POST vazio.
+test("senha vazia é barrada pelo painel, não pelo navegador", async ({
+  page,
+}) => {
+  let tentouEntrar = false;
+  await page.route("**/admin/auth/login", (rota) => {
+    tentouEntrar = true;
+    return rota.abort();
+  });
+
+  await page.goto("/login");
+  await aguardarFormularioVivo(page);
+  await page.getByRole("button", { name: "Entrar" }).click();
+
+  await expect(page.getByText("Informe a senha.")).toBeVisible();
+  expect(tentouEntrar).toBe(false);
+});
+
+test("o rodapé nomeia o Cloudflare Access por extenso", async ({ page }) => {
+  await page.goto("/login");
+  await expect(
+    page.getByRole("link", { name: "Encerrar sessão do Cloudflare Access" }),
+  ).toBeVisible();
+});
