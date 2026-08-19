@@ -27,7 +27,7 @@
 | 8. Worker Routes | ✅ as três, vindas do arquivo |
 | 9. Pages | ✅ |
 | 10. Rate Limiting Rule | ✅ uma regra, o que o plano Free permite |
-| 11. Hotmart (sandbox) e primeiro admin | 🟡 admin criado; **ucode não coletado** |
+| 11. Hotmart (sandbox) e primeiro admin | 🟡 **ucode não coletado**; admin não nasce mais de compra — o primeiro admin agora é o CLI (`npm run admin:senha`), rodado na seção "Publicar a separação do login do admin", ainda pendente |
 | 12. Runbook de verificação | 🟡 seções 1 e 2 iniciadas, [detalhe lá](runbook-verificacao-hotmart.md) |
 | 13. Virar para produção | ⬜ em aberto, por decisão |
 
@@ -271,10 +271,12 @@ beta e a documentação se move:
 - [x] **Site key** → vai para o *build* do Pages (fase 9), não para o Worker.
 - [x] **Secret key** → vira segredo do Worker (fase 6).
 
-> Atenção ao acoplamento: `web/admin/src/app/login/page.tsx:11` lê
-> `NEXT_PUBLIC_TURNSTILE_SITE_KEY` com fallback `""`. Se a variável faltar no
-> build, **o build passa** e o login quebra em produção, sem erro em lugar
-> nenhum.
+> **Este widget hoje só serve ao login do aluno.** A separação do login do
+> admin tirou o Turnstile do painel — `web/admin/src/app/login/page.tsx` não
+> lê mais `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (a variável não existe em lugar
+> nenhum de `web/admin/src`; ver a fase 9). O widget para `admin.` criado
+> acima ficou sem uso; o acoplamento a vigiar agora é do lado do aluno, quando
+> `app.maisaprovacao.com.br` subir (sub-projeto 4).
 
 ---
 
@@ -321,8 +323,9 @@ projetada: IdP → painel → senha.
 
 **Sobre `/auth/*` ficar dentro do Access.** Fica, e é o recomendado. Depois de
 passar pelo Access o navegador carrega o cookie `CF_Authorization` daquele
-hostname, e um `fetch("/auth/login")` same-origin o envia junto — o login
-completa normalmente. O ganho é que o endpoint de login some da internet
+hostname, e um `fetch("/auth/login")` — a rota de login **do aluno**,
+reaproveitada neste hostname, não a do painel — same-origin o envia junto: o
+login completa normalmente. O ganho é que esse endpoint some da internet
 aberta: só alcança quem já passou pelo seu IdP. O custo é que a Rate Limiting
 Rule da fase 10 perde boa parte da utilidade **neste** hostname (ela continua
 essencial no `app.`, onde o aluno entra sem Access).
@@ -594,7 +597,7 @@ caminhos que o Worker já serve, sem prefixo:
 | Padrão | Serve |
 |---|---|
 | `admin.maisaprovacao.com.br/admin/*` | Worker — conteúdo do painel |
-| `admin.maisaprovacao.com.br/auth/*` | Worker — login do painel |
+| `admin.maisaprovacao.com.br/auth/*` | Worker — rotas de auth do aluno (`api/src/app.ts`), reaproveitadas neste hostname |
 | `app.maisaprovacao.com.br/webhooks/*` | Worker — **webhook da Hotmart** |
 | `admin.maisaprovacao.com.br/*` | Pages — o painel (Custom Domain, fase 9 — **não** é Worker Route) |
 
