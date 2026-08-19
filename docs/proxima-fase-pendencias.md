@@ -146,11 +146,11 @@ rápido o bastante, mas a corrida sempre esteve lá.
 
 ### O que continua sendo verdade
 
-`visual.spec.ts` ainda afirma a *causa* (`appearance: none`) em vez do
-*sintoma* (`padding-left`). Com o WebKit na suíte, dá para apertar isso: agora
-existe um navegador onde o `padding-left` de fato distingue o código corrigido
-do quebrado. É melhoria de teste, não lacuna — a correção do `<select>` já foi
-entregue e conferida a olho no Safari.
+**Resolvido em 2026-08-19.** `visual.spec.ts` afirmava a *causa*
+(`appearance: none`) em vez do *sintoma* (`padding-left`); a rodada de ajustes
+do painel reescreveu a asserção para `toHaveCSS("padding-left", "44px")` nos
+três `<select>` — o WebKit na suíte é o que tornou isso possível, porque só
+nele o `padding-left` de fato distingue o código corrigido do quebrado.
 
 Cinco testes de rolagem horizontal de `caminho-critico.spec.ts` passavam
 **vazios** durante o período vermelho: sem sessão, eles mediam a tela de login

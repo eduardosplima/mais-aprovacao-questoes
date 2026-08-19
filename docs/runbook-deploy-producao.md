@@ -881,6 +881,14 @@ Worker que está em produção agora lê a coluna que ela apaga.
       sessão anterior a ele — é o caminho de emergência para expulsar quem
       roubou um cookie.
 
+> **Se logo depois do `admin:senha` a entrada devolver 401, espere alguns
+> segundos e tente de novo.** O CLI carimba `updated_at` com o relógio da
+> máquina de quem roda, e o `iat` do token vem do relógio do Worker. Se o
+> laptop estiver adiantado em N segundos, por N segundos a sexta checagem de
+> `requireSessaoAdmin` recusa uma sessão recém-criada — ela parece anterior à
+> credencial. Com NTP normal isso é sub-segundo; num laptop com relógio
+> manual, pode ser minutos.
+
 > **Se a `0005` falhar no meio, antes de tentar de novo:** ela cria
 > `__save_alternatives` e `__save_explanations` para segurar as filhas durante
 > o rebuild (e `__new_questions` para a tabela nova), e apaga as três no

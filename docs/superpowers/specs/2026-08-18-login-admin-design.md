@@ -193,9 +193,11 @@ essa reemissão, trocar a própria senha deslogaria quem trocou). Como o
 `upsertAdmin` do CLI carimba o mesmo `updated_at`, o `npm run admin:senha`
 passa a revogar sessão viva — o caminho de emergência do runbook.
 
-`POST /admin/auth/login` recebe só a senha e roda as mesmas cinco checagens
-de `requireSessaoAdmin`, menos as duas de sessão: email do Access ∈
-`ADMIN_EMAILS`, linha em `admins`, senha confere. Só então emite o cookie.
+`POST /admin/auth/login` recebe só a senha e roda as mesmas seis checagens
+de `requireSessaoAdmin`, menos as três de sessão — cookie, JWT válido e a
+sexta, que compara `iat` com `updated_at` e não faz sentido numa sessão que
+ainda não existe: email do Access ∈ `ADMIN_EMAILS`, linha em `admins`, senha
+confere. Só então emite o cookie.
 
 Ele **não** tem hash descartável no caminho do erro,
 diferente de `auth.ts:74`. Lá o `DUMMY_HASH` existe para o tempo de resposta
@@ -426,7 +428,7 @@ o painel não olha mais para lá.
 | `api/test/admins.test.ts` | novo módulo de banco |
 | `api/test/admin-auth.test.ts` | contexto nos três estados, login certo e errado, troca de senha, senha curta, senha atual errada, e o caso da invariante: email no corpo não muda resultado nenhum |
 | `api/test/access.test.ts` | `emailDoAccess`; bypass sem `ACCESS_DEV_EMAIL` devolve 401 |
-| `api/test/admin-guards.test.ts` | as cinco checagens de `requireSessaoAdmin`, uma a uma |
+| `api/test/admin-guards.test.ts` | as seis checagens de `requireSessaoAdmin`, uma a uma — a sexta compara o `iat` do token com o `updated_at` da credencial |
 | `api/test/users.test.ts`, `webhook-purchase.test.ts`, `reconcile.test.ts` | poda de `role` |
 | `web/admin/e2e/login.spec.ts` | reescrito para os três estados, sem campo de email |
 | `web/admin/e2e/senha.spec.ts` | troca de senha |

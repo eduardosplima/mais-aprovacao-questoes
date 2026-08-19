@@ -6,8 +6,9 @@ import { api, ApiError } from "./api";
 
 /**
  * Guarda de rota do lado do cliente. Não é controle de acesso — o controle é
- * as cinco checagens de `requireSessaoAdmin`
- * (api/src/middleware/adminSession.ts) e o Cloudflare Access na borda. Isto
+ * as seis checagens de `requireSessaoAdmin`
+ * (api/src/middleware/adminSession.ts) — a sexta compara o `iat` da sessão
+ * com o `updated_at` da credencial — e o Cloudflare Access na borda. Isto
  * aqui só evita mostrar uma tela vazia a quem não tem sessão, e é por isso
  * que pode viver no navegador sem risco.
  */

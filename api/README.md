@@ -134,6 +134,15 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | `true_false_needs_two` | 422 | Questão `true_false` sem exatamente duas alternativas |
 | `needs_two_alternatives` | 422 | Questão `multiple_choice` com menos de duas alternativas |
 | `invalid_subject` / `invalid_banca` / `invalid_cargo` / `invalid_level` | 422 | FK de taxonomia inexistente, soft-deletada ou de `kind` errado |
+| `invalid_credentials` | 401 | Login com senha errada — `/auth/login` (aluno) ou `/admin/auth/login` (painel) |
+| `senha_atual_incorreta` | 400 | `senhaAtual` não confere em `POST /admin/auth/senha` |
+| `weak_password` | 400 | Senha nova abaixo do mínimo — 8 caracteres em `/auth/set-password` (aluno), 12 em `/admin/auth/senha` (painel) |
+| `captcha_failed` | 403 | Turnstile recusou o token, em `/auth/login` ou `/auth/recover` |
+| `missing_file` | 400 | `POST /admin/media` sem `file` no `multipart/form-data` |
+| `too_large` | 413 | Imagem acima de 2 MB em `POST /admin/media` |
+| `unsupported_type` | 415 | Bytes que não batem com PNG, JPEG, WebP ou GIF — SVG fica fora de propósito, é o único formato de imagem que executa script |
+| `unauthorized` | 401 | Sem sessão válida — cookie ausente, JWT inválido ou expirado; em `/admin/*` cobre também o token do Access ausente ou inválido |
+| `forbidden` | 403 | Email autenticado pelo Access sem permissão de admin — fora de `ADMIN_EMAILS` ou sem senha cadastrada em `admins` |
 
 Parâmetro de query inválido tem um código por campo (`invalid_kind`,
 `invalid_status`, `invalid_year`); corpo de requisição inválido sempre cai no

@@ -20,6 +20,64 @@ renderizam sem estilo nenhum, silenciosamente, sem erro de build. Qualquer
 consumidor de `@mais/ui` precisa da mesma declaração `@source` apontando
 para o `src` do pacote.
 
+## Regras de design system
+
+Valem para o `admin` e para qualquer consumidor futuro do `ui/`. Moram aqui,
+e não só na spec que as criou, porque regra que vive em spec de rodada não é
+herdada — é redescoberta, geralmente divergindo.
+
+### Campos obrigatórios
+
+1. **Obrigatório não leva marca no rótulo.** É o default; marcar todo campo
+   exigido num formulário em que quase tudo é exigido é ruído.
+2. **Opcional leva `dica="Opcional"`**, que o `Campo` renderiza abaixo do
+   controle.
+3. **Campo vazio nunca aciona a validação nativa do navegador.** O `<form>`
+   leva `noValidate`, a conferência é do cliente, e o erro é borda vermelha
+   (`CONTROLE_INVALIDO`) mais mensagem no `Campo`.
+4. **O atributo `required` não se usa; `aria-required` sim.** O que se
+   descarta é a UI do navegador — o balão "Fill out this field", em inglês,
+   fora da tipografia do projeto, que some sozinho. A informação para leitor
+   de tela fica.
+5. **Resumo de erros no topo é só para formulário longo**, onde um campo
+   inválido pode estar fora do viewport. Hoje, só o editor de questões.
+
+```tsx
+<Campo rotulo="Nova senha" htmlFor="nova" erro={erros.nova}>
+  <input
+    id="nova"
+    type="password"
+    aria-required
+    aria-invalid={erros.nova ? true : undefined}
+    className={`${CONTROLE} ${erros.nova ? CONTROLE_INVALIDO : ""}`}
+    value={nova}
+    onChange={(e) => setNova(e.target.value)}
+  />
+</Campo>
+```
+
+### Botões
+
+1. **Ação inline em linha de tabela → `BotaoIcone`**: só o ícone, com
+   `rotulo` virando `title` e `aria-label`. Texto repetido em N linhas vira
+   parede.
+2. **Toda outra ação → `Botao` com ícone + texto.** Fora da tabela o botão
+   aparece uma vez, e precisa se explicar sem hover — `title` não existe em
+   toque.
+3. **O ícone vem antes do texto, exceto em ação direcional**, onde ele vai do
+   lado para onde aponta. Nos outros botões o ícone é *rótulo* (disquete =
+   salvar) e rótulo antecede o que nomeia; numa ação direcional ele é *vetor*,
+   e uma seta apontando para fora do próprio botão contradiz o movimento.
+
+```tsx
+<BotaoIcone icone={<IconeExcluir />} rotulo="Excluir" onClick={...} />
+
+<Botao><IconeAdicionar />Nova questão</Botao>
+
+<Botao variante="secundario"><IconeAnterior />Anterior</Botao>
+<Botao variante="secundario">Próxima<IconeProxima /></Botao>
+```
+
 ## Setup
 
 ```bash

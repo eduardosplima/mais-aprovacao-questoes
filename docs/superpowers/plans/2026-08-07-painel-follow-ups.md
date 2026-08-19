@@ -13,6 +13,28 @@
 > lista de follow-ups que não é reconferida vira passivo: ou se age sobre
 > entrada morta, ou se para de confiar nela. As datas abaixo dizem o que
 > mudou e quando.
+>
+> **Reconferido em 2026-08-19, na rodada de ajustes. Três entradas não
+> sobreviveram à leitura do código — é a terceira vez que esta lista drifta,
+> e o padrão já é claro: entrada de ledger envelhece no diagnóstico antes de
+> envelhecer no sintoma.**
+>
+> - **Tipos de `Usuario.role` e `Usuario.tier`: entrada morta.** Não existe
+>   mais `Usuario` no `web/` — `grep -rn "Usuario\|\.role\|\.tier"
+>   web/admin/src web/ui/src` não devolve nada. A separação do login apagou o
+>   modelo de usuário do cliente: `useSessao` devolve `{ email }` e nada mais.
+>   A entrada descrevia uma dívida que outra rodada quitou de passagem.
+> - **O GET extra da paginação: diagnóstico errado em metade.** O segundo
+>   `api.questoes` do recuo é **necessário** — sem ele não há linhas da página
+>   corrigida para exibir, e a API não clampa o offset. Já o "Carregando…
+>   piscando" não existe: `setCarregando(false)` mora só no `finally`
+>   (`page.tsx:108-109`), então os dois fetches acontecem dentro de um único
+>   estado de carregamento. Fechada como não é defeito.
+> - **Linha da `Tabela` por teclado: fechada como não é defeito.** A coluna
+>   Ações tem "Editar", que é botão real, focável e anunciado — o teclado já
+>   chega à edição. Pôr `tabIndex` na linha acrescentaria uma parada de
+>   tabulação por linha, até 50 numa lista cheia, para chegar ao mesmo lugar.
+>   Seria acessibilidade pior com aparência de melhor.
 
 ## Empacotamento do `web/ui` — **pré-requisito do sub-projeto 4**
 
@@ -44,8 +66,10 @@ isso —, mas o empacotamento tem três arestas:
 
 | Item | Efeito |
 |---|---|
-| A linha da `Tabela` responde só a mouse (`onClick` em `<tr>`/`<li>`, sem `tabIndex` nem `role`) | Mitigado: a coluna Ações agora tem "Editar", então o teclado tem caminho. A linha continua sendo atalho de mouse |
-| ~~Um 409 ao renomear taxonomia aparece como toast enquanto o modal segue aberto, em vez de inline no campo~~ **Resolvido em 2026-08-18** | O erro do servidor passou a cair no próprio campo do modal, junto com a validação de nome vazio que entrou na mesma rodada. Coberto por `taxonomias.spec.ts`. **Continua aberto:** falta guarda de duplo clique no botão Salvar do modal |
+| ~~A linha da `Tabela` responde só a mouse (`onClick` em `<tr>`/`<li>`, sem `tabIndex` nem `role`)~~ **Fechada em 2026-08-19 — não é defeito** | Ver a reconferência no topo do arquivo: a coluna Ações já tem "Editar", focável e anunciado; `tabIndex` na linha só acrescentaria paradas de tabulação redundantes |
+| ~~Um 409 ao renomear taxonomia aparece como toast enquanto o modal segue aberto, em vez de inline no campo~~ **Resolvido em 2026-08-18** | O erro do servidor passou a cair no próprio campo do modal, junto com a validação de nome vazio que entrou na mesma rodada. Coberto por `taxonomias.spec.ts`. |
+| ~~Falta guarda de duplo clique no botão Salvar do modal de renomear taxonomia~~ **Resolvido em 2026-08-19** | `Modal` (`web/ui`) ganhou a prop `carregando`, que desabilita o confirmar e troca o texto por "Aguarde…"; `taxonomias/page.tsx` passa `carregando={renomeando}` e `carregando={excluindo}` nos dois modais |
+| O erro de `excluir()` aparece em toast, enquanto o de `renomear()` cai inline no campo | Inconsistência entre dois modais irmãos, levantada na revisão da Task 2 desta rodada. Anterior a ela, fora do brief — fechar exigiria decidir se `excluir()` ganha um lugar inline (não tem campo de texto para carregar o erro) ou se `renomear()` volta a usar toast |
 
 ## Qualidade de erro no editor
 
@@ -81,35 +105,47 @@ isso —, mas o empacotamento tem três arestas:
 >   Teste: `editor.spec.ts` → "select de taxonomia avisa quando a carga falha,
 >   em vez de ficar vazio".
 
-Continua aberto desta seção:
-
-- O campo Enunciado exibe a mensagem de erro pelo `Campo`, mas **não** recebe
-  borda vermelha: `CONTROLE_INVALIDO` se aplica a input e select, e o Enunciado
-  é o wrapper do TipTap, que não usa `CONTROLE`. Mesma classe do defeito
-  corrigido no `SeletorTaxonomia`, num componente que a correção não alcança.
+> **Resolvido em 2026-08-19.** O `Editor` ganhou a prop `invalido`, aplicada
+> ao wrapper do TipTap em `Editor.tsx:81` — a mesma classe do defeito que já
+> tinha sido corrigido no `SeletorTaxonomia`, agora alcançando o componente
+> que ficava de fora.
+>
+> - ~~O campo Enunciado exibe a mensagem de erro pelo `Campo`, mas **não**
+>   recebe borda vermelha: `CONTROLE_INVALIDO` se aplica a input e select, e o
+>   Enunciado é o wrapper do TipTap, que não usa `CONTROLE`.~~
 
 ## Tipos
 
-`Usuario.role` e `Usuario.tier` são `string` no cliente, enquanto a API tem
+> **Entrada morta em 2026-08-19** — ver a reconferência no topo do arquivo. A
+> separação do login do admin apagou `Usuario` do cliente; `useSessao` hoje
+> devolve só `{ email }`.
+
+~~`Usuario.role` e `Usuario.tier` são `string` no cliente, enquanto a API tem
 união literal (`"admin" | "user"`, `"assinante" | "gratuito"`). O
 `sessao.tsx:24` faz `u.role !== "admin"` — exatamente a comparação que uma
-união protegeria de um typo.
+união protegeria de um typo.~~
 
-**Nota de 2026-08-18, sobre a ênfase:** o raio é menor do que a entrada sugere.
-Um typo ali faz a comparação **falhar fechada** (expulsa o admin de verdade, não
-deixa entrar quem não é), e o próprio arquivo documenta em `sessao.tsx:8-9` que
-aquilo não é controle de acesso — o controle real é o `role=admin` lido do D1
-por `api/src/middleware/rbac.ts`. É dívida de tipos legítima, com custo de DX,
-**não é furo de segurança**. Cabe junto do sub-projeto 4, que vai consumir o
-mesmo cliente.
+**Nota de 2026-08-18, sobre a ênfase (histórico):** o raio era menor do que a
+entrada sugeria. Um typo ali fazia a comparação **falhar fechada** (expulsa o
+admin de verdade, não deixa entrar quem não é), e o próprio arquivo
+documentava que aquilo não era controle de acesso — o controle real era o
+`role=admin` lido do D1 por `api/src/middleware/rbac.ts`. Registro mantido
+pelo histórico; o `rbac.ts` e o `role` que ele lia também não existem mais.
 
 ## Cosmético
 
-- O `next/image` avisa no console sobre proporção do logo, apesar do `w-auto`.
-- O gap do cabeçalho no desktop caiu de 24px para 16px sem intenção, num fix
-  de responsividade; um `md:gap-x-6` restaura.
-- O recuo de paginação dispara um GET a mais e um "Carregando…" piscando, só
-  no caminho raro em que uma mutação encolhe o acervo abaixo da página atual.
+- ~~O `next/image` avisa no console sobre proporção do logo, apesar do
+  `w-auto`.~~ **Resolvido em 2026-08-19** — o `<Image>` do logo passou a
+  declarar `width`/`height` na proporção real do arquivo (2,5006), em
+  `Layout.tsx` e `login/page.tsx`.
+- ~~O gap do cabeçalho no desktop caiu de 24px para 16px sem intenção, num fix
+  de responsividade; um `md:gap-x-6` restaura.~~ **Resolvido em 2026-08-19** —
+  `Layout.tsx:57` já tem `md:gap-x-6`.
+- ~~O recuo de paginação dispara um GET a mais e um "Carregando…" piscando, só
+  no caminho raro em que uma mutação encolhe o acervo abaixo da página
+  atual.~~ **Fechada em 2026-08-19 — diagnóstico errado em metade.** Ver a
+  reconferência no topo do arquivo: o GET extra é necessário, e o
+  "Carregando…" piscando nunca existiu.
 
 ## Fora do escopo deste plano, mas aberto no `api/`
 
@@ -142,10 +178,13 @@ O texto original, pelo registro do que se sabia em 2026-08-07:
   `7.29.0` já passou no cooldown; forçar override numa transitiva do miniflare
   é decisão de manutenção à parte.
 
-Também levantado: a tabela "Códigos de erro" do `api/README.md` lista 11
+~~Também levantado: a tabela "Códigos de erro" do `api/README.md` lista 11
 códigos, mas a API emite pelo menos 7 outros (`invalid_credentials`,
 `captcha_failed`, `missing_file`, `too_large`, `unsupported_type`,
-`unauthorized`, `forbidden`).
+`unauthorized`, `forbidden`).~~ **Resolvido em 2026-08-19** — a tabela ganhou
+as nove linhas que faltavam (os sete acima mais `senha_atual_incorreta` e
+`weak_password`, que a separação do login trouxe), cada status e descrição
+conferidos contra `api/src`.
 
 ## Escopo declarado como fora, não esquecido
 
@@ -160,20 +199,82 @@ Três itens que a revisão final do branch `login-admin` levantou e que foram
 parqueados de propósito, para não abrir uma segunda onda de correção. Nenhum
 é defeito de comportamento; os três são baratos.
 
-- **Dois casos e2e afirmam com `toContainText` onde `toBeVisible` seria mais
+**As três fecharam nesta mesma rodada, 2026-08-19.**
+
+- ~~**Dois casos e2e afirmam com `toContainText` onde `toBeVisible` seria mais
   estrito** — `web/admin/e2e/login.spec.ts`, nos casos que interceptam
   `/admin/auth/contexto` (o email fora da allowlist e o contexto que falha).
   `toContainText` passa num elemento presente porém oculto. Os dois estão
-  renderizados hoje, então é rigor de asserção, não falso verde.
-- **Três referências a "cinco checagens" sobreviveram, e agora são seis** —
+  renderizados hoje, então é rigor de asserção, não falso verde.~~
+  **Resolvido** — os dois casos (`login.spec.ts:83-84` e `:102-103`) agora
+  encadeiam `toBeVisible` antes do `toContainText`.
+- ~~**Três referências a "cinco checagens" sobreviveram, e agora são seis** —
   `docs/superpowers/specs/2026-08-18-login-admin-design.md:196` e `:429`, e o
   comentário de `web/admin/src/lib/sessao.tsx:9`. A sexta é a que compara o
   `iat` do token com o `updated_at` da credencial. Quem contar cinco e
-  procurar a sexta no código vai achá-la — o custo é a confusão, não um erro.
-- **O CLI carimba `updated_at` com o relógio da máquina de quem roda, e o
+  procurar a sexta no código vai achá-la — o custo é a confusão, não um
+  erro.~~ **Resolvido** — as três agora dizem "seis checagens" e citam a
+  sexta.
+- ~~**O CLI carimba `updated_at` com o relógio da máquina de quem roda, e o
   `iat` vem do relógio do Worker** — `api/scripts/senha-admin.mjs`. Se o
   laptop estiver adiantado em N segundos, por N segundos depois do
   `npm run admin:senha` uma sessão recém-criada falha a sexta checagem e
   devolve 401, bem no passo do runbook que manda rodar o CLI e depois entrar.
   Com NTP normal isso é sub-segundo. A correção é uma linha de
-  troubleshooting no runbook, não código.
+  troubleshooting no runbook, não código.~~ **Resolvido** — a nota de
+  troubleshooting entrou em `docs/runbook-deploy-producao.md`, depois do
+  passo 9 de "Publicar a separação do login do admin".
+
+Ainda restam, do e2e do login: três outras asserções de
+`web/admin/e2e/login.spec.ts` (por volta das linhas 20, 38 e 114) usam
+`toContainText`/`toHaveText` isoladas — o mesmo padrão frágil que os dois
+casos acima corrigiram, fora do escopo desta rodada.
+
+## Sobras do modal de trocar senha — 2026-08-19
+
+Levantadas na revisão desta rodada e deixadas de fora de propósito — nenhuma
+é regressão, todas são dívida conhecida no `ModalTrocarSenha`
+(`web/admin/src/componentes/`).
+
+- Cancelar com a requisição em voo deixa o erro da resposta guardado para a
+  próxima abertura. As senhas **são** limpas; o que sobra é a mensagem de
+  erro.
+- `erros.geral` nunca é limpo ao digitar, ao contrário dos erros de campo —
+  uma falha de rede fica na tela enquanto a pessoa reescreve tudo.
+- Com "Nova senha" vazia e "Confirme" preenchida, aparece "A confirmação não
+  confere." quando o problema real é o campo de cima estar vazio.
+- O clique no backdrop descarta três senhas digitadas sem confirmação.
+- O tip de divergência entra pelo `Campo`, que renderiza `role="alert"` —
+  alerta assertivo para um aviso de conveniência.
+- O `onChange` de "Nova senha" limpa `erros.nova` incondicionalmente,
+  apagando também a mensagem de `weak_password` vinda do servidor no primeiro
+  caractere digitado.
+- Falta cobertura e2e de que reabrir o modal mostra os campos limpos, e de
+  `aria-required`.
+
+## Sobras de rigor de teste — 2026-08-19
+
+- O teste do cabeçalho conta `svg` e prova presença, não a ordem "ícone antes
+  do texto" — passaria com o ícone do lado errado. É o padrão já existente no
+  arquivo, não regressão desta rodada. A paginação, essa sim, prova posição
+  (compara contra o texto, não elemento com elemento).
+
+## Auto-submit do Apple Passwords — para a sessão dedicada
+
+Registrado em `docs/superpowers/specs/2026-08-19-ajustes-painel-design.md`
+§7, copiado aqui para a sessão dedicada não recomeçar do zero.
+
+> **Auto-submit do Apple Passwords.** O que esta sessão apurou, para não ser
+> reapurado: o comportamento existe desde o Safari 12.1 e é decisão do
+> Safari, não do site; a Apple **não o documenta em lugar nenhum**; a
+> documentação de Password AutoFill promete, para formulário partido em
+> páginas, "tap and fill" — preencher, não enviar; o caminho de MFA é outro
+> (`autocomplete="one-time-code"`), com auto-submit amplamente relatado, o
+> que significa que existe pelo menos um caminho em que o Safari envia sem
+> usuário nem senha na tela. As alavancas plausíveis e não testadas são:
+> campo `autocomplete="username"` somente-leitura com o email do Access,
+> `action` e `method` no `<form>` (hoje não há nenhum dos dois), e conferir
+> se o preenchimento do Safari chega ao estado do React — este último é
+> risco, não correção: se o auto-submit passar a funcionar e o `onChange`
+> não disparar, o formulário envia senha vazia e a tela acusa "senha
+> inválida" para uma senha correta.
