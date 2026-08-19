@@ -80,7 +80,7 @@ export function SeletorTaxonomia({
           className={`${CONTROLE} appearance-none pl-11 pr-11 ${mensagem ? CONTROLE_INVALIDO : ""}`}
           aria-invalid={mensagem ? true : undefined}
           value={valor}
-          required={obrigatorio}
+          aria-required={obrigatorio || undefined}
           onChange={(e) => aoMudar(e.target.value)}
         >
           {/* Valor vazio = sem filtro. A API normaliza string vazia para
