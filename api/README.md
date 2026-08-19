@@ -64,11 +64,19 @@ validar o JWT da borda.
 
 Opcional e só de desenvolvimento: `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula
 a verificação do Cloudflare Access em `/admin/*` (ver seção "Painel
-administrativo"). Nunca definir em produção.
+administrativo") e usa `ACCESS_DEV_EMAIL`, também em `.dev.vars`, como email
+do admin — fail-closed: bypass ligado sem `ACCESS_DEV_EMAIL` devolve 401.
+Nenhuma das duas vai para produção.
 
-`ADMIN_EMAILS` é uma lista separada por vírgula; e-mails nela recebem
-`role=admin` na compra (webhook) ou na reconciliação — nunca a partir do
-payload em si.
+`ADMIN_EMAILS` é uma lista separada por vírgula de quem **pode** ser admin —
+não concede nada por si só. Um email só vira admin de fato se também tiver
+senha na tabela `admins`, criada pelo `npm run admin:senha` (seção abaixo).
+Nem o webhook nem a reconciliação consultam essa lista.
+
+Em desenvolvimento, sobreponha `ADMIN_EMAILS` em `.dev.vars` com o email que
+você vai usar como admin local — o das entradas de produção no
+`wrangler.jsonc` não serve. Esse email precisa ser o mesmo do
+`ACCESS_DEV_EMAIL` acima e do `EMAIL` em `web/admin/e2e/credenciais.mjs`.
 
 ## Rodar
 
@@ -91,7 +99,7 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | POST | `/auth/login` | `{ email, password, turnstileToken }` → valida credenciais e seta cookie de sessão |
 | POST | `/auth/set-password` | `{ token, password }` → consome o token do link mágico, define a senha e seta cookie de sessão |
 | POST | `/auth/recover` | `{ email, document, turnstileToken }` → sempre `200 { ok: true }`; só envia o link de recuperação se email+CPF baterem |
-| GET | `/auth/me` | Protegido. Retorna `{ id, email, name, role, tier }` |
+| GET | `/auth/me` | Protegido. Retorna `{ id, email, name, tier }` |
 | POST | `/auth/logout` | Limpa o cookie de sessão |
 | POST | `/webhooks/hotmart` | Recebe eventos de compra/cancelamento da Hotmart (autenticado pelo header `x-hotmart-hottok`) |
 | GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia. `kind` é obrigatório (`subject`, `banca`, `cargo`, `level`); ausente ou desconhecido → 400 `invalid_kind` |
@@ -128,8 +136,8 @@ Parâmetro de query inválido tem um código por campo (`invalid_kind`,
 formulário do painel resolvido de um jeito só.
 
 Sessão: JWT (HS256) em cookie `HttpOnly; Secure; SameSite=Lax; Path=/`. A
-identidade vai no `sub`; `role`/`tier` são relidos do D1 a cada request —
-`tier` é derivado só de `subscriptions.access_until > now`, nunca do JWT.
+identidade vai no `sub`; `tier` é relido do D1 a cada request, derivado só de
+`subscriptions.access_until > now`, nunca do JWT.
 
 Não há cadastro público: a conta só nasce pela compra na Hotmart (webhook) ou
 pela reconciliação diária quando o webhook se perde; o primeiro acesso e a
@@ -212,20 +220,53 @@ janela em que isso era seguro sem cerimônia.
 
 ## Painel administrativo
 
+O admin não é um usuário: é a interseção de duas fontes que nenhuma rota
+escreve — `ADMIN_EMAILS` (`wrangler.jsonc`, editado à mão) e uma senha na
+tabela `admins` (D1), escrita só pelo CLI da seção seguinte. A coluna `role`
+não existe mais em `users`; ela foi removida do banco.
+
 `/admin/*` tem **duas camadas independentes**, e nenhuma confia na outra:
 
 1. **Cloudflare Access** na borda — identidade e MFA no IdP (Google/GitHub).
    O Worker valida o header `Cf-Access-Jwt-Assertion` contra o JWKS público do
-   time (`src/middleware/access.ts`).
-2. **Sessão + RBAC** — `requireSession` e `requireAdmin`, lendo `role` do D1.
+   time e extrai o email (`src/middleware/access.ts`, `requireAccess` +
+   `emailDoAccess`). É a única porta de entrada do email do admin — nenhuma
+   rota aceita email de corpo, query ou header de aplicação.
+2. **Sessão do painel** — `requireSessaoAdmin`
+   (`src/middleware/adminSession.ts`), que confere a cada requisição: cookie
+   `sessao_admin` presente, JWT válido do tipo `admin`, o `sub` igual ao email
+   do Access, o email em `ADMIN_EMAILS` e uma linha correspondente em
+   `admins`. Tirar o email da allowlist e publicar, ou apagar a linha,
+   derruba a sessão viva na requisição seguinte — sem lista de revogação.
 
-O email do JWT do Access **não** identifica o usuário na aplicação: por isso
-são duas camadas e não uma. Consequência prática: o admin autentica duas vezes.
+O email do JWT do Access **é** a identidade do admin: por isso as duas camadas
+ficam amarradas ao mesmo email, e não é possível passar pelo Access como uma
+pessoa e entrar no painel como outra. Consequência prática: o admin autentica
+duas vezes — Access, depois a senha em `POST /admin/auth/login`.
 
 Em desenvolvimento nada passa pela borda da Cloudflare, então o header não
-existe. `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula a camada 1 — e **só** a
-string exata `true` pula. A variável nunca vai para produção; o login com senha
-e o `role=admin` continuam valendo em dev.
+existe. `ACCESS_DEV_BYPASS=true` em `.dev.vars` pula a camada 1 e usa
+`ACCESS_DEV_EMAIL` como identidade — e **só** a string exata `true` pula.
+Nenhuma das duas vai para produção.
+
+### `npm run admin:senha` — o único jeito de criar senha de admin
+
+Nenhuma rota grava em `admins`; é este script (`api/scripts/senha-admin.mjs`)
+quem faz isso, de um terminal com credencial da Cloudflare:
+
+```bash
+npm run admin:senha -- pessoa@dominio.com            # D1 remoto (produção)
+npm run admin:senha -- pessoa@dominio.com --local    # D1 de desenvolvimento
+npm run admin:senha -- pessoa@dominio.com --remover  # apaga a linha
+```
+
+O script recusa emails fora de `ADMIN_EMAILS` (lido de `wrangler.jsonc`), pede
+a senha duas vezes sem eco, exige 12 caracteres e grava o mesmo formato
+PBKDF2 de `lib/password.ts`. Sem `--local`, ele roda contra o D1 de produção
+via `wrangler d1 execute --remote`. `--remover` apaga a linha do email — o que
+derruba a sessão dele na próxima requisição e, por `questions.created_by`
+referenciar `admins.email` com `ON DELETE SET NULL`, deixa as questões dele
+sem autoria.
 
 Conteúdo HTML (enunciado, alternativas, gabarito) é sanitizado **na escrita**
 por `src/lib/sanitizeHtml.ts`, com `HTMLRewriter` nativo. Allowlist de tags e

@@ -28,21 +28,23 @@ npm ci
 npx playwright install chromium webkit   # só na primeira vez
 ```
 
-Criar `web/admin/.env.development.local`:
+O login do painel não usa Turnstile — `.env.development.local` não precisa de
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
 
-```
-NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
-```
-
-E em `api/.dev.vars` (nunca commitado):
+Em `api/.dev.vars` (nunca commitado):
 
 ```
 ACCESS_DEV_BYPASS=true
+ACCESS_DEV_EMAIL=admin@dev.local
+ADMIN_EMAILS=admin@dev.local
 TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 ```
 
-As duas chaves acima são as de teste publicadas pela Cloudflare — sempre
-passam. As de produção vêm do dashboard.
+`ACCESS_DEV_EMAIL` e `ADMIN_EMAILS` precisam ser o mesmo email do `EMAIL` em
+`web/admin/e2e/credenciais.mjs` — é ele que faz as vezes do que o Cloudflare
+Access injetaria na borda. A `TURNSTILE_SECRET_KEY` acima é a chave de teste
+publicada pela Cloudflare — sempre passa, e segue valendo para o login do
+aluno. A de produção vem do dashboard.
 
 ## Rodar
 
@@ -52,7 +54,8 @@ cd web && npm run dev                               # painel em :3000
 node web/admin/e2e/seed.mjs                         # admin de desenvolvimento
 ```
 
-Entrar com `admin@dev.local` / `senha-de-desenvolvimento`.
+Entrar só com a senha `senha-de-desenvolvimento` — o email não é digitado,
+vem do `ACCESS_DEV_EMAIL` de `api/.dev.vars` (ver "Setup").
 
 ## Testar
 
@@ -85,8 +88,8 @@ caminhos que o Worker já serve, sem prefixo:
 
 | Padrão | Serve |
 |---|---|
-| `admin.<domínio>/admin/*` | Worker — rotas de conteúdo |
-| `admin.<domínio>/auth/*` | Worker — login e sessão |
+| `admin.<domínio>/admin/*` | Worker — rotas do painel: conteúdo e login/sessão do admin (`/admin/auth/*`) |
+| `admin.<domínio>/auth/*` | Worker — rotas de autenticação do **aluno** (login, recuperação); hoje só alcançáveis aqui, por acidente de roteamento que o sub-projeto 4 desfaz |
 | `admin.<domínio>/*` | Pages — o painel |
 
 Consequência que precisa ser respeitada: **o painel não pode ter página em
@@ -124,13 +127,19 @@ Passo a passo de provisionamento, com os hostnames reais:
 ## Segurança
 
 Duas camadas independentes, nenhuma confiando na outra: Cloudflare Access na
-borda (identidade + MFA no Google ou GitHub) e `role=admin` lido do D1 pelo
-Worker. Passar pelo Access não cria sessão no app — o admin autentica duas
-vezes, e isso é deliberado.
+borda (identidade + MFA no Google ou GitHub) e `requireSessaoAdmin`, que
+confere a cada requisição o cookie `sessao_admin`, o email em `ADMIN_EMAILS`
+e uma senha cadastrada na tabela `admins`. Passar pelo Access não cria sessão
+no painel — o admin autentica duas vezes, e isso é deliberado.
+
+O email é o mesmo nas duas camadas, por decisão: a sessão do painel só é
+aceita se o email nela bater com o que o token do Access carrega
+(`emailDoAccess`), então não é possível passar pelo Access como uma pessoa e
+entrar no painel como outra.
 
 Em desenvolvimento a camada 1 não existe (nada passa pela borda), e
-`ACCESS_DEV_BYPASS=true` a pula explicitamente. O login com senha e o
-`role=admin` continuam valendo.
+`ACCESS_DEV_BYPASS=true` a pula explicitamente, usando `ACCESS_DEV_EMAIL`
+como identidade. O login com senha continua valendo.
 
 O HTML do editor é sanitizado **no servidor, na escrita**
 (`api/src/lib/sanitizeHtml.ts`). O editor é uma sugestão para clientes

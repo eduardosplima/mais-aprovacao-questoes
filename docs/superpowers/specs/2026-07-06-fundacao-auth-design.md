@@ -1,5 +1,10 @@
 # Fundação — Auth própria, Webhook Hotmart e Base de Dados (design)
 
+> **Superado em parte, 2026-08-18.** A identidade do admin descrita aqui
+> (`role='admin'` em `users`, concedido na compra) foi substituída por
+> [`2026-08-18-login-admin-design.md`](2026-08-18-login-admin-design.md). O
+> resto do documento — auth do aluno, webhook, entitlement — continua valendo.
+
 > Sub-projeto 1 de 4 da plataforma **Mais Aprovação Questões**. Companion da
 > `docs/especificacao-tecnica.md`. Escopo: **backend apenas** (Worker), sem frontend.
 >

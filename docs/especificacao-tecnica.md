@@ -315,7 +315,7 @@ Quatro decisões estruturais:
 - **`X-HOTMART-HOTTOK`** comparado em tempo constante; 401 sem match.
 - **Validação tolerante (Zod):** valida só os campos que usamos e ignora o resto — a Hotmart adiciona campos sem aviso.
 - **Idempotência** pelo `id` do evento; só `processed`/`ignored` deduplicam.
-- **Nunca concede `role='admin'`.** O papel vem exclusivamente da allowlist `ADMIN_EMAILS`; payload forjado não escala privilégio.
+- **Nunca concede acesso de admin.** A coluna `role` não existe mais em `users`; admin é a interseção de `ADMIN_EMAILS` (`api/wrangler.jsonc`) com a tabela `admins`, e nem o webhook nem o cron de reconciliação consultam a allowlist.
 
 ### Autenticação
 

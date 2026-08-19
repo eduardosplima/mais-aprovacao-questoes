@@ -251,7 +251,7 @@ DELETE FROM auth_tokens;
 DELETE FROM subscriptions;
 DELETE FROM webhook_events;
 DELETE FROM deleted_accounts;
-DELETE FROM users WHERE role <> 'admin';
+DELETE FROM users;
 SQL
 
 npx wrangler d1 execute mais-aprovacao-db --remote --file=/tmp/reset-rodada.sql
@@ -261,13 +261,10 @@ O `--remote` pede confirmação interativa antes de tocar o banco de produção.
 **Leia o nome do banco na pergunta antes de confirmar** — é a única barreira
 entre uma rodada de teste e o D1 errado.
 
-**Por que `role <> 'admin'` e não `DELETE FROM users`.** O admin de produção é
-o problema do ovo e da galinha da fase 11 — não existe cadastro de admin, ele
-só nasce de uma compra com email em `ADMIN_EMAILS`. Apagá-lo custa refazer
-aquela fase inteira. As outras quatro tabelas podem ir por completo: `role`
-vem de `users`, não de `subscriptions` (`loadEntitlement` em `db/users.ts:105`),
-então o admin sobrevive ao reset com o login intacto — perde só o `tier`, que
-volta a `gratuito`.
+**Por que `DELETE FROM users` sem filtro.** O admin não é mais uma linha de
+`users` — vive na tabela `admins`, que este reset não toca. Uma compra de
+teste com email em `ADMIN_EMAILS` cria conta de aluno como qualquer outra;
+apagá-la aqui não tem nenhuma relação com o painel, que nem consulta `users`.
 
 **Por que a ordem importa.** `auth_tokens` e `subscriptions` têm FK para
 `users` com `ON DELETE cascade`, então a ordem inversa também funcionaria; a
@@ -275,8 +272,8 @@ ordem acima é a que não depende de o `PRAGMA foreign_keys` estar ligado no D1.
 
 **O que o reset deliberadamente não toca.** `questions`, `alternatives`,
 `explanations` e `taxonomy_terms` — o acervo. Ele não participa do fluxo de
-compra, e `questions.created_by` referencia `users` com `ON DELETE set null`:
-apagar o admin errado apagaria a autoria do acervo, em silêncio.
+compra, e `questions.created_by` referencia `admins`, tabela que este reset
+não apaga.
 
 ### Conferir que voltou ao zero
 
@@ -289,7 +286,7 @@ npx wrangler d1 execute mais-aprovacao-db --remote --command \
    UNION ALL SELECT 'deleted_accounts', count(*) FROM deleted_accounts"
 ```
 
-- [ ] `users` = 1 (só o admin), todo o resto = 0.
+- [ ] Tudo = 0.
 
 ### O ciclo de uma rodada
 

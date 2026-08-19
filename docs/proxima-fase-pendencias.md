@@ -16,11 +16,12 @@
 |---|---|
 | **Sub-projeto 1** — fundação: auth própria, webhook Hotmart, reconciliação, cron | Construído e **publicado** |
 | **Sub-projeto 2** — API admin + painel administrativo | Construído e **publicado**. O painel funciona ponta a ponta |
+| **Login do admin** — separado do sub-projeto 2, spec própria ([`2026-08-18-login-admin-design.md`](superpowers/specs/2026-08-18-login-admin-design.md)) | Construído na branch `login-admin`, **não publicado** |
 | **Sub-projetos 3 e 4** | Não iniciados |
 | **Fase 12** do runbook — verificação contra o sandbox | Em andamento, e é onde a atenção está |
 | **Fase 13** — virar para produção | Em aberto, por decisão do dono |
 
-Duas ressalvas que mudam o que dá para prometer:
+Três ressalvas que mudam o que dá para prometer:
 
 - **`master` está à frente do que está publicado.** Dois lotes de conserto de
   painel esperam deploy: o `67eb803` (preview de vídeo, aviso de falha no
@@ -34,6 +35,18 @@ Duas ressalvas que mudam o que dá para prometer:
   existe. Um comprador real recebe o email e cai num 404. O que fecha hoje é
   compra → conta criada no banco → email enviado. O painel administrativo não
   passa por aí: entra com senha.
+- **O login do admin está pronto e não publicado.** A branch `login-admin`
+  fecha o modelo antigo — admin como linha de `users` com `role='admin'`,
+  nascida de uma compra com email em `ADMIN_EMAILS` — e implementa o que a
+  spec descreve: admin é a interseção de `ADMIN_EMAILS`
+  (`api/wrangler.jsonc`) com uma senha na tabela `admins`, criada só pelo
+  `npm run admin:senha`; o painel autentica atrás do Cloudflare Access, sem
+  campo de email nem Turnstile na tela de login. Publicar exige, nesta ordem
+  (detalhada na spec, §11): aplicar a migração aditiva que cria `admins`,
+  publicar o Worker, rodar `admin:senha` para os três emails, publicar o
+  Pages do painel, só então aplicar a migração que dropa `users.role`, e
+  configurar a aplicação do Cloudflare Access (ligar o *Enable Binding
+  Cookie*). Nenhum passo depende do ucode da Hotmart.
 
 ## O próximo passo: coletar o ucode
 
@@ -163,7 +176,6 @@ Para não reabrir por engano o que já foi decidido:
 
 | Item | Situação |
 |---|---|
-| Email do admin vindo do Access | Adiado deliberadamente para conversa própria. Mexe no modelo de duas identidades e no `/auth/login`, que o sub-projeto 4 vai herdar |
 | Dark theme | Decidido não fazer. O Turnstile foi fixado em `light` por causa disso |
 | Vídeo sem gabarito bloqueando o salvamento | Comportamento novo e aprovado. Se incomodar, são ~4 linhas em `web/admin/src/lib/validacao.ts` |
 | Rótulos `DISPUTE`/`PROTEST` e `CANCELED`/`EXPIRED` | Divergências de auditoria achadas na conferência dos payloads da Hotmart. Não afetam acesso; ficaram para uma rodada futura |
