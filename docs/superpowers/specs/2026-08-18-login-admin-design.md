@@ -194,10 +194,12 @@ essa reemissão, trocar a própria senha deslogaria quem trocou). Como o
 passa a revogar sessão viva — o caminho de emergência do runbook.
 
 `POST /admin/auth/login` recebe só a senha e roda as mesmas seis checagens
-de `requireSessaoAdmin`, menos as três de sessão — cookie, JWT válido e a
-sexta, que compara `iat` com `updated_at` e não faz sentido numa sessão que
-ainda não existe: email do Access ∈ `ADMIN_EMAILS`, linha em `admins`, senha
-confere. Só então emite o cookie.
+de `requireSessaoAdmin`, menos as quatro de sessão — cookie, JWT válido, o
+email da sessão bater com o do Access, e a sexta, que compara `iat` com
+`updated_at` e não faz sentido numa sessão que ainda não existe —, mais a
+comparação da senha, que é verificação nova, exclusiva do login: email do
+Access ∈ `ADMIN_EMAILS`, linha em `admins`, senha confere. Só então emite o
+cookie.
 
 Ele **não** tem hash descartável no caminho do erro,
 diferente de `auth.ts:74`. Lá o `DUMMY_HASH` existe para o tempo de resposta

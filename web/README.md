@@ -64,6 +64,13 @@ herdada — é redescoberta, geralmente divergindo.
 2. **Toda outra ação → `Botao` com ícone + texto.** Fora da tabela o botão
    aparece uma vez, e precisa se explicar sem hover — `title` não existe em
    toque.
+   **Exceção: a barra de ação de um diálogo e o submit único de um
+   formulário curto ficam sem ícone.** Ali quem nomeia a ação já é um título
+   visível — o do diálogo (`Modal`, prop `titulo`) ou o da tela —, e repeti-la
+   em ícone rotularia a mesma coisa duas vezes, não acrescentaria informação.
+   A exceção é do contexto, não do componente: um formulário com mais de uma
+   ação (o editor de questões, por exemplo) não se qualifica — ali o botão
+   concorre com outros, e só o título da tela não desambigua qual é qual.
 3. **O ícone vem antes do texto, exceto em ação direcional**, onde ele vai do
    lado para onde aponta. Nos outros botões o ícone é *rótulo* (disquete =
    salvar) e rótulo antecede o que nomeia; numa ação direcional ele é *vetor*,

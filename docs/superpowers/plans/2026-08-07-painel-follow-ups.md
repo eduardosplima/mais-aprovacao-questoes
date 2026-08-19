@@ -28,13 +28,14 @@
 >   `api.questoes` do recuo é **necessário** — sem ele não há linhas da página
 >   corrigida para exibir, e a API não clampa o offset. Já o "Carregando…
 >   piscando" não existe: `setCarregando(false)` mora só no `finally`
->   (`page.tsx:108-109`), então os dois fetches acontecem dentro de um único
+>   (`page.tsx:109`), então os dois fetches acontecem dentro de um único
 >   estado de carregamento. Fechada como não é defeito.
 > - **Linha da `Tabela` por teclado: fechada como não é defeito.** A coluna
->   Ações tem "Editar", que é botão real, focável e anunciado — o teclado já
->   chega à edição. Pôr `tabIndex` na linha acrescentaria uma parada de
->   tabulação por linha, até 50 numa lista cheia, para chegar ao mesmo lugar.
->   Seria acessibilidade pior com aparência de melhor.
+>   Ações tem "Editar", que é âncora com `href` — focável e anunciada por
+>   isso, não por ser botão —, e o teclado já chega à edição. Pôr `tabIndex`
+>   na linha acrescentaria uma parada de tabulação por linha, até 50 numa
+>   lista cheia, para chegar ao mesmo lugar. Seria acessibilidade pior com
+>   aparência de melhor.
 
 ## Empacotamento do `web/ui` — **pré-requisito do sub-projeto 4**
 
@@ -69,7 +70,7 @@ isso —, mas o empacotamento tem três arestas:
 | ~~A linha da `Tabela` responde só a mouse (`onClick` em `<tr>`/`<li>`, sem `tabIndex` nem `role`)~~ **Fechada em 2026-08-19 — não é defeito** | Ver a reconferência no topo do arquivo: a coluna Ações já tem "Editar", focável e anunciado; `tabIndex` na linha só acrescentaria paradas de tabulação redundantes |
 | ~~Um 409 ao renomear taxonomia aparece como toast enquanto o modal segue aberto, em vez de inline no campo~~ **Resolvido em 2026-08-18** | O erro do servidor passou a cair no próprio campo do modal, junto com a validação de nome vazio que entrou na mesma rodada. Coberto por `taxonomias.spec.ts`. |
 | ~~Falta guarda de duplo clique no botão Salvar do modal de renomear taxonomia~~ **Resolvido em 2026-08-19** | `Modal` (`web/ui`) ganhou a prop `carregando`, que desabilita o confirmar e troca o texto por "Aguarde…"; `taxonomias/page.tsx` passa `carregando={renomeando}` e `carregando={excluindo}` nos dois modais |
-| O erro de `excluir()` aparece em toast, enquanto o de `renomear()` cai inline no campo | Inconsistência entre dois modais irmãos, levantada na revisão da Task 2 desta rodada. Anterior a ela, fora do brief — fechar exigiria decidir se `excluir()` ganha um lugar inline (não tem campo de texto para carregar o erro) ou se `renomear()` volta a usar toast |
+| O erro de `excluir()` aparece em toast, enquanto o de `renomear()` cai inline no campo | Inconsistência entre dois modais irmãos, levantada na revisão da Task 2 desta rodada. Anterior a ela, fora do brief — fechar exigiria decidir se `excluir()` ganha um lugar inline (não tem campo de texto para carregar o erro) ou se `renomear()` volta a usar toast. Esta rodada **fortaleceu** o argumento para fechá-la, não o contrário: `excluir()` ganhou a guarda de duplo clique (`carregando={excluindo}`) e, no caminho de erro, o modal continua aberto — `aExcluir` só zera no sucesso —, então a falha aparece como toast na borda da tela enquanto o operador tem o modal na frente, olhando para o lugar errado |
 
 ## Qualidade de erro no editor
 
@@ -109,6 +110,12 @@ isso —, mas o empacotamento tem três arestas:
 > ao wrapper do TipTap em `Editor.tsx:81` — a mesma classe do defeito que já
 > tinha sido corrigido no `SeletorTaxonomia`, agora alcançando o componente
 > que ficava de fora.
+>
+> A asserção do teste (`e2e/validacao.spec.ts:205`) prova **"a cor mudou"**
+> (`not.toHaveCSS("border-top-color", antes)`), não "a cor ficou vermelha" —
+> troca consciente para eliminar uma corrida com `transition-colors` (ler
+> `getComputedStyle` cedo demais pegaria o quadro inicial da transição, não o
+> destino). Não deve ser lembrada como garantia mais forte do que é.
 >
 > - ~~O campo Enunciado exibe a mensagem de erro pelo `Campo`, mas **não**
 >   recebe borda vermelha: `CONTROLE_INVALIDO` se aplica a input e select, e o
@@ -243,7 +250,8 @@ Levantadas na revisão desta rodada e deixadas de fora de propósito — nenhuma
   uma falha de rede fica na tela enquanto a pessoa reescreve tudo.
 - Com "Nova senha" vazia e "Confirme" preenchida, aparece "A confirmação não
   confere." quando o problema real é o campo de cima estar vazio.
-- O clique no backdrop descarta três senhas digitadas sem confirmação.
+- O clique no backdrop descarta três senhas digitadas sem confirmação — e o
+  Escape faz o mesmo (`Modal.tsx:55-57`), pelo mesmo caminho de cancelamento.
 - O tip de divergência entra pelo `Campo`, que renderiza `role="alert"` —
   alerta assertivo para um aviso de conveniência.
 - O `onChange` de "Nova senha" limpa `erros.nova` incondicionalmente,

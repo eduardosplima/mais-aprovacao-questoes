@@ -88,7 +88,8 @@ pela primeira vez. Não bloqueia nada e não exige decisão — só a data.
 
 ## Fechado em 2026-08-18: WebKit na suíte e2e
 
-A suíte roda em **chromium e WebKit**, 54 testes em cada, verde nos dois. O
+A suíte roda em **chromium e WebKit**, 76 testes em cada (152 nos dois
+navegadores), verde nos dois. O
 catálogo de 35 falhas que este documento carregava está obsoleto — e estava
 errado em dois pontos, que só apareceram quando a medição foi refeita.
 
