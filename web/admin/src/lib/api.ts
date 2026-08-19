@@ -17,19 +17,45 @@ export class ApiError extends Error {
   }
 }
 
+const CHAVE_RECARGA = "recarga-access";
+
+/**
+ * Sessão do Access expirada devolve 302 para o IdP, e um fetch cross-origin
+ * morre sem status — o painel só vê "failed to fetch" e pareceria fora do ar.
+ * Recarregar transforma o caso numa navegação de topo, que o Access
+ * redireciona de verdade.
+ *
+ * O carimbo evita laço quando quem caiu é o Worker: no máximo uma recarga por
+ * minuto, e a falha seguinte vira mensagem na tela.
+ */
+function talvezRecarregar(): void {
+  if (typeof window === "undefined") return;
+  const agora = Date.now();
+  const ultima = Number(sessionStorage.getItem(CHAVE_RECARGA) ?? 0);
+  if (agora - ultima < 60_000) return;
+  sessionStorage.setItem(CHAVE_RECARGA, String(agora));
+  window.location.reload();
+}
+
 async function chamar<T>(caminho: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(caminho, {
-    ...init,
-    credentials: "same-origin",
-    headers: {
-      ...(init?.body instanceof FormData
-        ? {}
-        : init?.body
-          ? { "content-type": "application/json" }
-          : {}),
-      ...init?.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(caminho, {
+      ...init,
+      credentials: "same-origin",
+      headers: {
+        ...(init?.body instanceof FormData
+          ? {}
+          : init?.body
+            ? { "content-type": "application/json" }
+            : {}),
+        ...init?.headers,
+      },
+    });
+  } catch (falha) {
+    talvezRecarregar();
+    throw falha;
+  }
 
   if (!res.ok) {
     const corpo = (await res.json().catch(() => null)) as {
@@ -48,12 +74,10 @@ export type TipoQuestao = "multiple_choice" | "true_false";
 export type SituacaoQuestao = "draft" | "published";
 export type TipoTermo = "subject" | "banca" | "cargo" | "level";
 
-export interface Usuario {
-  id: string;
+export interface ContextoAdmin {
   email: string;
-  name: string | null;
-  role: string;
-  tier: string;
+  ehAdmin: boolean;
+  temSenha: boolean;
 }
 
 export interface Termo {
@@ -133,13 +157,19 @@ function queryDe(filtros: FiltrosQuestao): string {
 
 export const api = {
   // ---- sessão ----
-  me: () => chamar<Usuario>("/auth/me"),
-  entrar: (email: string, senha: string, turnstileToken?: string) =>
-    chamar<{ ok: true }>("/auth/login", {
+  contexto: () => chamar<ContextoAdmin>("/admin/auth/contexto"),
+  me: () => chamar<{ email: string }>("/admin/auth/me"),
+  entrar: (senha: string) =>
+    chamar<{ ok: true }>("/admin/auth/login", {
       method: "POST",
-      body: json({ email, password: senha, turnstileToken }),
+      body: json({ senha }),
     }),
-  sair: () => chamar<{ ok: true }>("/auth/logout", { method: "POST" }),
+  sair: () => chamar<{ ok: true }>("/admin/auth/logout", { method: "POST" }),
+  trocarSenha: (senhaAtual: string, nova: string) =>
+    chamar<{ ok: true }>("/admin/auth/senha", {
+      method: "POST",
+      body: json({ senhaAtual, nova }),
+    }),
 
   // ---- taxonomias ----
   termos: (kind: TipoTermo) =>

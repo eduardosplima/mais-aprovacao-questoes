@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { EMAIL, SENHA } from "./credenciais.mjs";
+import { SENHA } from "./credenciais.mjs";
 
 /**
  * Entra no painel do jeito que o operador entra. Um lugar só, porque seis
@@ -13,26 +13,28 @@ import { EMAIL, SENHA } from "./credenciais.mjs";
 export async function entrar(page: Page): Promise<void> {
   await page.goto("/login");
   await aguardarFormularioVivo(page);
-  await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Senha").fill(SENHA);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL("/");
+  // A troca de URL é só a metade: o `router.replace` do login ainda está
+  // buscando e montando a árvore de "/" quando a asserção acima já passou —
+  // Layout dispara `/admin/auth/me`, a própria página dispara
+  // `/admin/questions`, tudo em voo. No WebKit, um `page.goto` disparado
+  // nesse meio-tempo colide com esse tráfego e é visto como uma segunda
+  // navegação concorrente, morrendo com "interrompida por outra navegação"
+  // — falha que é do teste seguinte, não deste login. Esperar a rede
+  // sossegar fecha essa janela antes de devolver o controle para quem
+  // chamou.
+  await page.waitForLoadState("networkidle");
 }
 
 /**
  * Espera o formulário estar de fato interativo antes de preencher.
  *
- * Sem isto o teste fica intermitente, e falha de um jeito que não parece o que
- * é: preencher antes de o React hidratar faz a hidratação restaurar o input
- * controlado para "" — só o primeiro campo, porque o segundo já é preenchido
- * depois. O `required` do email vazio então faz a validação nativa cancelar o
- * submit **em silêncio**: nenhuma requisição sai, nenhuma mensagem aparece, e
- * o teste só acusa que continuou em /login.
- *
- * O botão habilitado é o sinal certo porque ele depende das duas coisas: só
- * liga por estado do React (logo, hidratado) e só quando o Turnstile devolve
- * o token (login/page.tsx, `disabled={!token}`). O prazo é maior que o padrão
- * de 5 s porque o token vem pela rede, da Cloudflare.
+ * Preencher antes de o React hidratar faz a hidratação restaurar o input
+ * controlado para "". O botão habilitado é o sinal certo porque ele só existe
+ * depois que `/admin/auth/contexto` respondeu — o que implica React vivo e
+ * estado carregado. O prazo é generoso porque a resposta vem do Worker.
  */
 export async function aguardarFormularioVivo(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Entrar" })).toBeEnabled({

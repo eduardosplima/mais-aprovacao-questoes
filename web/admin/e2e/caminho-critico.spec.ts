@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { EMAIL, SENHA } from "./credenciais.mjs";
+import { SENHA } from "./credenciais.mjs";
 import { aguardarFormularioVivo, entrar } from "./entrar";
 import { semear } from "./seed.mjs";
 
@@ -9,7 +9,6 @@ test("login → cadastrar → publicar → aparece na lista", async ({ page }) =
   // 1. Login
   await page.goto("/login");
   await aguardarFormularioVivo(page);
-  await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Senha").fill(SENHA);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL("/");

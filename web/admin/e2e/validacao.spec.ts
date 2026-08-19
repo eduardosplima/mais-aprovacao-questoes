@@ -132,6 +132,10 @@ test("corrigidos os campos, o resumo some", async ({ page }) => {
   await page.getByRole("tab", { name: "Assunto" }).click();
   await page.getByLabel("Nome", { exact: true }).fill("Português");
   await page.getByRole("button", { name: "Adicionar" }).click();
+  // Como em entrar(): sem isto, o WebKit ocasionalmente vê a navegação
+  // seguinte como concorrente com o assentamento da rota atual e falha com
+  // "interrompida por outra navegação".
+  await page.waitForLoadState("networkidle");
 
   await page.goto("/questoes/editar");
   await page.getByRole("button", { name: "Salvar rascunho" }).click();

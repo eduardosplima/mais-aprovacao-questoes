@@ -1,10 +1,14 @@
 /**
- * Cria (ou recria) o admin de desenvolvimento no D1 local, e limpa o acervo.
- * Exportada como `semear()` para que cada spec a chame no próprio
- * `test.beforeAll` — cada arquivo fica independente dos outros, sem depender
- * da ordem em que a suíte executa os arquivos (Task 9: sem isso, um spec que
- * persiste dado real, como o do caminho crítico, contamina o D1 compartilhado
- * para quem rodar depois).
+ * Cria (ou recria) a senha do admin de desenvolvimento no D1 local (tabela
+ * `admins`), e limpa o acervo. Exportada como `semear()` para que cada spec a
+ * chame no próprio `test.beforeAll` — cada arquivo fica independente dos
+ * outros, sem depender da ordem em que a suíte executa os arquivos (Task 9:
+ * sem isso, um spec que persiste dado real, como o do caminho crítico,
+ * contamina o D1 compartilhado para quem rodar depois).
+ *
+ * `EMAIL` precisa casar com o `ACCESS_DEV_EMAIL` e o `ADMIN_EMAILS` de
+ * `api/.dev.vars`: é aquele email que o Access "injeta" em desenvolvimento, e
+ * é ele que precisa estar na allowlist e ter senha aqui.
  *
  * Continua funcionando como script solto (`node e2e/seed.mjs` / `npm run
  * seed`), pro ambiente de desenvolvimento manual.
@@ -60,10 +64,10 @@ export async function semear() {
   d1("delete from explanations");
   d1("delete from questions");
   d1("delete from taxonomy_terms");
-  d1(`delete from users where email = '${EMAIL}'`);
+  d1(`delete from admins where email = '${EMAIL}'`);
   d1(
-    `insert into users (id, email, name, role, password_hash, created_at, updated_at)
-     values ('dev-admin', '${EMAIL}', 'Admin Dev', 'admin', '${hash}', ${agora}, ${agora})`,
+    `insert into admins (email, password_hash, created_at, updated_at)
+     values ('${EMAIL}', '${hash}', ${agora}, ${agora})`,
   );
 
   console.log(`admin de desenvolvimento pronto: ${EMAIL}`);

@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError, type Usuario } from "./api";
+import { api, ApiError } from "./api";
 
 /**
  * Guarda de rota do lado do cliente. Não é controle de acesso — o controle é
- * o `role=admin` lido do D1 pelo Worker (api/src/middleware/rbac.ts) e o
- * Cloudflare Access na borda. Isto aqui só evita mostrar uma tela vazia a
- * quem não tem sessão, e é por isso que pode viver no navegador sem risco.
+ * as cinco checagens de `requireSessaoAdmin`
+ * (api/src/middleware/adminSession.ts) e o Cloudflare Access na borda. Isto
+ * aqui só evita mostrar uma tela vazia a quem não tem sessão, e é por isso
+ * que pode viver no navegador sem risco.
  */
-export function useSessao(): { carregando: boolean; usuario: Usuario | null } {
-  const [usuario, setUsuario] = useState<Usuario | null>(null);
+export function useSessao(): {
+  carregando: boolean;
+  admin: { email: string } | null;
+} {
+  const [admin, setAdmin] = useState<{ email: string } | null>(null);
   const [carregando, setCarregando] = useState(true);
   const router = useRouter();
 
@@ -19,23 +23,21 @@ export function useSessao(): { carregando: boolean; usuario: Usuario | null } {
     let vivo = true;
     api
       .me()
-      .then((u) => {
+      .then((a) => {
         if (!vivo) return;
-        if (u.role !== "admin") {
-          router.replace("/login?motivo=forbidden");
-          return;
-        }
-        setUsuario(u);
+        setAdmin(a);
       })
       .catch((erro) => {
         if (!vivo) return;
+        // Sem ?motivo=: a tela de login descobre sozinha o que dizer, pelo
+        // /admin/auth/contexto.
         if (erro instanceof ApiError && (erro.status === 401 || erro.status === 403)) {
           router.replace("/login");
           return;
         }
         // Falha de rede não desloga: manter o usuário na tela e deixar a
         // próxima ação mostrar o erro é melhor que expulsar por um blip.
-        setUsuario(null);
+        setAdmin(null);
       })
       .finally(() => {
         if (vivo) setCarregando(false);
@@ -45,5 +47,5 @@ export function useSessao(): { carregando: boolean; usuario: Usuario | null } {
     };
   }, [router]);
 
-  return { carregando, usuario };
+  return { carregando, admin };
 }

@@ -1,67 +1,41 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import Script from "next/script";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Botao, Campo, Card, CONTROLE } from "@mais/ui";
-import { api, ApiError } from "@/lib/api";
+import { api, type ContextoAdmin } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
-const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
-
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        el: HTMLElement,
-        opts: {
-          sitekey: string;
-          callback: (token: string) => void;
-          theme?: "light" | "dark" | "auto";
-        },
-      ) => string;
-    };
-  }
-}
-
-function Formulario() {
-  const parametros = useSearchParams();
-  const [email, setEmail] = useState("");
+/**
+ * Três estados, decididos pelo servidor. Não há campo de email: a identidade
+ * vem do token do Access e o Worker a lê de lá, então oferecer onde digitar
+ * outro seria oferecer um controle que não controla nada.
+ *
+ * Sem Turnstile, ao contrário do login do aluno: esta tela só é alcançável
+ * atrás do Access, que exige login no IdP com MFA — não há bot anônimo a
+ * barrar (spec §6).
+ */
+export default function PaginaLogin() {
+  const [contexto, setContexto] = useState<ContextoAdmin | null>(null);
   const [senha, setSenha] = useState("");
-  // useSessao manda pra cá com ?motivo=forbidden quando a sessão é válida mas
-  // a conta não é admin — sem isto a pessoa cai num formulário limpo, entra
-  // de novo com a mesma conta e é expulsa outra vez, sem entender por quê.
-  const [erro, setErro] = useState<string | null>(() =>
-    parametros.get("motivo") === "forbidden"
-      ? mensagemDe(new ApiError(403, "forbidden"))
-      : null,
-  );
+  const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
-  const [token, setToken] = useState("");
-  const widget = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // O widget é montado à mão porque o script do Turnstile é carregado de
-  // forma assíncrona pelo <Script>: o auto-render pode correr antes do React
-  // ter posto a div no DOM.
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (window.turnstile && widget.current && !widget.current.dataset.pronto) {
-        widget.current.dataset.pronto = "1";
-        window.turnstile.render(widget.current, {
-          sitekey: SITE_KEY,
-          callback: setToken,
-          // O padrão do Turnstile é `auto`, que segue o prefers-color-scheme
-          // do sistema. O painel é claro e não tem tema escuro, então em quem
-          // usa o macOS no escuro o widget aparecia escuro dentro de um card
-          // branco. Fixar em `light` é o que casa com o resto da tela.
-          theme: "light",
-        });
-        clearInterval(timer);
-      }
-    }, 100);
-    return () => clearInterval(timer);
+    let vivo = true;
+    api
+      .contexto()
+      .then((c) => {
+        if (vivo) setContexto(c);
+      })
+      .catch((falha) => {
+        if (vivo) setErro(mensagemDe(falha));
+      });
+    return () => {
+      vivo = false;
+    };
   }, []);
 
   async function enviar(evento: React.FormEvent) {
@@ -69,7 +43,7 @@ function Formulario() {
     setErro(null);
     setEnviando(true);
     try {
-      await api.entrar(email, senha, token);
+      await api.entrar(senha);
       router.replace("/");
     } catch (falha) {
       setErro(mensagemDe(falha));
@@ -77,6 +51,8 @@ function Formulario() {
       setEnviando(false);
     }
   }
+
+  const pronto = contexto?.ehAdmin && contexto.temSenha;
 
   return (
     <main className="min-h-dvh flex items-center justify-center p-4">
@@ -93,75 +69,59 @@ function Formulario() {
           Painel administrativo
         </h1>
 
-        <form onSubmit={enviar} className="flex flex-col gap-4">
-          <Campo rotulo="Email" htmlFor="email">
-            <input
-              id="email"
-              type="email"
-              autoComplete="username"
-              required
-              className={CONTROLE}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Campo>
-          <Campo rotulo="Senha" htmlFor="senha">
-            <input
-              id="senha"
-              type="password"
-              autoComplete="current-password"
-              required
-              className={CONTROLE}
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-            />
-          </Campo>
+        {contexto && (
+          <p className="text-[13.5px] text-txt-2 text-center">
+            Você entrou pelo Access como <strong>{contexto.email}</strong>.
+          </p>
+        )}
 
-          {/* O Turnstile injeta um widget de largura fixa (300px no tamanho
-              padrão), e este contêiner é esticado pelo flex do formulário até
-              a largura do Card. Sem centrar, o widget é o único elemento da
-              coluna que nem preenche a linha nem fica no meio dela — encosta
-              à esquerda e deixa uma folga morta à direita. */}
-          <div ref={widget} className="flex justify-center" />
+        {contexto && !contexto.ehAdmin && (
+          <p role="alert" className="text-[13.5px] font-semibold text-erro">
+            Este email não é administrador.
+          </p>
+        )}
 
-          {erro && (
-            <p role="alert" className="text-[13.5px] font-semibold text-erro">
-              {erro}
-            </p>
-          )}
+        {contexto?.ehAdmin && !contexto.temSenha && (
+          <p role="alert" className="text-[13.5px] font-semibold text-erro">
+            Este email ainda não tem senha definida. Entre em contato com o time
+            de desenvolvimento.
+          </p>
+        )}
 
-          {/* Desabilitado até o Turnstile responder: o token chega de forma
-              assíncrona (a Cloudflare resolve o desafio em segundo plano) e
-              submeter antes disso manda turnstileToken vazio, que o Worker
-              sempre rejeita com captcha_failed. O aviso abaixo dá causa
-              visível ao botão morto — sem ele, alguém com o Turnstile
-              bloqueado por rede ou bloqueador de anúncios não teria como
-              saber por que "Entrar" não reage. */}
-          <Botao type="submit" carregando={enviando} disabled={!token}>
-            Entrar
-          </Botao>
-          {!token && (
-            <p className="text-[12.5px] text-txt-3">
-              Aguardando a verificação de segurança…
-            </p>
-          )}
-        </form>
+        {pronto && (
+          <form onSubmit={enviar} className="flex flex-col gap-4">
+            <Campo rotulo="Senha" htmlFor="senha">
+              <input
+                id="senha"
+                type="password"
+                autoComplete="current-password"
+                required
+                className={CONTROLE}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+              />
+            </Campo>
+
+            {erro && (
+              <p role="alert" className="text-[13.5px] font-semibold text-erro">
+                {erro}
+              </p>
+            )}
+
+            <Botao type="submit" carregando={enviando}>
+              Entrar
+            </Botao>
+          </form>
+        )}
+
+        {/* Sair do painel não sai do Access — são sessões diferentes. */}
+        <a
+          href="/cdn-cgi/access/logout"
+          className="text-[12.5px] text-txt-3 text-center"
+        >
+          Encerrar também a sessão do Access
+        </a>
       </Card>
     </main>
-  );
-}
-
-export default function PaginaLogin() {
-  // useSearchParams exige Suspense no App Router.
-  return (
-    <>
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-        strategy="afterInteractive"
-      />
-      <Suspense fallback={<main className="min-h-dvh" />}>
-        <Formulario />
-      </Suspense>
-    </>
   );
 }

@@ -13,14 +13,14 @@ const NAV = [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { carregando, usuario } = useSessao();
+  const { carregando, admin } = useSessao();
   const caminho = usePathname();
   const router = useRouter();
 
   if (carregando) {
     return <main className="p-8 text-txt-2">Carregando…</main>;
   }
-  if (!usuario) return null; // useSessao já redirecionou
+  if (!admin) return null; // useSessao já redirecionou
 
   async function sair() {
     await api.sair().catch(() => undefined);
@@ -65,8 +65,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
           <div className="order-2 md:order-none ml-auto flex items-center gap-3">
             <span className="hidden sm:inline text-[15px] font-semibold">
-              {usuario.name ?? usuario.email}
+              {admin.email}
             </span>
+            <Link
+              href="/senha"
+              className="hidden sm:inline text-[15px] font-semibold text-txt-2"
+            >
+              Trocar senha
+            </Link>
             <Botao variante="secundario" onClick={sair}>
               Sair
             </Botao>

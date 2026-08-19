@@ -22,8 +22,10 @@ const MENSAGEM: Record<string, string> = {
   too_large: "Imagem acima de 2 MB. Reduza antes de enviar.",
   unsupported_type: "Formato não suportado. Use PNG, JPEG, WebP ou GIF.",
   // sessão
-  invalid_credentials: "Email ou senha inválidos.",
-  captcha_failed: "Não conseguimos confirmar que você não é um robô. Recarregue a página.",
+  // Não existe mais campo de email: o que pode estar errado é a senha.
+  invalid_credentials: "Senha inválida.",
+  weak_password: "A senha precisa ter pelo menos 12 caracteres.",
+  senha_atual_incorreta: "Senha atual incorreta.",
   unauthorized: "Sua sessão expirou. Entre novamente.",
   forbidden: "Sua conta não tem permissão de administrador.",
 };
