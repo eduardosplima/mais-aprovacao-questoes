@@ -193,3 +193,32 @@ test("os botões do modal de senha têm ícone junto do texto", async ({
     await salvar.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
   ).toBe("svg");
 });
+
+// O tip ao vivo é aviso de conveniência, não alerta: `role="alert"` é
+// assertivo e interrompe o leitor de tela. E o gatilho é ruim — `divergem`
+// compara as strings inteiras, então quem digita a confirmação CORRETAMENTE
+// dispara a divergência no primeiro caractere e continua "divergente" até a
+// última letra. Interromper para afirmar algo que é falso a maior parte do
+// tempo é o pior par possível.
+test("o tip ao vivo é polido; o erro de envio continua assertivo", async ({
+  page,
+}) => {
+  const modal = await abrirTrocarSenha(page);
+
+  await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida");
+  await modal.getByLabel("Confirme a nova senha").fill("nova-senha-compri");
+
+  const tip = modal.getByText("A confirmação não confere.");
+  await expect(tip).toBeVisible();
+  await expect(tip).toHaveAttribute("role", "status");
+
+  // E continua vermelho: o que muda é a etiqueta ARIA, não a aparência.
+  await expect(tip).toHaveCSS("color", "rgb(229, 72, 77)");
+
+  // Depois do envio, a mesma frase é erro de verdade e volta a ser alerta.
+  await modal.getByLabel("Senha atual").fill(SENHA);
+  await modal.getByRole("button", { name: "Salvar" }).click();
+  await expect(
+    modal.getByRole("alert").filter({ hasText: "A confirmação não confere." }),
+  ).toBeVisible();
+});

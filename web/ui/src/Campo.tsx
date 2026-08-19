@@ -9,12 +9,22 @@ import type { ReactNode } from "react";
 export function Campo({
   rotulo,
   erro,
+  aviso,
   dica,
   htmlFor,
   children,
 }: {
   rotulo: string;
   erro?: string;
+  /**
+   * Mesma aparência do `erro` e etiqueta ARIA diferente: `role="status"` é
+   * polido — entra na fila do leitor de tela em vez de interromper o que
+   * está sendo falado.
+   *
+   * Para o aviso que aparece enquanto a pessoa digita, e que ela não pediu.
+   * Um erro que responde a uma ação disparada continua sendo `erro`.
+   */
+  aviso?: string;
   dica?: string;
   htmlFor?: string;
   children: ReactNode;
@@ -25,7 +35,14 @@ export function Campo({
         {rotulo}
       </label>
       {children}
-      {dica && !erro && <p className="text-[12.5px] text-txt-3">{dica}</p>}
+      {dica && !erro && !aviso && (
+        <p className="text-[12.5px] text-txt-3">{dica}</p>
+      )}
+      {aviso && !erro && (
+        <p role="status" className="text-[12.5px] font-semibold text-erro">
+          {aviso}
+        </p>
+      )}
       {erro && (
         <p role="alert" className="text-[12.5px] font-semibold text-erro">
           {erro}

@@ -102,7 +102,14 @@ export function ModalTrocarSenha({
     }
   }
 
-  const erroConfirmacao = erros.confirmacao ?? (divergem ? "A confirmação não confere." : undefined);
+  // O erro de envio e o tip ao vivo têm a mesma frase e papéis diferentes: o
+  // primeiro responde a uma ação e interrompe; o segundo aparece sozinho e
+  // espera a vez.
+  const avisoDivergencia =
+    !erros.confirmacao && divergem ? "A confirmação não confere." : undefined;
+  // O campo está de fato inválido nos dois casos — o aria-invalid e a borda
+  // vermelha não distinguem, só a etiqueta do texto distingue.
+  const confirmacaoInvalida = Boolean(erros.confirmacao) || divergem;
 
   return (
     <Modal
@@ -161,15 +168,16 @@ export function ModalTrocarSenha({
         <Campo
           rotulo="Confirme a nova senha"
           htmlFor="confirmacao"
-          erro={erroConfirmacao}
+          erro={erros.confirmacao}
+          aviso={avisoDivergencia}
         >
           <input
             id="confirmacao"
             type="password"
             autoComplete="new-password"
             aria-required
-            aria-invalid={erroConfirmacao ? true : undefined}
-            className={`${CONTROLE} ${erroConfirmacao ? CONTROLE_INVALIDO : ""}`}
+            aria-invalid={confirmacaoInvalida ? true : undefined}
+            className={`${CONTROLE} ${confirmacaoInvalida ? CONTROLE_INVALIDO : ""}`}
             value={confirmacao}
             onChange={(e) => {
               setConfirmacao(e.target.value);
