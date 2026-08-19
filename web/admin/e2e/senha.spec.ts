@@ -400,3 +400,36 @@ test("depois do weak_password, um novo erro local volta a sumir ao digitar", asy
   await modal.getByLabel("Nova senha", { exact: true }).fill("q");
   await expect(erroLocal).toHaveCount(0);
 });
+
+// Reabrir precisa mostrar os campos limpos. É comportamento que fechar() já
+// tem, e que ninguém provava — se ele se perder num refactor, o vazamento é
+// de senha digitada entre duas aberturas.
+test("reabrir o modal mostra os três campos limpos", async ({ page }) => {
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill("alguma-coisa-comprida");
+  await modal.getByLabel("Nova senha", { exact: true }).fill("outra-coisa-comprida");
+  await modal.getByLabel("Confirme a nova senha").fill("mais-uma-coisa-comprida");
+  await modal.getByRole("button", { name: "Cancelar" }).click();
+  await expect(modal).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Trocar senha" }).click();
+  const reaberto = page.getByRole("dialog");
+  await expect(reaberto.getByLabel("Senha atual")).toHaveValue("");
+  await expect(reaberto.getByLabel("Nova senha", { exact: true })).toHaveValue("");
+  await expect(reaberto.getByLabel("Confirme a nova senha")).toHaveValue("");
+});
+
+// O `required` saiu para tirar o balão nativo do navegador; o aria-required
+// ficou porque a informação para leitor de tela é legítima e não tem nada a
+// ver com a aparência. Sem teste, a segunda metade se perde na primeira vez
+// que alguém "limpar" os atributos.
+test("os três campos declaram aria-required", async ({ page }) => {
+  const modal = await abrirTrocarSenha(page);
+
+  for (const rotulo of ["Senha atual", "Confirme a nova senha"]) {
+    await expect(modal.getByLabel(rotulo)).toHaveAttribute("aria-required", "true");
+  }
+  await expect(
+    modal.getByLabel("Nova senha", { exact: true }),
+  ).toHaveAttribute("aria-required", "true");
+});
