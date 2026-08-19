@@ -89,6 +89,24 @@ test("o erro de confirmação também some ao corrigir pela Nova senha, não só
   await expect(modal.getByText("A confirmação não confere.")).toHaveCount(0);
 });
 
+// Espelho do I1: erros.confirmacao tem duas causas (campo vazio ou
+// divergência). Editar "Nova senha" resolve a segunda, mas não a primeira —
+// "Confirme a nova senha" continua vazio, então a mensagem de campo
+// obrigatório não pode sumir por causa de uma edição em outro campo.
+test("a mensagem de confirmação vazia não some ao editar a Nova senha, só ao preencher a confirmação", async ({
+  page,
+}) => {
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill(SENHA);
+  await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+
+  await expect(modal.getByText("Confirme a nova senha.")).toBeVisible();
+
+  await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida2");
+  await expect(modal.getByText("Confirme a nova senha.")).toBeVisible();
+});
+
 // 5b: o tip é ao vivo. Sem ele, a pessoa só descobre a divergência depois de
 // mandar — e como os dois campos são type=password, ela não tem como conferir
 // a olho o que digitou.

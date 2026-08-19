@@ -134,12 +134,18 @@ export function ModalTrocarSenha({
             value={nova}
             onChange={(e) => {
               setNova(e.target.value);
-              // Corrigir a nova senha também pode sanar a divergência que
-              // gerou o erro de confirmação — sem limpar os dois, a mensagem
-              // ficava presa no campo "Confirme a nova senha" mesmo depois
-              // de ele já bater com o valor novo.
-              if (erros.nova || erros.confirmacao) {
-                setErros((x) => ({ ...x, nova: undefined, confirmacao: undefined }));
+              if (erros.nova) setErros((x) => ({ ...x, nova: undefined }));
+              // erros.confirmacao tem duas causas possíveis (mais abaixo, na
+              // validação local): campo vazio ou divergência. Só a segunda é
+              // resolvida por aqui — se "Confirme a nova senha" continua
+              // vazio, editar a Nova senha não corrigiu nada, e a mensagem
+              // "Confirme a nova senha." precisa ficar. Quando há conteúdo,
+              // o erro só pode ser de divergência, e limpar aqui é o que faz
+              // o Enter (I1) funcionar: sem isso a mensagem ficava presa num
+              // campo que a pessoa acabou de corrigir pelo lado da Nova
+              // senha.
+              if (erros.confirmacao && confirmacao !== "") {
+                setErros((x) => ({ ...x, confirmacao: undefined }));
               }
             }}
           />
