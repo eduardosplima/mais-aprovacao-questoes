@@ -153,3 +153,27 @@ códigos, mas a API emite pelo menos 7 outros (`invalid_credentials`,
   parâmetro de busca. Exigiria rota nova na API.
 - **Modo escuro**: nenhum critério de pronto o pede; os tokens em custom
   properties deixam a porta aberta.
+
+## Sobras da separação do login do admin — 2026-08-19
+
+Três itens que a revisão final do branch `login-admin` levantou e que foram
+parqueados de propósito, para não abrir uma segunda onda de correção. Nenhum
+é defeito de comportamento; os três são baratos.
+
+- **Dois casos e2e afirmam com `toContainText` onde `toBeVisible` seria mais
+  estrito** — `web/admin/e2e/login.spec.ts`, nos casos que interceptam
+  `/admin/auth/contexto` (o email fora da allowlist e o contexto que falha).
+  `toContainText` passa num elemento presente porém oculto. Os dois estão
+  renderizados hoje, então é rigor de asserção, não falso verde.
+- **Três referências a "cinco checagens" sobreviveram, e agora são seis** —
+  `docs/superpowers/specs/2026-08-18-login-admin-design.md:196` e `:429`, e o
+  comentário de `web/admin/src/lib/sessao.tsx:9`. A sexta é a que compara o
+  `iat` do token com o `updated_at` da credencial. Quem contar cinco e
+  procurar a sexta no código vai achá-la — o custo é a confusão, não um erro.
+- **O CLI carimba `updated_at` com o relógio da máquina de quem roda, e o
+  `iat` vem do relógio do Worker** — `api/scripts/senha-admin.mjs`. Se o
+  laptop estiver adiantado em N segundos, por N segundos depois do
+  `npm run admin:senha` uma sessão recém-criada falha a sexta checagem e
+  devolve 401, bem no passo do runbook que manda rodar o CLI e depois entrar.
+  Com NTP normal isso é sub-segundo. A correção é uma linha de
+  troubleshooting no runbook, não código.
