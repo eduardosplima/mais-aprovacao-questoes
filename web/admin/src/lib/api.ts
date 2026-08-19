@@ -17,45 +17,19 @@ export class ApiError extends Error {
   }
 }
 
-const CHAVE_RECARGA = "recarga-access";
-
-/**
- * Sessão do Access expirada devolve 302 para o IdP, e um fetch cross-origin
- * morre sem status — o painel só vê "failed to fetch" e pareceria fora do ar.
- * Recarregar transforma o caso numa navegação de topo, que o Access
- * redireciona de verdade.
- *
- * O carimbo evita laço quando quem caiu é o Worker: no máximo uma recarga por
- * minuto, e a falha seguinte vira mensagem na tela.
- */
-function talvezRecarregar(): void {
-  if (typeof window === "undefined") return;
-  const agora = Date.now();
-  const ultima = Number(sessionStorage.getItem(CHAVE_RECARGA) ?? 0);
-  if (agora - ultima < 60_000) return;
-  sessionStorage.setItem(CHAVE_RECARGA, String(agora));
-  window.location.reload();
-}
-
 async function chamar<T>(caminho: string, init?: RequestInit): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(caminho, {
-      ...init,
-      credentials: "same-origin",
-      headers: {
-        ...(init?.body instanceof FormData
-          ? {}
-          : init?.body
-            ? { "content-type": "application/json" }
-            : {}),
-        ...init?.headers,
-      },
-    });
-  } catch (falha) {
-    talvezRecarregar();
-    throw falha;
-  }
+  const res = await fetch(caminho, {
+    ...init,
+    credentials: "same-origin",
+    headers: {
+      ...(init?.body instanceof FormData
+        ? {}
+        : init?.body
+          ? { "content-type": "application/json" }
+          : {}),
+      ...init?.headers,
+    },
+  });
 
   if (!res.ok) {
     const corpo = (await res.json().catch(() => null)) as {
