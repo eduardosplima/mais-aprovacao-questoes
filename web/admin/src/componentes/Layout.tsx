@@ -60,7 +60,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               src="/logo.png"
               alt="Mais Aprovação Questões"
               width={180}
-              height={68}
+              height={72}
               className="h-10 md:h-[68px] w-auto"
               priority
             />

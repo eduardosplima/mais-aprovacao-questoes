@@ -71,7 +71,7 @@ export default function PaginaLogin() {
           src="/logo.png"
           alt="Mais Aprovação Questões"
           width={200}
-          height={76}
+          height={80}
           className="h-14 w-auto self-center"
           priority
         />
