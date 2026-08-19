@@ -65,6 +65,12 @@ cd web && npm test            # Playwright (sobe os dois servidores sozinho)
 cd web && npm run audit       # OSV.dev contra a árvore instalada
 ```
 
+**Não rode esta suíte junto com a de `api/`.** O `wrangler dev` que o
+Playwright sobe abre o mesmo arquivo SQLite do D1 local
+(`api/.wrangler/state`) que o vitest usa, e a disputa derruba testes daqui de
+um jeito que não parece contenção — parece defeito do painel. Rode em
+sequência.
+
 A suíte roda em **chromium e WebKit** — o cliente trabalha em macOS, então o
 Safari é navegador de primeira classe aqui, não cobertura extra.
 
