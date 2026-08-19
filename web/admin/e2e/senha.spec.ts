@@ -173,3 +173,16 @@ test("Enter no campo envia, sem passar pelo botão", async ({ page }) => {
 
   await expect(page.getByText("Senha trocada.")).toBeVisible();
 });
+
+test("os botões do modal de senha têm ícone junto do texto", async ({
+  page,
+}) => {
+  const modal = await abrirTrocarSenha(page);
+
+  await expect(
+    modal.getByRole("button", { name: "Cancelar" }).locator("svg"),
+  ).toHaveCount(1);
+  await expect(
+    modal.getByRole("button", { name: "Salvar" }).locator("svg"),
+  ).toHaveCount(1);
+});

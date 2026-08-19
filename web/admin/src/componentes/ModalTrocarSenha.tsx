@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Campo, CONTROLE, CONTROLE_INVALIDO, Modal, useToast } from "@mais/ui";
+import {
+  Campo,
+  CONTROLE,
+  CONTROLE_INVALIDO,
+  IconeSalvar,
+  Modal,
+  useToast,
+} from "@mais/ui";
 import { api, ApiError } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
@@ -102,6 +109,7 @@ export function ModalTrocarSenha({
       aberto={aberto}
       titulo="Trocar senha"
       rotuloConfirmar="Salvar"
+      iconeConfirmar={<IconeSalvar />}
       carregando={enviando}
       idFormulario={ID_FORM}
       aoConfirmar={() => undefined}

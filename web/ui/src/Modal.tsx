@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { Botao } from "./Botao";
+import { IconeCancelar } from "./Icone";
 
 export function Modal({
   aberto,
@@ -11,6 +12,7 @@ export function Modal({
   aoCancelar,
   rotuloConfirmar = "Confirmar",
   perigo = false,
+  iconeConfirmar,
   carregando = false,
   idFormulario,
 }: {
@@ -21,6 +23,17 @@ export function Modal({
   aoCancelar: () => void;
   rotuloConfirmar?: string;
   perigo?: boolean;
+  /**
+   * Ícone do botão de confirmar. Vem do chamador porque `Excluir` e `Salvar`
+   * não são a mesma ação e não podem levar o mesmo ícone. O `Cancelar` não
+   * tem prop equivalente: cancelar é sempre a mesma coisa, e oferecer a
+   * escolha seria inventar uma decisão que não existe.
+   *
+   * Opcional, e não obrigatória, porque este pacote é consumido de fora: a
+   * regra 2 do `web/README.md` é a autoridade sobre ícone em botão, e o tipo
+   * não é o lugar de forçá-la.
+   */
+  iconeConfirmar?: ReactNode;
   /** Desabilita o confirmar e troca o texto por "Aguarde…" — a guarda de duplo clique. */
   carregando?: boolean;
   /**
@@ -81,6 +94,7 @@ export function Modal({
         {children && <div className="text-[14.5px] text-txt-2">{children}</div>}
         <div className="flex gap-3 justify-end">
           <Botao variante="secundario" onClick={aoCancelar}>
+            <IconeCancelar />
             Cancelar
           </Botao>
           <Botao
@@ -90,6 +104,7 @@ export function Modal({
             form={idFormulario}
             onClick={idFormulario ? undefined : aoConfirmar}
           >
+            {iconeConfirmar}
             {rotuloConfirmar}
           </Botao>
         </div>

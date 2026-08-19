@@ -306,6 +306,7 @@ export default function PaginaLista() {
         titulo="Excluir questão?"
         perigo
         rotuloConfirmar="Excluir"
+        iconeConfirmar={<IconeExcluir />}
         aoConfirmar={() => void excluir()}
         aoCancelar={() => setAExcluir(null)}
       >

@@ -137,6 +137,13 @@ test("depois de excluir o único item da última página, a lista recua para a p
 
   // Idem: o botão de ação existe duas vezes (linha desktop e mobile).
   await page.locator("table").getByRole("button", { name: "Excluir" }).click();
+  const dialogo = page.getByRole("dialog");
+  await expect(
+    dialogo.getByRole("button", { name: "Cancelar" }).locator("svg"),
+  ).toHaveCount(1);
+  await expect(
+    dialogo.getByRole("button", { name: "Excluir", exact: true }).locator("svg"),
+  ).toHaveCount(1);
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Excluir" })

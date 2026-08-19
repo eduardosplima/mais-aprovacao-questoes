@@ -15,6 +15,7 @@ import {
   IconeEditar,
   IconeExcluir,
   IconeNivel,
+  IconeSalvar,
   Modal,
   Tabela,
   useToast,
@@ -245,6 +246,7 @@ export default function PaginaTaxonomias() {
         aberto={aRenomear !== null}
         titulo="Renomear termo"
         rotuloConfirmar="Salvar"
+        iconeConfirmar={<IconeSalvar />}
         carregando={renomeando}
         aoConfirmar={() => void renomear()}
         aoCancelar={() => {
@@ -276,6 +278,7 @@ export default function PaginaTaxonomias() {
         titulo="Excluir termo?"
         perigo
         rotuloConfirmar="Excluir"
+        iconeConfirmar={<IconeExcluir />}
         carregando={excluindo}
         aoConfirmar={() => void excluir()}
         aoCancelar={() => setAExcluir(null)}

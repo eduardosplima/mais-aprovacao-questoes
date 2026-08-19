@@ -186,3 +186,41 @@ test("a paginação leva a seta do lado para onde aponta", async ({ page }) => {
     ),
   ).toBe("svg");
 });
+
+test("os botões dos diálogos seguem o padrão de ícone junto do texto", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+  await page.getByLabel("Nome", { exact: true }).fill("Vunesp");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Vunesp")).toBeVisible();
+
+  // O diálogo de renomear: confirmar é "Salvar", e leva disquete.
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Vunesp" })
+    .click();
+  const renomear = page.getByRole("dialog");
+  await expect(
+    renomear.getByRole("button", { name: "Cancelar" }).locator("svg"),
+  ).toHaveCount(1);
+  await expect(
+    renomear.getByRole("button", { name: "Salvar" }).locator("svg"),
+  ).toHaveCount(1);
+  await renomear.getByRole("button", { name: "Cancelar" }).click();
+
+  // O de excluir: confirmar é "Excluir", e leva lixeira — não o mesmo ícone
+  // do salvar, que é justamente por isso que o ícone vem do chamador.
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Excluir Vunesp" })
+    .click();
+  const excluir = page.getByRole("dialog");
+  await expect(
+    excluir.getByRole("button", { name: "Cancelar" }).locator("svg"),
+  ).toHaveCount(1);
+  await expect(
+    excluir.getByRole("button", { name: "Excluir", exact: true }).locator("svg"),
+  ).toHaveCount(1);
+});
