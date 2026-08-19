@@ -222,3 +222,48 @@ test("o tip ao vivo é polido; o erro de envio continua assertivo", async ({
     modal.getByRole("alert").filter({ hasText: "A confirmação não confere." }),
   ).toBeVisible();
 });
+
+// Cancelar com a requisição em voo: fechar() limpa o estado, mas o catch
+// escreve depois que ele rodou. As senhas somem e a mensagem de erro fica
+// guardada para a próxima abertura.
+test("cancelar com a requisição em voo não guarda o erro para a próxima abertura", async ({
+  page,
+}) => {
+  await page.route("**/admin/auth/senha", async (rota) => {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return rota.fulfill({ status: 400, json: { error: "senha_atual_incorreta" } });
+  });
+
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill("qualquer-coisa-comprida");
+  await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida");
+  await modal.getByLabel("Confirme a nova senha").fill("nova-senha-comprida");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+  await modal.getByRole("button", { name: "Cancelar" }).click();
+
+  // A resposta chega agora, com o modal já fechado.
+  await page.waitForTimeout(1200);
+
+  await page.getByRole("button", { name: "Trocar senha" }).click();
+  const reaberto = page.getByRole("dialog");
+  await expect(reaberto.getByText("Senha atual incorreta.")).toHaveCount(0);
+});
+
+// Falha de rede não tem campo culpado, então vira o erro do diálogo. Como os
+// erros de campo, ele precisa sair quando a pessoa começa a corrigir — senão
+// fica na tela enquanto ela reescreve tudo.
+test("o erro geral some ao voltar a digitar", async ({ page }) => {
+  await page.route("**/admin/auth/senha", (rota) => rota.abort());
+
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill(SENHA);
+  await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida");
+  await modal.getByLabel("Confirme a nova senha").fill("nova-senha-comprida");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+
+  const geral = modal.getByRole("alert").filter({ hasText: /não foi possível falar/i });
+  await expect(geral).toBeVisible();
+
+  await modal.getByLabel("Senha atual").fill(`${SENHA}x`);
+  await expect(geral).toHaveCount(0);
+});

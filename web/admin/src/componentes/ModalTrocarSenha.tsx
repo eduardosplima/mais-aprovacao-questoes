@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Campo,
   CONTROLE,
@@ -47,6 +47,11 @@ export function ModalTrocarSenha({
   const [erros, setErros] = useState<Erros>({});
   const [enviando, setEnviando] = useState(false);
   const avisar = useToast();
+  // Cancelar não cancela a requisição que já saiu: o `catch` roda depois que
+  // fechar() limpou tudo e reescreve o erro por cima do estado limpo, que
+  // então aparece na próxima abertura. A marca faz a resposta tardia ser
+  // ignorada em vez de ressuscitar o modal fechado.
+  const descartada = useRef(false);
 
   // O tip ao vivo (spec §4): com os dois preenchidos e diferentes, a
   // divergência aparece enquanto se digita. Os dois campos são type=password,
@@ -56,10 +61,16 @@ export function ModalTrocarSenha({
     nova !== "" && confirmacao !== "" && nova !== confirmacao;
 
   function fechar() {
+    descartada.current = true;
     setAtual("");
     setNova("");
     setConfirmacao("");
     setErros({});
+    // fechar() acontece tanto pelo Cancelar quanto pelo sucesso do envio, e
+    // o finally de enviar() não mexe em enviando quando descartada.current
+    // está marcada — sem isto aqui, o botão ficava preso em "Aguarde…" na
+    // reabertura.
+    setEnviando(false);
     aoFechar();
   }
 
@@ -82,11 +93,13 @@ export function ModalTrocarSenha({
 
     setErros({});
     setEnviando(true);
+    descartada.current = false;
     try {
       await api.trocarSenha(atual, nova);
       avisar("Senha trocada.");
       fechar();
     } catch (falha) {
+      if (descartada.current) return;
       // O erro pertence ao campo que o causou — mesmo tratamento que o 409 de
       // taxonomia recebe. Cair tudo numa linha genérica obrigaria o operador
       // a adivinhar qual dos três campos está errado.
@@ -98,7 +111,7 @@ export function ModalTrocarSenha({
         setErros({ geral: mensagemDe(falha) });
       }
     } finally {
-      setEnviando(false);
+      if (!descartada.current) setEnviando(false);
     }
   }
 
@@ -111,6 +124,12 @@ export function ModalTrocarSenha({
   // vermelha não distinguem, só a etiqueta do texto distingue.
   const confirmacaoInvalida = Boolean(erros.confirmacao) || divergem;
 
+  // O erro geral não pertence a nenhum campo, então nenhum `onChange` o
+  // limpava — e ele ficava na tela enquanto a pessoa reescrevia tudo.
+  function limparGeral() {
+    setErros((x) => (x.geral ? { ...x, geral: undefined } : x));
+  }
+
   return (
     <Modal
       aberto={aberto}
@@ -121,6 +140,7 @@ export function ModalTrocarSenha({
       idFormulario={ID_FORM}
       aoConfirmar={() => undefined}
       aoCancelar={fechar}
+      erro={erros.geral}
     >
       <form id={ID_FORM} onSubmit={enviar} noValidate className="flex flex-col gap-4">
         <Campo rotulo="Senha atual" htmlFor="atual" erro={erros.atual}>
@@ -134,6 +154,7 @@ export function ModalTrocarSenha({
             value={atual}
             onChange={(e) => {
               setAtual(e.target.value);
+              limparGeral();
               if (erros.atual) setErros((x) => ({ ...x, atual: undefined }));
             }}
           />
@@ -149,6 +170,7 @@ export function ModalTrocarSenha({
             value={nova}
             onChange={(e) => {
               setNova(e.target.value);
+              limparGeral();
               if (erros.nova) setErros((x) => ({ ...x, nova: undefined }));
               // erros.confirmacao tem duas causas possíveis (mais abaixo, na
               // validação local): campo vazio ou divergência. Só a segunda é
@@ -181,17 +203,13 @@ export function ModalTrocarSenha({
             value={confirmacao}
             onChange={(e) => {
               setConfirmacao(e.target.value);
+              limparGeral();
               if (erros.confirmacao) {
                 setErros((x) => ({ ...x, confirmacao: undefined }));
               }
             }}
           />
         </Campo>
-        {erros.geral && (
-          <p role="alert" className="text-[13.5px] font-semibold text-erro">
-            {erros.geral}
-          </p>
-        )}
       </form>
     </Modal>
   );
