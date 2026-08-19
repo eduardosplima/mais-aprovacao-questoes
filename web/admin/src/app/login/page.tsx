@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Botao, Campo, Card, CONTROLE, CONTROLE_INVALIDO } from "@mais/ui";
+import {
+  Botao,
+  Campo,
+  Card,
+  CONTROLE,
+  CONTROLE_INVALIDO,
+  IconeEntrar,
+} from "@mais/ui";
 import { api, type ContextoAdmin } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
@@ -81,7 +88,7 @@ export default function PaginaLogin() {
 
         {contexto && (
           <p className="text-[13.5px] text-txt-2 text-center">
-            Você entrou pelo Access como <strong>{contexto.email}</strong>.
+            Você entrou pelo Cloudflare Access como <strong>{contexto.email}</strong>.
           </p>
         )}
 
@@ -129,6 +136,7 @@ export default function PaginaLogin() {
             </Campo>
 
             <Botao type="submit" carregando={enviando}>
+              <IconeEntrar />
               Entrar
             </Botao>
           </form>

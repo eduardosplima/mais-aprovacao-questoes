@@ -31,6 +31,7 @@ export {
   IconeSalvar,
   IconeCancelar,
   IconeChave,
+  IconeEntrar,
   IconeSair,
   type ComponenteIcone,
 } from "./Icone";

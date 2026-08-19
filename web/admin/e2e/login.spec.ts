@@ -145,3 +145,31 @@ test("o rodapé nomeia o Cloudflare Access por extenso", async ({ page }) => {
     page.getByRole("link", { name: "Encerrar sessão do Cloudflare Access" }),
   ).toBeVisible();
 });
+
+test("o botão Entrar tem ícone junto do texto", async ({ page }) => {
+  await page.goto("/login");
+  await aguardarFormularioVivo(page);
+
+  const entrar = page.getByRole("button", { name: "Entrar" });
+  await expect(entrar.locator("svg")).toHaveCount(1);
+  // Ícone é rótulo, não vetor: vem antes do texto — childNodes[0] prova a
+  // ordem, e não só a presença (raciocínio completo no teste da paginação
+  // em visual.spec.ts).
+  expect(
+    await entrar.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+});
+
+// O rodapé já chamava o produto pelo nome completo, e o corpo da mesma tela
+// dizia só "Access" — duas formas do mesmo nome próprio a dez linhas de
+// distância, sendo que é o produto que autentica a pessoa.
+test("o corpo nomeia o Cloudflare Access por extenso, como o rodapé", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await aguardarFormularioVivo(page);
+
+  await expect(
+    page.getByText(/Você entrou pelo Cloudflare Access como/),
+  ).toBeVisible();
+});
