@@ -20,6 +20,8 @@ export {
   IconeSituacao,
   IconeTipo,
   IconeSeta,
+  IconeAnterior,
+  IconeProxima,
   IconeEditar,
   IconeExcluir,
   IconePublicar,

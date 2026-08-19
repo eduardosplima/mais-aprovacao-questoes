@@ -137,3 +137,43 @@ test("o <select> abre mão da aparência nativa, e o <input> não ganha seta", a
     page.getByLabel("Ano").locator("xpath=..").locator("svg"),
   ).toHaveCount(1);
 });
+
+// A paginação só aparece acima de 50 questões, e a semente não chega lá —
+// então o total vem forjado, como no caso das ações da linha.
+test("a paginação leva a seta do lado para onde aponta", async ({ page }) => {
+  await page.route("**/admin/questions**", async (route) => {
+    await route.fulfill({
+      json: {
+        total: 120,
+        rows: [
+          {
+            id: "q-1",
+            statement: "Questão de exemplo",
+            type: "multiple_choice",
+            status: "draft",
+            year: 2024,
+            subjectName: null,
+            bancaName: null,
+          },
+        ],
+      },
+    });
+  });
+
+  await entrar(page);
+
+  const anterior = page.getByRole("button", { name: "Anterior" });
+  const proxima = page.getByRole("button", { name: "Próxima" });
+  await expect(anterior.locator("svg")).toHaveCount(1);
+  await expect(proxima.locator("svg")).toHaveCount(1);
+
+  // O ícone é vetor, não rótulo: ele diz para onde a ação vai, então precisa
+  // estar do lado para onde aponta. Fosse rótulo, viria antes do texto como
+  // em todos os outros botões.
+  expect(
+    await anterior.evaluate((b) => b.firstElementChild?.tagName.toLowerCase()),
+  ).toBe("svg");
+  expect(
+    await proxima.evaluate((b) => b.lastElementChild?.tagName.toLowerCase()),
+  ).toBe("svg");
+});

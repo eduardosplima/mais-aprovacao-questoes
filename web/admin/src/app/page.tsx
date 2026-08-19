@@ -13,9 +13,11 @@ import {
   CONTROLE,
   Controle,
   IconeAdicionar,
+  IconeAnterior,
   IconeDespublicar,
   IconeEditar,
   IconeExcluir,
+  IconeProxima,
   IconePublicar,
   IconeSituacao,
   Modal,
@@ -282,6 +284,7 @@ export default function PaginaLista() {
             disabled={pagina === 0}
             onClick={() => setPagina((p) => p - 1)}
           >
+            <IconeAnterior />
             Anterior
           </Botao>
           <span className="text-[14.5px] font-semibold text-txt-2">
@@ -293,6 +296,7 @@ export default function PaginaLista() {
             onClick={() => setPagina((p) => p + 1)}
           >
             Próxima
+            <IconeProxima />
           </Botao>
         </div>
       )}

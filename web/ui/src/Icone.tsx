@@ -128,6 +128,28 @@ export function IconeSeta(p: PropsIcone) {
   );
 }
 
+/**
+ * Setas de navegação de página. Separadas do `IconeSeta` (que é a do
+ * `<select>`, e aponta para baixo) porque significam coisa diferente: aqui a
+ * direção é o próprio conteúdo da ação, e é por isso que estes dois ficam do
+ * lado para onde apontam em vez de antes do texto.
+ */
+export function IconeAnterior(p: PropsIcone) {
+  return (
+    <Svg {...p}>
+      <polyline points="15 18 9 12 15 6" />
+    </Svg>
+  );
+}
+
+export function IconeProxima(p: PropsIcone) {
+  return (
+    <Svg {...p}>
+      <polyline points="9 18 15 12 9 6" />
+    </Svg>
+  );
+}
+
 // ---- ações ----
 
 export function IconeEditar(p: PropsIcone) {
