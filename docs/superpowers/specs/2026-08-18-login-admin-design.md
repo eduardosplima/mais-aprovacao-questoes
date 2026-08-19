@@ -115,6 +115,16 @@ herda já correta.
 Módulo novo `api/src/db/admins.ts`: `findAdmin(db, email)`,
 `upsertAdmin(db, email, passwordHash)`, `deleteAdmin(db, email)`.
 
+**`questions.created_by` passa a referenciar `admins.email`.** Hoje a coluna
+aponta para `users.id`, que era o id do admin quando admin era usuário. Com a
+separação, o alvo certo é a tabela nova — não `null`, que apagaria a autoria de
+todo cadastro futuro. O `onDelete: "set null"` continua, e com ele a mesma
+consequência de antes, agora sobre outra tabela: apagar a linha de um admin
+(pelo `--remover` do CLI, ou porque ele saiu) deixa as questões dele sem
+autoria. É o preço da integridade referencial — a alternativa seria uma coluna
+de texto solta, que preservaria o email para sempre ao custo de poder apontar
+para quem não existe. A escolha é pela chave estrangeira.
+
 ## 5. A invariante do email
 
 **O email do admin nunca entra por corpo, query string ou header de

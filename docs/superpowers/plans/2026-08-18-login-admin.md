@@ -2176,3 +2176,137 @@ git commit -m "docs(runbook): o primeiro admin vira dois comandos, e o Access ga
 | 10 | Runbook e Access | checklist executável pelo dono |
 
 As tarefas 1 a 5 são sequenciais — cada uma compila em cima da anterior. A 6 depende só da 1. A 7 depende da 4; a 8, da 7. As 9 e 10 dependem de tudo, e são as únicas que podem correr em paralelo entre si.
+
+---
+
+### Task 11: `created_by` aponta para `admins`
+
+Acrescentada em 2026-08-18, depois da Task 6, a pedido do dono. A Task 4 passou a gravar `null` em `questions.created_by` porque a coluna referenciava `users.id` e o admin deixou de ser linha de `users`. O alvo certo é a tabela nova, não o vazio.
+
+**Files:**
+- Modify: `api/src/db/schema.ts:138-144` (a coluna `createdBy` e o comentário acima dela)
+- Modify: `api/src/routes/admin/questions.ts:192-198` (a chamada de `createQuestion`)
+- Modify: `api/test/admin-questions.test.ts`
+- Create: `api/migrations/0005_*.sql` (gerada, e depois editada à mão — ver Step 3)
+
+**Interfaces:**
+- Consumes: `emailDoAccess(c): string` (Task 2), a tabela `admins` (Task 1), `deleteAdmin` (Task 1).
+- Produces: `questions.created_by` referenciando `admins.email` com `onDelete: "set null"`; `createQuestion(db, input, createdBy, status)` mantém a assinatura — muda só o valor que a rota passa.
+
+- [ ] **Step 1: Escrever o teste que falha**
+
+Em `api/test/admin-questions.test.ts`, ao lado dos casos que já existem de criação:
+
+```ts
+  it("grava o email do Access em created_by", async () => {
+    const res = await app.request(
+      "/admin/questions",
+      { method: "POST", body: JSON.stringify(corpoValido()) },
+      comoAdmin(),
+    );
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+
+    const linha = await getDb(env)
+      .select({ createdBy: questions.createdBy })
+      .from(questions)
+      .where(eq(questions.id, id))
+      .get();
+    expect(linha?.createdBy).toBe("admin@test.com");
+  });
+```
+
+`corpoValido()` e `comoAdmin()` são os helpers que o arquivo já usa para os outros casos de POST — reusar, não duplicar. Se os nomes forem outros, seguir os do arquivo.
+
+- [ ] **Step 2: Rodar e ver falhar**
+
+Run: `cd api && npx vitest run test/admin-questions.test.ts`
+Expected: FAIL — `created_by` vem `null`, porque a rota grava `null`.
+
+- [ ] **Step 3: Trocar o alvo da chave estrangeira**
+
+Em `api/src/db/schema.ts`, a coluna e o comentário:
+
+```ts
+    /** SET NULL: a questão é conteúdo da plataforma, não dado pessoal de quem
+     *  a cadastrou. Apagar a linha do admin — pelo `--remover` do CLI, ou
+     *  porque ele saiu — deixa as questões dele sem autoria, e isso é
+     *  aceitável: o acervo sobrevive à pessoa. */
+    createdBy: text("created_by").references(() => admins.email, {
+      onDelete: "set null",
+    }),
+```
+
+Run: `cd api && npm run db:generate`
+
+O SQLite não altera uma chave estrangeira no lugar, então o drizzle-kit emite a reconstrução da tabela (cria `__new_questions`, copia, dropa, renomeia). **Conferir o SQL gerado**, e então editá-lo à mão: acrescentar, como **primeira** instrução do arquivo, antes de qualquer `CREATE TABLE`:
+
+```sql
+--> statement-breakpoint
+UPDATE questions SET created_by = NULL;
+```
+
+O motivo: as linhas que existem hoje guardam um `users.id`, que não existe em `admins`. Copiá-las como estão deixaria a coluna apontando para ninguém — dado inválido sob a chave estrangeira nova. A autoria antiga se perde, e não há como recuperá-la: o id que está lá é de uma tabela que não descreve mais quem cadastra questão.
+
+Run: `cd api && npm run db:migrate:local`
+
+- [ ] **Step 4: Gravar o email na rota**
+
+Em `api/src/routes/admin/questions.ts`, trocar o `null` e o comentário que o justificava:
+
+```ts
+  const res = await createQuestion(
+    getDb(c.env),
+    parsed.data as QuestionInput,
+    // A autoria é o email do token do Access, que é a chave de `admins`.
+    // A rota está atrás de `requireSessaoAdmin`, então a linha existe.
+    emailDoAccess(c),
+    parsed.data.status,
+  );
+```
+
+Acrescentar o import de `emailDoAccess` de `../../middleware/access`.
+
+- [ ] **Step 5: Rodar e ver passar**
+
+Run: `cd api && npx vitest run test/admin-questions.test.ts`
+Expected: PASS.
+
+- [ ] **Step 6: Provar o `SET NULL`**
+
+Acrescentar o caso que exercita a ação da chave estrangeira:
+
+```ts
+  it("apagar o admin deixa a questão sem autoria, não apaga a questão", async () => {
+    const res = await app.request(
+      "/admin/questions",
+      { method: "POST", body: JSON.stringify(corpoValido()) },
+      comoAdmin(),
+    );
+    const { id } = (await res.json()) as { id: string };
+
+    await deleteAdmin(getDb(env), "admin@test.com");
+
+    const linha = await getDb(env)
+      .select({ createdBy: questions.createdBy })
+      .from(questions)
+      .where(eq(questions.id, id))
+      .get();
+    expect(linha).toBeDefined();
+    expect(linha?.createdBy).toBeNull();
+  });
+```
+
+Este caso depende de o ambiente de teste aplicar ações de chave estrangeira. Se ele falhar porque o Miniflare não as aplica, **não apague a asserção e não a troque por outra coisa** — reporte o achado ao controlador, com a saída do teste. Recriar a linha de `admin@test.com` no fim do caso, se os testes vizinhos dependerem dela.
+
+- [ ] **Step 7: Suíte e typecheck**
+
+Run: `cd api && npm test && npm run typecheck`
+Expected: PASS.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add api/src/db/schema.ts api/src/routes/admin/questions.ts api/test/admin-questions.test.ts api/migrations
+git commit -m "fix(api): a autoria da questão volta, agora apontando para admins"
+```
