@@ -148,6 +148,48 @@ test("renomear com só espaços é barrado no modal, sem chamar a API", async ({
   await expect(page.locator("table").getByText("Fundatec RS")).toBeVisible();
 });
 
+// O modal de renomear não tinha estado de envio: dois cliques em Salvar
+// eram duas chamadas ao servidor. O segundo PATCH chegava depois do modal
+// fechar, e o operador não via nada — a lista já tinha recarregado.
+test("dois cliques em Salvar renomeiam uma vez só", async ({ page }) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+  // Nomes exclusivos deste teste: a suíte roda em série sobre o mesmo D1
+  // local, e tanto "Fundatec" quanto "Fundatec RS" já são usados por outro
+  // teste do arquivo — reaproveitá-los faria o rename esbarrar num 409 por
+  // nome já existente, em vez de exercitar a guarda de duplo clique.
+  await page.getByLabel("Nome", { exact: true }).fill("Ibade");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+
+  let chamadas = 0;
+  await page.route("**/admin/taxonomy/**", async (rota) => {
+    if (rota.request().method() === "PATCH") {
+      chamadas += 1;
+      // Segura a resposta: sem atraso, a primeira chamada termina antes do
+      // segundo clique e o teste passaria mesmo sem a guarda.
+      await new Promise((r) => setTimeout(r, 600));
+    }
+    return rota.continue();
+  });
+
+  // Escopado em "table" e pelo nome exato do termo recém-criado: a suíte
+  // roda os testes em série sobre o mesmo D1 local, então a aba Banca já tem
+  // linhas de testes anteriores, e um seletor genérico pegaria o primeiro
+  // "Renomear" da tabela — que não é necessariamente o deste Ibade.
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Ibade", exact: true })
+    .click();
+  const modal = page.getByRole("dialog");
+  await modal.getByLabel("Novo nome").fill("Ibade Nordeste");
+  const salvar = modal.getByRole("button", { name: "Salvar" });
+  await salvar.click();
+  await salvar.click({ force: true, timeout: 1000 }).catch(() => undefined);
+
+  await expect(page.getByText("Termo renomeado.")).toBeVisible();
+  expect(chamadas).toBe(1);
+});
+
 test("renomear para um nome que já existe explica dentro do modal", async ({ page }) => {
   await entrar(page);
   await page.goto("/taxonomias");

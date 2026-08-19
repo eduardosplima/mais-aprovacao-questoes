@@ -11,6 +11,8 @@ export function Modal({
   aoCancelar,
   rotuloConfirmar = "Confirmar",
   perigo = false,
+  carregando = false,
+  idFormulario,
 }: {
   aberto: boolean;
   titulo: string;
@@ -19,6 +21,15 @@ export function Modal({
   aoCancelar: () => void;
   rotuloConfirmar?: string;
   perigo?: boolean;
+  /** Desabilita o confirmar e troca o texto por "Aguarde…" — a guarda de duplo clique. */
+  carregando?: boolean;
+  /**
+   * Id de um <form> renderizado dentro de `children`. Com ele o confirmar
+   * vira o submit desse formulário, e Enter num campo envia — que é o que
+   * qualquer pessoa espera de um formulário, e o que um <div> com botões
+   * nunca fez.
+   */
+  idFormulario?: string;
 }) {
   const dialogoRef = useRef<HTMLDivElement>(null);
   const focoAnteriorRef = useRef<HTMLElement | null>(null);
@@ -72,7 +83,13 @@ export function Modal({
           <Botao variante="secundario" onClick={aoCancelar}>
             Cancelar
           </Botao>
-          <Botao variante={perigo ? "perigo" : "primario"} onClick={aoConfirmar}>
+          <Botao
+            variante={perigo ? "perigo" : "primario"}
+            carregando={carregando}
+            type={idFormulario ? "submit" : "button"}
+            form={idFormulario}
+            onClick={idFormulario ? undefined : aoConfirmar}
+          >
             {rotuloConfirmar}
           </Botao>
         </div>

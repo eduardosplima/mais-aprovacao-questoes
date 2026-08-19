@@ -49,6 +49,8 @@ export default function PaginaTaxonomias() {
   const [novoNome, setNovoNome] = useState("");
   const [erroRenomear, setErroRenomear] = useState<string | null>(null);
   const [aExcluir, setAExcluir] = useState<Termo | null>(null);
+  const [renomeando, setRenomeando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const avisar = useToast();
   // Descarta respostas fora de ordem: trocar de aba rápido (Banca → Assunto →
   // Cargo) pode fazer a resposta de uma aba antiga chegar depois da atual, e
@@ -113,6 +115,7 @@ export default function PaginaTaxonomias() {
       return;
     }
     setErroRenomear(null);
+    setRenomeando(true);
     try {
       await api.renomearTermo(alvo.id, limpo);
       setARenomear(null);
@@ -123,19 +126,24 @@ export default function PaginaTaxonomias() {
       // não notar com o modal ainda aberto na frente. O erro pertence ao
       // campo que o causou — é o mesmo tratamento que o cadastro dá ao 409.
       setErroRenomear(mensagemDe(falha));
+    } finally {
+      setRenomeando(false);
     }
   }
 
   async function excluir() {
     if (!aExcluir) return;
     const alvo = aExcluir;
-    setAExcluir(null);
+    setExcluindo(true);
     try {
       await api.excluirTermo(alvo.id);
+      setAExcluir(null);
       avisar("Termo excluído.");
       await carregar();
     } catch (falha) {
       avisar(mensagemDe(falha), "erro");
+    } finally {
+      setExcluindo(false);
     }
   }
 
@@ -237,6 +245,7 @@ export default function PaginaTaxonomias() {
         aberto={aRenomear !== null}
         titulo="Renomear termo"
         rotuloConfirmar="Salvar"
+        carregando={renomeando}
         aoConfirmar={() => void renomear()}
         aoCancelar={() => {
           setARenomear(null);
@@ -267,6 +276,7 @@ export default function PaginaTaxonomias() {
         titulo="Excluir termo?"
         perigo
         rotuloConfirmar="Excluir"
+        carregando={excluindo}
         aoConfirmar={() => void excluir()}
         aoCancelar={() => setAExcluir(null)}
       >
