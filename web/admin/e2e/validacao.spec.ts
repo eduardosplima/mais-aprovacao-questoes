@@ -179,3 +179,27 @@ test("salvar com pendências durante a pré-visualização não falha em silênc
   await expect(resumo).toContainText(/assunto/i);
   expect(envios).toHaveLength(0);
 });
+
+// A mensagem já aparecia; a borda não. Quem rola um formulário longo procura
+// a moldura vermelha, não o texto — foi assim que o campo passou despercebido.
+test("o Enunciado vazio ganha borda de erro, não só mensagem", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/questoes/editar");
+
+  const moldura = page
+    .getByLabel("Enunciado")
+    .locator("xpath=ancestor::div[contains(@class,'rounded-btn')][1]");
+  const antes = await moldura.evaluate(
+    (e) => getComputedStyle(e).borderTopColor,
+  );
+
+  await page.getByRole("button", { name: "Publicar" }).click();
+  await expect(page.locator("[data-resumo-erros]")).toBeVisible();
+
+  // A moldura tem `transition-colors`: ler getComputedStyle uma vez só, logo
+  // após a troca de classe, pega o quadro inicial da transição, não o
+  // destino — toHaveCSS reconsulta até a cor realmente mudar.
+  await expect(moldura).not.toHaveCSS("border-top-color", antes);
+});

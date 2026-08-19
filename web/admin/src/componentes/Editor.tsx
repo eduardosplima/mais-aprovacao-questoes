@@ -29,12 +29,14 @@ export function Editor({
   rotulo,
   comTabela = false,
   minAltura = 180,
+  invalido = false,
 }: {
   valor: string;
   aoMudar: (html: string) => void;
   rotulo: string;
   comTabela?: boolean;
   minAltura?: number;
+  invalido?: boolean;
 }) {
   const editor = useEditor({
     // Sem SSR: o Next não renderiza nada disto no servidor porque o app é
@@ -78,7 +80,13 @@ export function Editor({
   }, [valor, editor]);
 
   return (
-    <div className="border border-borda-2 rounded-btn bg-white overflow-hidden focus-within:border-roxo transition-colors">
+    <div
+      className={`border rounded-btn bg-white overflow-hidden transition-colors ${
+        invalido
+          ? "border-erro focus-within:border-erro"
+          : "border-borda-2 focus-within:border-roxo"
+      }`}
+    >
       <BarraFerramentas editor={editor} comTabela={comTabela} />
       <EditorContent editor={editor} />
     </div>

@@ -307,6 +307,7 @@ function Formulario() {
                 rotulo="Enunciado"
                 comTabela
                 minAltura={200}
+                invalido={Boolean(erros.enunciado)}
               />
             </Campo>
           </Card>
