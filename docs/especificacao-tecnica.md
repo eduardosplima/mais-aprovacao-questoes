@@ -244,7 +244,12 @@ erDiagram
         text name
         text document_hash "HMAC — nunca em claro"
         text password_hash "NULL = nunca definiu senha"
-        text role "admin | user"
+        int  created_at
+        int  updated_at
+    }
+    ADMIN {
+        text email PK "normalizado, minúsculo — sem relação com USER"
+        text password_hash "pbkdf2$sha256$100000$<salt>$<hash>"
         int  created_at
         int  updated_at
     }
@@ -294,7 +299,7 @@ erDiagram
     }
 ```
 
-Quatro decisões estruturais:
+Cinco decisões estruturais:
 
 **`access_until` é o único predicado de acesso.** `tier = 'assinante'` se existir qualquer assinatura do usuário com `access_until > now`. Uma comparação de data cobre assinatura ativa, cancelada com ciclo pago em curso, atrasada em carência e revogada — sem máquina de estados na camada de autorização.
 
@@ -305,6 +310,8 @@ Quatro decisões estruturais:
 **Toda FK para `USER` declara ação de exclusão** desde a primeira migração — `CASCADE` para dados estritamente pessoais, `SET NULL` para autoria de conteúdo público. Com a convenção estabelecida no dia 1, a exclusão de conta é um único `DELETE FROM users` e cada tabela criada depois entra na cascata automaticamente. O D1 aplica foreign keys por padrão (equivalente a `PRAGMA foreign_keys = on`) e suporta essas ações.
 
 `UsageQuota` não fica em tabela: vive num **Durable Object por usuário** (contador + janela), mecanismo da cota grátis e do rate-limit por usuário. `EXPLANATION.video_url` aponta para o Cloudflare Stream — manter só a URL desacopla o vídeo do resto.
+
+**`admins` não tem FK para `users`, de propósito** (o `ADMIN` do diagrama, sem linha até `USER`). É a tabela inteira: sem `id` (a chave natural é o email, que é o que o token do Cloudflare Access carrega) e sem coluna de papel (`role`) — a existência da linha já é o papel. A ausência de relacionamento no diagrama não é omissão: admin e aluno são sistemas separados, e a mesma pessoa pode existir nos dois sem que um dê acesso ao outro. `questions.created_by` referencia `admins.email` com `ON DELETE SET NULL` (o diagrama acima não modela `created_by` — nenhuma FK de `QUESTION` aparece nele hoje).
 
 ---
 
@@ -341,7 +348,7 @@ Em **Workers Secrets**, nunca em código: `JWT_SECRET`, `HOTMART_HOTTOK`, `HOTMA
 
 ### Autorização
 
-RBAC checado **no Worker**, nunca no frontend. `role ∈ {admin, user}`; o tier (`assinante` / `gratuito`) é **derivado** de `access_until`, não é coluna.
+Checado **no Worker**, nunca no frontend, em duas camadas: `requireAccess` valida na borda o JWT que o Cloudflare Access injeta (identidade + MFA no IdP); `requireSessaoAdmin` confere a cada requisição o cookie de sessão do painel, o `sub` batendo com o email do Access, o email em `ADMIN_EMAILS` e uma linha correspondente em `admins` — o admin é a interseção dessas duas últimas fontes, nenhuma escrita por código de aplicação. Não existe `role`. O tier do aluno (`assinante` / `gratuito`) é **derivado** de `access_until`, não é coluna.
 
 ### Dados pessoais e LGPD
 

@@ -102,6 +102,11 @@ npm test                   # Vitest (Miniflare + D1 local); rede mockada
 | GET | `/auth/me` | Protegido. Retorna `{ id, email, name, tier }` |
 | POST | `/auth/logout` | Limpa o cookie de sessão |
 | POST | `/webhooks/hotmart` | Recebe eventos de compra/cancelamento da Hotmart (autenticado pelo header `x-hotmart-hottok`) |
+| GET | `/admin/auth/contexto` | Protegido por Access. Retorna `{ email, ehAdmin, temSenha }` — o que a tela de login usa para escolher entre os três estados |
+| POST | `/admin/auth/login` | Protegido por Access. `{ senha }` → confere `ADMIN_EMAILS` e a senha em `admins`; seta o cookie `sessao_admin` |
+| POST | `/admin/auth/logout` | Protegido por Access. Limpa só o cookie `sessao_admin` — a sessão do Access continua viva |
+| GET | `/admin/auth/me` | Protegido por Access + `requireSessaoAdmin`. Retorna `{ email }` |
+| POST | `/admin/auth/senha` | Protegido por Access + `requireSessaoAdmin`. `{ senhaAtual, nova }` → troca a senha. 400 `weak_password` se `nova` tiver menos de 12 caracteres; 400 `senha_atual_incorreta` se `senhaAtual` não confere |
 | GET | `/admin/taxonomy?kind=` | Lista termos de uma taxonomia. `kind` é obrigatório (`subject`, `banca`, `cargo`, `level`); ausente ou desconhecido → 400 `invalid_kind` |
 | POST | `/admin/taxonomy` | `{ kind, name }` → cria termo. 409 `duplicate` se já existir ativo no mesmo kind |
 | PATCH | `/admin/taxonomy/:id` | `{ name }` → renomeia recalculando o slug. 409 `duplicate` se colidir com outro termo ativo do mesmo kind |
