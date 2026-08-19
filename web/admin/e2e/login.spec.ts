@@ -10,6 +10,18 @@ test("sem sessão, qualquer tela redireciona para o login", async ({ page }) => 
   await expect(page).toHaveURL(/\/login/);
 });
 
+// O outro lado da mesma promessa: falha de rede não desloga, mas ficar na
+// tela só ajuda se a tela disser alguma coisa. O Layout devolvia null.
+test("falha de rede no /admin/auth/me mostra a orientação, não tela em branco", async ({
+  page,
+}) => {
+  await page.route("**/admin/auth/me", (rota) => rota.abort());
+  await page.goto("/");
+  await expect(page.locator("main").getByRole("alert")).toContainText(
+    /recarregue a página/i,
+  );
+});
+
 test("a tela mostra o email do Access e não pede email", async ({ page }) => {
   await page.goto("/login");
   await aguardarFormularioVivo(page);
@@ -54,6 +66,22 @@ test("sair limpa a sessão e volta ao login", async ({ page }) => {
 
   await page.goto("/");
   await expect(page).toHaveURL(/\/login/);
+});
+
+// A falha do contexto é o caso que a spec §9 descreve: sessão do Access
+// expirada devolve um redirect cross-origin, o fetch morre sem status, e a
+// mensagem de erro é a única coisa que sobra para orientar a pessoa. Ela
+// precisa aparecer mesmo sem formulário — que é justamente o que não existe
+// quando o contexto falhou.
+test("contexto que falha mostra a orientação de recarregar", async ({
+  page,
+}) => {
+  await page.route("**/admin/auth/contexto", (rota) => rota.abort());
+  await page.goto("/login");
+  // main, como nos casos abaixo: fora dele o Next tem um role="alert" próprio.
+  await expect(page.locator("main").getByRole("alert")).toContainText(
+    /recarregue a página/i,
+  );
 });
 
 // Os dois estados abaixo dependem do que o Access mandaria, que em

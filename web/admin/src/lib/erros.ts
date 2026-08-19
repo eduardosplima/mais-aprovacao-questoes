@@ -30,13 +30,20 @@ const MENSAGEM: Record<string, string> = {
   forbidden: "Sua conta não tem permissão de administrador.",
 };
 
+/**
+ * Falha de rede: o fetch rejeita sem status nem corpo, tanto por queda de
+ * conexão quanto por sessão do Access expirada (que devolve 302 para o IdP,
+ * não 401). O cliente não distingue os dois casos, então pede para a pessoa
+ * decidir — e nunca recarrega sozinho (spec §9).
+ *
+ * Exportada porque o Layout precisa da mesma frase sem ter o erro em mãos.
+ */
+export const FALHA_DE_REDE =
+  "Não foi possível falar com o servidor. Pode ser sua conexão, ou a sessão do Access ter expirado — recarregue a página.";
+
 export function mensagemDe(erro: unknown): string {
   if (erro instanceof ApiError) {
     return MENSAGEM[erro.codigo] ?? `Erro inesperado (${erro.codigo}).`;
   }
-  // Falha de rede: o fetch rejeita sem status nem corpo, tanto por queda de
-  // conexão quanto por sessão do Access expirada (que devolve 302 para o IdP,
-  // não 401). O cliente não distingue os dois casos, então pede para a pessoa
-  // decidir.
-  return "Não foi possível falar com o servidor. Pode ser sua conexão, ou a sessão do Access ter expirado — recarregue a página.";
+  return FALHA_DE_REDE;
 }

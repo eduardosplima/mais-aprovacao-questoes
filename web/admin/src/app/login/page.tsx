@@ -88,6 +88,18 @@ export default function PaginaLogin() {
           </p>
         )}
 
+        {/*
+          Fora do `pronto`: quando o /admin/auth/contexto falha não existe
+          formulário, e era exatamente aí que a orientação de recarregar
+          precisava aparecer — o caso da sessão do Access expirada, que
+          responde com redirect cross-origin e mata o fetch sem status.
+        */}
+        {erro && (
+          <p role="alert" className="text-[13.5px] font-semibold text-erro">
+            {erro}
+          </p>
+        )}
+
         {pronto && (
           <form onSubmit={enviar} className="flex flex-col gap-4">
             <Campo rotulo="Senha" htmlFor="senha">
@@ -101,12 +113,6 @@ export default function PaginaLogin() {
                 onChange={(e) => setSenha(e.target.value)}
               />
             </Campo>
-
-            {erro && (
-              <p role="alert" className="text-[13.5px] font-semibold text-erro">
-                {erro}
-              </p>
-            )}
 
             <Botao type="submit" carregando={enviando}>
               Entrar

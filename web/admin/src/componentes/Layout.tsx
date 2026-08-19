@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Botao } from "@mais/ui";
 import { api } from "@/lib/api";
+import { FALHA_DE_REDE } from "@/lib/erros";
 import { useSessao } from "@/lib/sessao";
 
 const NAV = [
@@ -13,12 +14,23 @@ const NAV = [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { carregando, admin } = useSessao();
+  const { carregando, admin, falhaDeRede } = useSessao();
   const caminho = usePathname();
   const router = useRouter();
 
   if (carregando) {
     return <main className="p-8 text-txt-2">Carregando…</main>;
+  }
+  // A recarga é pedida, não automática (spec §9): o painel nunca navega
+  // sozinho. Aqui ele diz o que houve e espera a pessoa decidir.
+  if (falhaDeRede) {
+    return (
+      <main className="p-8">
+        <p role="alert" className="text-[13.5px] font-semibold text-erro">
+          {FALHA_DE_REDE}
+        </p>
+      </main>
+    );
   }
   if (!admin) return null; // useSessao já redirecionou
 

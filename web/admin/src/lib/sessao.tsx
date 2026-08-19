@@ -14,8 +14,10 @@ import { api, ApiError } from "./api";
 export function useSessao(): {
   carregando: boolean;
   admin: { email: string } | null;
+  falhaDeRede: boolean;
 } {
   const [admin, setAdmin] = useState<{ email: string } | null>(null);
+  const [falhaDeRede, setFalhaDeRede] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const router = useRouter();
 
@@ -35,8 +37,12 @@ export function useSessao(): {
           router.replace("/login");
           return;
         }
-        // Falha de rede não desloga: manter o usuário na tela e deixar a
-        // próxima ação mostrar o erro é melhor que expulsar por um blip.
+        // Falha de rede não desloga: expulsar por um blip é pior que ficar.
+        // Mas ficar precisa mostrar alguma coisa — devolver `null` daqui e
+        // `null` do Layout deixava a pessoa numa tela em branco, sem próxima
+        // ação nenhuma. Quem distingue este caso do 401/403 acima é esta
+        // bandeira; o Layout usa ela para exibir a orientação.
+        setFalhaDeRede(true);
         setAdmin(null);
       })
       .finally(() => {
@@ -47,5 +53,5 @@ export function useSessao(): {
     };
   }, [router]);
 
-  return { carregando, admin };
+  return { carregando, admin, falhaDeRede };
 }
