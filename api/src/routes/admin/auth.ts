@@ -85,5 +85,10 @@ adminAuth.post("/senha", requireSessaoAdmin, async (c) => {
   }
 
   await upsertAdmin(getDb(c.env), email, await hashPassword(parsed.data.nova));
+  // Reemite a sessão: o `updated_at` que acabou de ser carimbado invalida
+  // toda sessão anterior à troca (checagem 6 de requireSessaoAdmin) — a
+  // roubada e também esta. Sem o cookie novo, trocar a própria senha
+  // deslogaria quem trocou.
+  setAdminSessionCookie(c, await signAdminSession(email, c.env.JWT_SECRET));
   return c.json({ ok: true });
 });

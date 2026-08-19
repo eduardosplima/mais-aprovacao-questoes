@@ -54,16 +54,23 @@ export async function signAdminSession(
     .sign(key(secret));
 }
 
+/**
+ * Devolve o email e o `iat` — o momento da emissão. O `iat` é o que permite a
+ * `requireSessaoAdmin` comparar a sessão com a última troca de credencial;
+ * sem ele não há comparação possível, então token sem `iat` é recusado.
+ */
 export async function verifyAdminSession(
   token: string,
   secret: string,
-): Promise<string | null> {
+): Promise<{ email: string; iat: number } | null> {
   try {
     const { payload } = await jwtVerify(token, key(secret), {
       algorithms: ["HS256"],
     });
     if (payload.typ !== "admin") return null;
-    return typeof payload.sub === "string" ? payload.sub : null;
+    if (typeof payload.sub !== "string") return null;
+    if (typeof payload.iat !== "number") return null;
+    return { email: payload.sub, iat: payload.iat };
   } catch {
     return null;
   }

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SignJWT } from "jose";
 import {
   signSession,
   verifySession,
@@ -25,9 +26,12 @@ describe("jwt de sessão", () => {
 });
 
 describe("sessão de admin", () => {
-  it("ida e volta devolve o email", async () => {
+  it("ida e volta devolve o email e o iat", async () => {
+    const antes = Math.floor(Date.now() / 1000);
     const t = await signAdminSession("admin@test.com", "s");
-    expect(await verifyAdminSession(t, "s")).toBe("admin@test.com");
+    const sessao = await verifyAdminSession(t, "s");
+    expect(sessao?.email).toBe("admin@test.com");
+    expect(sessao?.iat).toBeGreaterThanOrEqual(antes);
   });
 
   it("segredo errado devolve null", async () => {
@@ -45,5 +49,16 @@ describe("sessão de admin", () => {
   it("token de admin não passa por sessão de aluno", async () => {
     const t = await signAdminSession("admin@test.com", "s");
     expect(await verifySession(t, "s")).toBeNull();
+  });
+
+  // Sem `iat` não dá para comparar a sessão com a última troca de senha, e
+  // uma sessão que não dá para comparar não pode ser aceita.
+  it("token de admin sem iat devolve null", async () => {
+    const t = await new SignJWT({ typ: "admin" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("admin@test.com")
+      .setExpirationTime("12h")
+      .sign(new TextEncoder().encode("s"));
+    expect(await verifyAdminSession(t, "s")).toBeNull();
   });
 });

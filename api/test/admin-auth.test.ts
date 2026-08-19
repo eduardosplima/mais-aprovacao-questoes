@@ -150,6 +150,23 @@ describe("POST /admin/auth/senha", () => {
     expect(await res.json()).toEqual({ error: "weak_password" });
   });
 
+  // A troca de senha carimba `updated_at`, e requireSessaoAdmin passa a
+  // recusar sessão anterior a ele — inclusive a de quem acabou de trocar. Por
+  // isso a rota reemite o cookie: quem troca continua dentro, quem roubou sai.
+  it("reemite o cookie de sessão, e o novo continua valendo", async () => {
+    const res = await trocar({ senhaAtual: SENHA, nova: "nova-senha-comprida" });
+    expect(res.status).toBe(200);
+    const novo = cookieFrom(res, "sessao_admin");
+    expect(novo).toBeTruthy();
+
+    const depois = await app.request(
+      "/admin/auth/me",
+      { headers: { cookie: novo! } },
+      comoAccess(ADMIN),
+    );
+    expect(depois.status).toBe(200);
+  });
+
   it("sem sessão é 401", async () => {
     const res = await app.request(
       "/admin/auth/senha",

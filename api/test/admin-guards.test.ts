@@ -123,6 +123,45 @@ describe("guardas de /admin", () => {
     expect(res.status).toBe(403);
   });
 
+  // Checagem 6: a sessão precisa ser posterior à última troca de credencial.
+  // Sem ela, trocar a senha (ou rodar `npm run admin:senha`) não derrubaria o
+  // cookie roubado que motivou a troca.
+  it("401 com sessão anterior à última troca de senha", async () => {
+    const token = await accessToken();
+    const passado = Math.floor(Date.now() / 1000) - 3600;
+    const antigo = await new SignJWT({ typ: "admin" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject("admin@test.com")
+      .setIssuedAt(passado)
+      .setExpirationTime("12h")
+      .sign(new TextEncoder().encode(env.JWT_SECRET));
+    // upsertAdmin depois de assinar: é ele que carimba updated_at = agora.
+    await upsertAdmin(getDb(env), "admin@test.com", "hash-nao-usado");
+    const res = await app.request(
+      "/admin/taxonomy?kind=banca",
+      {
+        headers: {
+          "cf-access-jwt-assertion": token,
+          cookie: `sessao_admin=${antigo}`,
+        },
+      },
+      prod(),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 com sessão emitida depois da troca de senha", async () => {
+    const token = await accessToken();
+    await upsertAdmin(getDb(env), "admin@test.com", "hash-nao-usado");
+    const cookie = `sessao_admin=${await signAdminSession("admin@test.com", env.JWT_SECRET)}`;
+    const res = await app.request(
+      "/admin/taxonomy?kind=banca",
+      { headers: { "cf-access-jwt-assertion": token, cookie } },
+      prod(),
+    );
+    expect(res.status).toBe(200);
+  });
+
   it("200 com Access válido e sessão de admin", async () => {
     const token = await accessToken();
     const cookie = await cookieAdmin("admin@test.com");
