@@ -12,7 +12,7 @@
 > Complementa o [`runbook-verificacao-hotmart.md`](runbook-verificacao-hotmart.md),
 > que é a **fase 12** deste aqui.
 
-## Estado da execução — 2026-08-17
+## Estado da execução — 2026-08-19
 
 | Fase | Estado |
 |---|---|
@@ -21,13 +21,13 @@
 | 2. R2 | ✅ `media.maisaprovacao.com.br` |
 | 3. Email Service | ✅ onboarding de `app.maisaprovacao.com.br` |
 | 4. Turnstile | ✅ |
-| 5. Zero Trust Access | ✅ `holy-rain-d92c.cloudflareaccess.com` + AUD |
+| 5. Zero Trust Access | ✅ `holy-rain-d92c.cloudflareaccess.com` + AUD; aplicação configurada em 19/08, com o *Binding Cookie* ligado |
 | 6. `wrangler.jsonc` e segredos | 🟡 tudo preenchido **menos** `HOTMART_SUBSCRIPTION_UCODES` |
 | 7. Migrar e publicar o Worker | ✅ |
 | 8. Worker Routes | ✅ as três, vindas do arquivo |
 | 9. Pages | ✅ |
 | 10. Rate Limiting Rule | ✅ uma regra, o que o plano Free permite |
-| 11. Hotmart (sandbox) e primeiro admin | 🟡 **ucode não coletado**; admin não nasce mais de compra — o primeiro admin agora é o CLI (`npm run admin:senha`), rodado na seção "Publicar a separação do login do admin", ainda pendente |
+| 11. Hotmart (sandbox) e primeiro admin | 🟡 **ucode não coletado**; a parte do admin fechou — os três nasceram do CLI (`npm run admin:senha`) na publicação de 19/08 |
 | 12. Runbook de verificação | 🟡 seções 1 e 2 iniciadas, [detalhe lá](runbook-verificacao-hotmart.md) |
 | 13. Virar para produção | ⬜ em aberto, por decisão |
 
@@ -44,13 +44,18 @@ correção do `<select>` no Safari, `questions.year` agora `NOT NULL` no banco
 painel foi conferido no Safari depois da publicação e os `<select>` estão
 corretos. Nada mudou nas fases 0-6 nem 8-13.
 
-> **`master` está à frente do que está publicado, desde 2026-08-18.** Depois
-> daquela republicação entraram dois consertos no painel (commit `67eb803`):
-> o preview deixou de apresentar como link um vídeo que a API recusaria, e o
-> `SeletorTaxonomia` passou a avisar quando a carga de termos falha. **São só
-> de `web/admin` — o Worker não mudou**, então levá-los ao ar é o deploy do
-> Pages sozinho, sem tocar na fase 7. Não há urgência: nenhum dos dois é
-> defeito de caminho feliz.
+**Publicação em 2026-08-19 — a separação do login do admin.** O roteiro
+"Publicar a separação do login do admin" (mais abaixo) rodou inteiro: Worker,
+as três migrações pendentes (`0003`–`0005`), `admin:senha` para os três
+emails, deploy do Pages e a configuração da aplicação Access, com o *Enable
+Binding Cookie* ligado. O painel em produção passou a ter login próprio, e
+`users.role` deixou de existir no banco.
+
+**`master` e o que está no ar voltaram a ser a mesma coisa.** A distância que
+existia desde 18/08 fechou junto: o deploy do Pages levou os consertos de
+painel que esperavam — preview de vídeo, aviso de falha no `SeletorTaxonomia`,
+erro de preenchimento no cadastro de taxonomia, e o erro de contexto e a falha
+de rede que viravam tela em branco.
 
 ## Leia isto antes de começar
 
@@ -434,11 +439,11 @@ duas soltas.
 | **Eager redirect cookie** | ON (padrão) | Só afeta aplicação multi-domínio; aqui há um hostname só e a cadeia de redirects tem comprimento um. |
 | **Enable Binding Cookie** | **ON** — única mudança | Emite o `CF_Binding`, que amarra o `CF_Authorization` àquele navegador: cookie roubado não é reutilizável. As exceções documentadas (SSH/RDP, Zaraz, cliente WARP) não se aplicam. |
 
-- [ ] Os cinco campos conferidos, o *Binding Cookie* ligado e **Save**.
-- [ ] **Global session duration** (Access settings) deixado como está — a
+- [x] Os cinco campos conferidos, o *Binding Cookie* ligado e **Save**.
+- [x] **Global session duration** (Access settings) deixado como está — a
       hierarquia é global > aplicação > política, e mexer no global afetaria
       qualquer aplicação futura.
-- [ ] **401 Response for Service Auth policies** ignorado: não usamos service
+- [x] **401 Response for Service Auth policies** ignorado: não usamos service
       tokens.
 
 > **A política do Access e o `ADMIN_EMAILS` são listas separadas e precisam ser
@@ -800,14 +805,16 @@ o quebra-molas em contenção de verdade.
 - [ ] Anotar os **ucodes** dos produtos de assinatura →
       `HOTMART_SUBSCRIPTION_UCODES`.
 
-**O primeiro admin.** Não existe mais problema do ovo e da galinha: admin não
-nasce de compra nenhuma. São dois passos, os dois manuais por decisão.
+**O primeiro admin — feito em 2026-08-19**, para os três emails, dentro do
+roteiro de publicação da separação do login. Não existe mais problema do ovo e
+da galinha: admin não nasce de compra nenhuma. São dois passos, os dois
+manuais por decisão.
 
-- [ ] O email está em `ADMIN_EMAILS` (`api/wrangler.jsonc`) e o Worker foi
+- [x] O email está em `ADMIN_EMAILS` (`api/wrangler.jsonc`) e o Worker foi
       publicado depois disso. Sem publicar, a allowlist em produção é a antiga.
-- [ ] `cd api && npm run admin:senha -- <email>` — pede a senha duas vezes, sem
+- [x] `cd api && npm run admin:senha -- <email>` — pede a senha duas vezes, sem
       eco, e grava em `admins` no D1 remoto. Mínimo de 12 caracteres.
-- [ ] Entrar em `https://admin.maisaprovacao.com.br/login`, passando **duas
+- [x] Entrar em `https://admin.maisaprovacao.com.br/login`, passando **duas
       vezes** por identidade: o Access primeiro, a senha depois. A tela não
       pede email — ela mostra o que veio do token do Access.
 
@@ -828,21 +835,27 @@ para rodar uma vez.
 A ordem existe porque uma das três migrações pendentes é destrutiva e o
 Worker que está em produção agora lê a coluna que ela apaga.
 
-- [ ] **1.** `cd api && npm run deploy` — o Worker primeiro.
-- [ ] **2.** **Backup do banco, antes de qualquer migração:**
+> **Executado em 2026-08-19**, na ordem, com a configuração do Access da fase 5
+> na mesma janela. Fica marcado como registro do que foi feito — é execução
+> única, não se repete. As notas abaixo continuam valendo como referência: a
+> de recuperação da `0005`, para quem for ler o histórico, e a do rebuild com
+> filhas em cascata, que é regra para **qualquer migração futura**.
+
+- [x] **1.** `cd api && npm run deploy` — o Worker primeiro.
+- [x] **2.** **Backup do banco, antes de qualquer migração:**
       `npx wrangler d1 export mais-aprovacao-db --remote --output ~/backup-d1-antes-0005.sql`.
       O caminho de salvar e restaurar da `0005` (ver a nota adiante) nunca
       rodou com linha nenhuma dentro — a suíte aplica as migrações num banco
       vazio, então é código não exercitado apontado para dado de produção.
       Guarde o arquivo até o passo 5 fechar.
-- [ ] **3.** **Contagens antes.** Anote os três números:
+- [x] **3.** **Contagens antes.** Anote os três números:
       ```
       npx wrangler d1 execute mais-aprovacao-db --remote --command \
         "SELECT (SELECT count(*) FROM questions) AS questions,
                 (SELECT count(*) FROM alternatives) AS alternatives,
                 (SELECT count(*) FROM explanations) AS explanations;"
       ```
-- [ ] **4.** `npx wrangler d1 migrations apply mais-aprovacao-db --remote` —
+- [x] **4.** `npx wrangler d1 migrations apply mais-aprovacao-db --remote` —
       aplica as **três** migrações pendentes juntas: `0003_military_praxagora`
       (`CREATE TABLE admins`), `0004_flippant_lilandra`
       (`ALTER TABLE users DROP COLUMN role`) e `0005_safe_vampiro`
@@ -851,15 +864,15 @@ Worker que está em produção agora lê a coluna que ela apaga.
       que estiver pendente — não dá para aplicar só a primeira sem tirar
       arquivo da pasta, e isso é frágil demais para produção. É por isso que a
       ordem certa é publicar o Worker antes, não separar as migrações.
-- [ ] **5.** **Contagens depois.** Rode o mesmo comando do passo 3. Os três
+- [x] **5.** **Contagens depois.** Rode o mesmo comando do passo 3. Os três
       números precisam estar **iguais** aos anotados. Se algum caiu, o
       `ON DELETE CASCADE` disparou: pare aqui e restaure do arquivo do passo 2.
-- [ ] **6.** `npm run admin:senha -- <email>` para cada um dos três emails —
+- [x] **6.** `npm run admin:senha -- <email>` para cada um dos três emails —
       depende da tabela `admins`, criada no passo 4.
-- [ ] **7.** Deploy do Pages (fase 9) com o painel novo.
-- [ ] **8.** Configuração do Access — subseção "Configuração da aplicação
+- [x] **7.** Deploy do Pages (fase 9) com o painel novo.
+- [x] **8.** Configuração do Access — subseção "Configuração da aplicação
       Access", na fase 5.
-- [ ] **9.** Conferência: janela anônima → IdP → a tela de login mostra o
+- [x] **9.** Conferência: janela anônima → IdP → a tela de login mostra o
       email certo; uma identidade fora do `ADMIN_EMAILS` vê "não é
       administrador"; `npm run admin:senha -- <email> --remover` derruba a
       sessão viva na requisição seguinte (e depois recriar a senha de quem foi

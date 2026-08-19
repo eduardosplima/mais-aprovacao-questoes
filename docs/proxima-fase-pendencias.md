@@ -5,53 +5,41 @@
 > por engano o que foi fechado de propósito. Os detalhes moram nos runbooks e
 > nos planos linkados; aqui fica só o que orienta a decisão.
 >
-> Atualizado em **2026-08-18**. O WebKit, que já deu nome a este documento,
-> saiu da lista de pendências nessa data: a suíte e2e roda verde em chromium e
-> WebKit. O registro do que era e do que foi encontrado ficou mais abaixo,
-> porque duas coisas que ele afirmava estavam erradas e vale saber por quê.
+> Atualizado em **2026-08-19**, quando a separação do login do admin foi
+> publicada. O WebKit, que já deu nome a este documento, saiu da lista de
+> pendências em 18/08: a suíte e2e roda verde em chromium e WebKit. O registro
+> do que era e do que foi encontrado ficou mais abaixo, porque duas coisas que
+> ele afirmava estavam erradas e vale saber por quê.
 
-## Estado — 2026-08-18
+## Estado — 2026-08-19
 
 | Frente | Estado |
 |---|---|
 | **Sub-projeto 1** — fundação: auth própria, webhook Hotmart, reconciliação, cron | Construído e **publicado** |
 | **Sub-projeto 2** — API admin + painel administrativo | Construído e **publicado**. O painel funciona ponta a ponta |
-| **Login do admin** — separado do sub-projeto 2, spec própria ([`2026-08-18-login-admin-design.md`](superpowers/specs/2026-08-18-login-admin-design.md)) | Construído na branch `login-admin`, **não publicado** |
+| **Login do admin** — separado do sub-projeto 2, spec própria ([`2026-08-18-login-admin-design.md`](superpowers/specs/2026-08-18-login-admin-design.md)) | Construído e **publicado** em 2026-08-19 |
 | **Sub-projetos 3 e 4** | Não iniciados |
 | **Fase 12** do runbook — verificação contra o sandbox | Em andamento, e é onde a atenção está |
 | **Fase 13** — virar para produção | Em aberto, por decisão do dono |
 
-Três ressalvas que mudam o que dá para prometer:
+Duas ressalvas que mudam o que dá para prometer:
 
-- **`master` está à frente do que está publicado.** Dois lotes de conserto de
-  painel esperam deploy: o `67eb803` (preview de vídeo, aviso de falha no
-  seletor de taxonomia) e o erro de preenchimento no cadastro de taxonomia, de
-  2026-08-18 — que trocou o balão nativo do navegador pelo padrão de erro do
-  painel e passou a barrar nome só com espaços no cliente. Todos são de
-  `web/admin`: publicá-los é o deploy do Pages sozinho, sem tocar no Worker.
-  Nenhum é defeito de caminho feliz, então não corre.
 - **O fluxo do aluno não fecha.** `api/src/lib/email.ts:48` monta o link
   mágico apontando para `/definir-senha`, que é tela do sub-projeto 4 e não
   existe. Um comprador real recebe o email e cai num 404. O que fecha hoje é
   compra → conta criada no banco → email enviado. O painel administrativo não
   passa por aí: entra com senha.
-- **O login do admin está pronto e não publicado.** A branch `login-admin`
-  fecha o modelo antigo — admin como linha de `users` com `role='admin'`,
-  nascida de uma compra com email em `ADMIN_EMAILS` — e implementa o que a
-  spec descreve: admin é a interseção de `ADMIN_EMAILS`
-  (`api/wrangler.jsonc`) com uma senha na tabela `admins`, criada só pelo
-  `npm run admin:senha`; o painel autentica atrás do Cloudflare Access, sem
-  campo de email nem Turnstile na tela de login. Publicar é o roteiro
-  "Publicar a separação do login do admin" do
-  [runbook de deploy](runbook-deploy-producao.md) — **a autoridade operacional
-  desta publicação**, com backup e contagens antes e depois. Em resumo:
-  publicar o Worker primeiro, depois aplicar as **três** migrações pendentes
-  de uma vez (o `wrangler d1 migrations apply` aplica tudo que estiver
-  pendente), rodar `admin:senha` para os três emails, publicar o Pages do
-  painel e configurar a aplicação do Cloudflare Access (ligar o *Enable
-  Binding Cookie*). O Worker vem antes porque é o que está em produção agora
-  que ainda lê `users.role`, coluna que uma das migrações dropa. Nenhum passo
-  depende do ucode da Hotmart.
+- **O modelo de admin mudou em produção, em 2026-08-19.** O antigo — admin
+  como linha de `users` com `role='admin'`, nascida de uma compra com email em
+  `ADMIN_EMAILS` — não existe mais: a coluna `role` foi dropada do banco.
+  Admin hoje é a interseção de `ADMIN_EMAILS` (`api/wrangler.jsonc`) com uma
+  senha na tabela `admins`, criada só pelo `npm run admin:senha`, e o painel
+  autentica atrás do Cloudflare Access, sem campo de email nem Turnstile na
+  tela de login. Quem for ler um `wrangler tail` ou depurar acesso precisa
+  saber disso antes de procurar `role` em lugar nenhum. O que rodou está
+  registrado no roteiro "Publicar a separação do login do admin" do
+  [runbook de deploy](runbook-deploy-producao.md), com os nove passos
+  marcados.
 
 ## O próximo passo: coletar o ucode
 
@@ -144,8 +132,14 @@ requisição sai, nenhuma mensagem aparece, e o teste só acusa que continuou em
 
 A correção é `aguardarFormularioVivo()` em `web/admin/e2e/entrar.ts`, chamada
 antes de qualquer preenchimento: espera o botão "Entrar" habilitar, que é o
-único sinal que depende das duas condições — React vivo (o botão só liga por
-estado) e token do Turnstile presente.
+único sinal que depende de o React estar vivo — o botão só liga por estado.
+
+> **O sinal continua o mesmo, a razão dele mudou em 2026-08-19.** Quando isto
+> foi escrito, o botão dependia do token do Turnstile; a separação do login do
+> admin tirou o Turnstile e o campo de email da tela, e hoje o botão só liga
+> depois que `GET /admin/auth/contexto` responde. A corrida de hidratação que
+> motivou o helper é a mesma, e o campo que ela zerava — o email — nem existe
+> mais nesse formulário.
 
 **Isto vale para o chromium também.** Ele nunca expôs a falha porque hidrata
 rápido o bastante, mas a corrida sempre esteve lá.
