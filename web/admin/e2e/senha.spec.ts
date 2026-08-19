@@ -336,3 +336,39 @@ test("resposta atrasada de uma requisição cancelada não atrapalha o envio seg
   await expect(page.getByText("Senha trocada.")).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+// Com a Nova senha vazia, a divergência é consequência, não causa: acusar
+// "A confirmação não confere." manda a pessoa olhar para o campo certo pelo
+// motivo errado, e o campo que precisa de conteúdo é o de cima.
+test("com a Nova senha vazia, o erro é dela — não da confirmação", async ({
+  page,
+}) => {
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill(SENHA);
+  await modal.getByLabel("Confirme a nova senha").fill("nova-senha-comprida");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+
+  await expect(modal.getByText("Informe a nova senha.")).toBeVisible();
+  await expect(modal.getByText("A confirmação não confere.")).toHaveCount(0);
+});
+
+// A mensagem do servidor enuncia a regra que a pessoa precisa cumprir, e
+// sumia justamente quando ela começava a cumpri-la.
+test("a exigência de tamanho do servidor sobrevive à digitação", async ({
+  page,
+}) => {
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill(SENHA);
+  await modal.getByLabel("Nova senha", { exact: true }).fill("curta12345");
+  await modal.getByLabel("Confirme a nova senha").fill("curta12345");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+
+  const exigencia = modal.getByText(
+    "A senha precisa ter pelo menos 12 caracteres.",
+  );
+  await expect(exigencia).toBeVisible();
+
+  // Digitar mais um caractere não faz a regra desaparecer da tela.
+  await modal.getByLabel("Nova senha", { exact: true }).fill("curta123456");
+  await expect(exigencia).toBeVisible();
+});

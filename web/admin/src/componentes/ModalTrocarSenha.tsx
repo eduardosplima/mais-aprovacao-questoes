@@ -54,6 +54,11 @@ export function ModalTrocarSenha({
   // dá identidade a cada requisição — mesmo mecanismo de
   // app/taxonomias/page.tsx e app/page.tsx.
   const idRequisicao = useRef(0);
+  // O erro de "Nova senha" tem duas origens: validação local (some ao digitar,
+  // porque digitar é o que a corrige) e recusa do servidor, que enuncia a
+  // regra a cumprir — essa precisa ficar na tela enquanto a pessoa tenta
+  // cumpri-la, e só sai no envio seguinte.
+  const novaDoServidor = useRef(false);
 
   // O tip ao vivo (spec §4): com os dois preenchidos e diferentes, a
   // divergência aparece enquanto se digita. Os dois campos são type=password,
@@ -88,7 +93,10 @@ export function ModalTrocarSenha({
     if (!atual) encontrados.atual = "Informe a senha atual.";
     if (!nova) encontrados.nova = "Informe a nova senha.";
     if (!confirmacao) encontrados.confirmacao = "Confirme a nova senha.";
-    else if (nova !== confirmacao) {
+    // `nova &&` porque com ela vazia a divergência é consequência, não causa:
+    // o campo que precisa de conteúdo é o de cima, e é dele que a pessoa
+    // precisa ouvir.
+    else if (nova && nova !== confirmacao) {
       encontrados.confirmacao = "A confirmação não confere.";
     }
     if (Object.keys(encontrados).length > 0) {
@@ -99,6 +107,7 @@ export function ModalTrocarSenha({
     setErros({});
     setEnviando(true);
     const id = ++idRequisicao.current;
+    novaDoServidor.current = false;
     try {
       await api.trocarSenha(atual, nova);
       if (id !== idRequisicao.current) return;
@@ -112,6 +121,7 @@ export function ModalTrocarSenha({
       if (falha instanceof ApiError && falha.codigo === "senha_atual_incorreta") {
         setErros({ atual: mensagemDe(falha) });
       } else if (falha instanceof ApiError && falha.codigo === "weak_password") {
+        novaDoServidor.current = true;
         setErros({ nova: mensagemDe(falha) });
       } else {
         setErros({ geral: mensagemDe(falha) });
@@ -177,7 +187,9 @@ export function ModalTrocarSenha({
             onChange={(e) => {
               setNova(e.target.value);
               limparGeral();
-              if (erros.nova) setErros((x) => ({ ...x, nova: undefined }));
+              if (erros.nova && !novaDoServidor.current) {
+                setErros((x) => ({ ...x, nova: undefined }));
+              }
               // erros.confirmacao tem duas causas possíveis (mais abaixo, na
               // validação local): campo vazio ou divergência. Só a segunda é
               // resolvida por aqui — se "Confirme a nova senha" continua
