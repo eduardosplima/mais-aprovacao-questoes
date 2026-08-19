@@ -280,9 +280,18 @@ com `NEXT_PUBLIC_TURNSTILE_SITE_KEY` e o `<Script>` da Cloudflare.
 **Expiração do Access precisa de tratamento no cliente.** Quando a sessão do
 Access expira com o painel aberto, as requisições recebem **302 para o IdP**,
 não 401 — e um `fetch` cross-origin para o team domain morre como erro de rede,
-sem status. `lib/api.ts` ganha um ponto único: falha de rede em `/admin/*`
-vira `location.reload()`, que transforma o caso numa navegação de topo que o
-Access consegue redirecionar.
+sem status. Só uma navegação de topo faz o Access redirecionar de verdade.
+
+**E a recarga é pedida, não automática.** A primeira versão deste design
+recarregava sozinha em qualquer falha de rede. Está errado: um `fetch` rejeita
+igual quando a sessão morreu e quando o navegador cancelou a requisição porque
+a página navegou — e recarregar no segundo caso é uma segunda navegação
+concorrente, que atropela a primeira. O sintoma apareceu como teste
+intermitente só no WebKit, que é mais estrito ao expor requisição cancelada
+como erro de rede; a causa seria a mesma em produção, recarregando a tela de
+quem só clicou num link. Como o cliente não tem como distinguir os dois casos,
+ele não tenta: a mensagem de falha de rede diz para recarregar, e quem decide
+é a pessoa. Um clique por dia, no máximo — a sessão do Access dura 24 horas.
 
 ## 10. Configuração do Cloudflare Access
 
