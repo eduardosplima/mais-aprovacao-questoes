@@ -280,3 +280,32 @@ test("clicar no fundo escuro não fecha o diálogo; Escape fecha", async ({
   await page.keyboard.press("Escape");
   await expect(dialogo).toHaveCount(0);
 });
+
+// O form era `sm:items-end` e o botão era irmão do BLOCO do campo, não do
+// input: quando o <p> de erro aparecia dentro do Campo, o bloco crescia e
+// levava o botão junto, para baixo.
+test("o botão Adicionar continua alinhado ao input quando o erro aparece", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  const input = page.getByLabel("Nome", { exact: true });
+  const botao = page.getByRole("button", { name: "Adicionar" });
+
+  const centro = async (alvo: typeof input) => {
+    const caixa = await alvo.boundingBox();
+    if (!caixa) throw new Error("elemento sem caixa");
+    return caixa.y + caixa.height / 2;
+  };
+
+  const antes = Math.abs((await centro(botao)) - (await centro(input)));
+  expect(antes).toBeLessThan(3);
+
+  // Campo vazio: o erro é inline e não chama a API.
+  await botao.click();
+  await expect(page.getByText("Informe o nome do termo.")).toBeVisible();
+
+  const depois = Math.abs((await centro(botao)) - (await centro(input)));
+  expect(depois).toBeLessThan(3);
+});

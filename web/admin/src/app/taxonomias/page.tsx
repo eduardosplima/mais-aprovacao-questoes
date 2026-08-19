@@ -209,26 +209,33 @@ export default function PaginaTaxonomias() {
       </div>
 
       <Card className="p-4 md:p-5 mb-5">
-        <form onSubmit={adicionar} className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1">
-            <Campo rotulo="Nome" htmlFor="novo-termo" erro={erro ?? undefined}>
-              <input
-                id="novo-termo"
-                className={`${CONTROLE} ${erro ? CONTROLE_INVALIDO : ""}`}
-                aria-invalid={erro ? true : undefined}
-                value={nome}
-                maxLength={120}
-                onChange={(e) => {
-                  setNome(e.target.value);
-                  if (erro) setErro(null);
-                }}
-              />
-            </Campo>
-          </div>
-          <Botao type="submit" carregando={salvando}>
-            <IconeAdicionar />
-            Adicionar
-          </Botao>
+        <form onSubmit={adicionar}>
+          <Campo rotulo="Nome" htmlFor="novo-termo" erro={erro ?? undefined}>
+            {/* O botão é irmão do input, e não do bloco do campo: assim o <p>
+                de erro cresce ABAIXO dos dois e não tem como empurrar um sem
+                empurrar o outro. Com o botão fora do Campo, `items-end`
+                alinhava pela base do bloco, que muda de altura quando o erro
+                aparece. */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="flex-1">
+                <input
+                  id="novo-termo"
+                  className={`${CONTROLE} ${erro ? CONTROLE_INVALIDO : ""}`}
+                  aria-invalid={erro ? true : undefined}
+                  value={nome}
+                  maxLength={120}
+                  onChange={(e) => {
+                    setNome(e.target.value);
+                    if (erro) setErro(null);
+                  }}
+                />
+              </div>
+              <Botao type="submit" carregando={salvando} className="shrink-0">
+                <IconeAdicionar />
+                Adicionar
+              </Botao>
+            </div>
+          </Campo>
         </form>
       </Card>
 
