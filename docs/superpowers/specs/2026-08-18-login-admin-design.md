@@ -169,18 +169,29 @@ app.use("/admin/{taxonomy,questions,media}/*", requireSessaoAdmin)
 ```
 
 `middleware/rbac.ts` é substituído por `middleware/adminSession.ts`, exportando
-`requireSessaoAdmin`, que confere **cinco** coisas a cada requisição:
+`requireSessaoAdmin`, que confere **seis** coisas a cada requisição:
 
 1. cookie `sessao_admin` presente;
 2. JWT válido, com `typ: "admin"`;
 3. `sub` igual a `emailDoAccess(c)`;
 4. email ∈ `ADMIN_EMAILS`;
-5. linha correspondente em `admins`.
+5. linha correspondente em `admins`;
+6. `iat` do token ≥ `admins.updated_at` — a sessão é posterior à última troca
+   de senha.
 
-Tirar um email de `ADMIN_EMAILS` e publicar, ou apagar a linha, derruba a
-sessão viva na requisição seguinte — sem lista de revogação. É o mesmo
-princípio de `loadEntitlement`, que já derivava o tier a cada request em vez de
-carregá-lo no JWT.
+Tirar um email de `ADMIN_EMAILS` e publicar, apagar a linha, ou trocar a senha
+derruba a sessão viva na requisição seguinte — sem lista de revogação. É o
+mesmo princípio de `loadEntitlement`, que já derivava o tier a cada request em
+vez de carregá-lo no JWT.
+
+A sexta é o que faz da troca de senha um remédio de verdade: sem ela um cookie
+roubado sobreviveria as 12 horas inteiras depois da rotação, e a §9 estaria
+prometendo o que não entrega. A comparação é em **segundos**, como o `iat` do
+JWT — em milissegundos recusaria o cookie emitido no mesmo segundo da troca,
+inclusive o que `POST /admin/auth/senha` reemite logo depois de gravar (sem
+essa reemissão, trocar a própria senha deslogaria quem trocou). Como o
+`upsertAdmin` do CLI carimba o mesmo `updated_at`, o `npm run admin:senha`
+passa a revogar sessão viva — o caminho de emergência do runbook.
 
 `POST /admin/auth/login` recebe só a senha e roda as mesmas cinco checagens
 de `requireSessaoAdmin`, menos as duas de sessão: email do Access ∈
@@ -247,9 +258,16 @@ O passo 5 usa `--file` em vez de `--command` porque `--command` deixaria o hash
 visível em `ps` para qualquer processo da máquina e no histórico do shell.
 
 O passo 1 é **conveniência, não fronteira** — a fronteira é `requireSessaoAdmin`
-conferindo `ADMIN_EMAILS` a cada requisição. Por isso o script pode extrair a
-lista com um regex na linha do `ADMIN_EMAILS` e recusar se não encontrar, sem
-precisar de um parser de JSONC (que seria pacote novo).
+conferindo `ADMIN_EMAILS` a cada requisição. A primeira versão desta seção
+concluía daí que bastaria um regex na linha do `ADMIN_EMAILS`, para não
+precisar de um parser de JSONC (que seria pacote novo). O que foi construído é
+melhor e continua sem pacote novo: `api/scripts/jsonc.mjs`, 52 linhas que
+tiram os comentários `//` e `/* */` respeitando strings, e devolvem o arquivo
+ao `JSON.parse`. O regex era o que cortaria `"https://…"` no meio, porque o
+`//` de dentro de uma string não é comentário — e o script lê o mesmo arquivo
+que o `wrangler deploy` lê, em vez de uma aproximação dele. O parser também é
+usado pelo teste que confere que `ACCESS_DEV_BYPASS` não existe no bloco
+`vars` de produção.
 
 O SQL é `INSERT … ON CONFLICT(email) DO UPDATE`, então o mesmo comando cria e
 rotaciona.
@@ -336,34 +354,66 @@ do `ADMIN_EMAILS` vê a mensagem de "não é administrador"; (3) apagar a linha 
 
 ## 11. Migração e dados existentes
 
-**Duas migrações, não uma.** A criação de `admins` é aditiva; o `DROP COLUMN`
-de `users.role` é destrutivo, e o Worker que está em produção agora seleciona
-essa coluna por nome (o Drizzle lista as colunas do schema, não usa `SELECT *`).
-Dropá-la antes de publicar o Worker novo derrubaria o **login do aluno** pelos
-minutos entre um passo e outro. Separadas, a janela deixa de existir:
+**Três migrações, e o Worker vai antes das três.** São elas:
 
-| Migração | Conteúdo | Quando aplicar |
+| Migração | Conteúdo | Natureza |
 |---|---|---|
-| `000X_admins` | `CREATE TABLE admins` | antes do deploy do Worker |
-| `000Y_users_sem_role` | `ALTER TABLE users DROP COLUMN role` | depois, quando nenhum código a lê |
+| `0003_military_praxagora` | `CREATE TABLE admins` | aditiva |
+| `0004_flippant_lilandra` | `ALTER TABLE users DROP COLUMN role` | destrutiva |
+| `0005_safe_vampiro` | reconstrói `questions` para `created_by` referenciar `admins.email` em vez de `users.id` | destrutiva por dentro |
+
+A versão anterior desta seção previa duas migrações e mandava aplicar **só a
+primeira** antes do deploy do Worker, adiando a destrutiva. A `0005` não
+existia ainda, e o conselho não sobrevive à existência dela por uma razão de
+ferramenta: `wrangler d1 migrations apply` aplica **tudo** que estiver
+pendente. Não há como aplicar só a primeira sem tirar arquivo da pasta e
+recolocá-lo depois — manobra frágil demais para produção, e que ainda deixaria
+a janela que ela pretendia fechar. Então as três vão juntas, num passo só, e
+quem fecha a janela é a **ordem**: o Worker primeiro.
+
+**Por que o Worker antes das migrações, e não depois.** Parece ao contrário,
+mas o perigo mora na outra ordem. O Worker que está em produção agora
+seleciona `users.role` por nome — o Drizzle lista as colunas do schema, não
+usa `SELECT *`. Dropar a coluna antes de publicar o Worker novo derrubaria o
+**login do aluno** pelos minutos entre um passo e outro. Publicando o Worker
+primeiro, esses minutos ficam sem janela nenhuma para o aluno: o Worker novo
+nunca lê `role`, e o `INSERT` do webhook da Hotmart, que ainda não sabe que a
+coluna vai sumir, cai no `DEFAULT` dela enquanto ela existir. O que fica
+quebrado nesse intervalo é só o painel, que já está em transição e no qual
+ninguém consegue entrar até o Pages novo subir.
 
 Ordem de publicação:
 
-1. `npm run db:generate` gera as duas; aplicar **só a primeira** em produção
-   com `npx wrangler d1 migrations apply mais-aprovacao-db --remote`. O
-   `wrangler deploy` não aplica migração — é passo separado, como já registra
-   `runbook-deploy-producao.md:504`;
-2. `npm run deploy` do Worker (rotas, middleware, sem leitura de `role`);
+1. `npm run deploy` do Worker (rotas, middleware, sem leitura de `role`);
+2. `npx wrangler d1 migrations apply mais-aprovacao-db --remote`, que aplica as
+   três de uma vez. O `wrangler deploy` não aplica migração — é passo separado,
+   como já registra `runbook-deploy-producao.md`;
 3. `npm run admin:senha -- <email>` para cada um dos três emails — depende da
-   tabela criada no passo 1;
+   tabela criada no passo 2;
 4. deploy do Pages com o painel novo;
-5. aplicar a segunda migração, que dropa a coluna já órfã;
-6. ajustes do Access da §10 e a conferência da mesma seção.
+5. ajustes do Access da §10 e a conferência da mesma seção.
 
-Entre 2 e 4 o painel publicado chama rotas que deixaram de existir. A janela é
-de minutos e o painel não tem usuário fora das três pessoas; inverter 2 e 4
-seria o mesmo erro com mais tempo de exposição, porque o painel novo ficaria
-falando com um Worker antigo.
+**A `0005` merece leitura antes de aplicar.** Em D1 toda query já roda dentro
+de uma transação implícita, e o SQLite ignora `PRAGMA foreign_keys=OFF` em
+transação — o que o `drizzle-kit` gera para desligar a FK durante o rebuild é
+no-op em produção, e funciona só no Miniflare local, o que esconde o problema.
+Sem a FK desligada de verdade, o `DROP TABLE questions` dispara o
+`ON DELETE CASCADE` de `alternatives` e `explanations`. Por isso a `0005`
+salva as duas antes do `DROP` e as restaura depois do `RENAME`. Esse caminho
+de salvar e restaurar nunca rodou com linha nenhuma dentro — a suíte aplica as
+migrações num banco vazio —, e é por isso que o runbook manda exportar o banco
+e contar as três tabelas antes e depois.
+
+**O runbook é a autoridade operacional.** Esta seção diz *por que* a ordem é
+essa; a lista com caixas de marcar, o backup, as contagens e o que fazer se a
+`0005` falhar no meio vivem na seção "Publicar a separação do login do admin"
+de [`runbook-deploy-producao.md`](../../runbook-deploy-producao.md). Se os dois
+divergirem, o runbook está certo.
+
+Entre os passos 1 e 4 o painel publicado chama rotas que deixaram de existir. A
+janela é de minutos e o painel não tem usuário fora das três pessoas; inverter
+1 e 4 seria pior, não igual — o painel novo falaria com um Worker que nunca
+teve `/admin/auth/*`, e nem a tela de "não é administrador" funcionaria.
 
 A linha de produção de `dudu@zava.dev.br`, nascida da compra de teste no
 sandbox, **fica** — pela regra 4 reescrita ela é uma conta de aluno legítima, e

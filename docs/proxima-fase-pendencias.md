@@ -41,12 +41,17 @@ Três ressalvas que mudam o que dá para prometer:
   spec descreve: admin é a interseção de `ADMIN_EMAILS`
   (`api/wrangler.jsonc`) com uma senha na tabela `admins`, criada só pelo
   `npm run admin:senha`; o painel autentica atrás do Cloudflare Access, sem
-  campo de email nem Turnstile na tela de login. Publicar exige, nesta ordem
-  (detalhada na spec, §11): aplicar a migração aditiva que cria `admins`,
-  publicar o Worker, rodar `admin:senha` para os três emails, publicar o
-  Pages do painel, só então aplicar a migração que dropa `users.role`, e
-  configurar a aplicação do Cloudflare Access (ligar o *Enable Binding
-  Cookie*). Nenhum passo depende do ucode da Hotmart.
+  campo de email nem Turnstile na tela de login. Publicar é o roteiro
+  "Publicar a separação do login do admin" do
+  [runbook de deploy](runbook-deploy-producao.md) — **a autoridade operacional
+  desta publicação**, com backup e contagens antes e depois. Em resumo:
+  publicar o Worker primeiro, depois aplicar as **três** migrações pendentes
+  de uma vez (o `wrangler d1 migrations apply` aplica tudo que estiver
+  pendente), rodar `admin:senha` para os três emails, publicar o Pages do
+  painel e configurar a aplicação do Cloudflare Access (ligar o *Enable
+  Binding Cookie*). O Worker vem antes porque é o que está em produção agora
+  que ainda lê `users.role`, coluna que uma das migrações dropa. Nenhum passo
+  depende do ucode da Hotmart.
 
 ## O próximo passo: coletar o ucode
 

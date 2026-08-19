@@ -829,7 +829,20 @@ A ordem existe porque uma das três migrações pendentes é destrutiva e o
 Worker que está em produção agora lê a coluna que ela apaga.
 
 - [ ] **1.** `cd api && npm run deploy` — o Worker primeiro.
-- [ ] **2.** `npx wrangler d1 migrations apply mais-aprovacao-db --remote` —
+- [ ] **2.** **Backup do banco, antes de qualquer migração:**
+      `npx wrangler d1 export mais-aprovacao-db --remote --output ~/backup-d1-antes-0005.sql`.
+      O caminho de salvar e restaurar da `0005` (ver a nota adiante) nunca
+      rodou com linha nenhuma dentro — a suíte aplica as migrações num banco
+      vazio, então é código não exercitado apontado para dado de produção.
+      Guarde o arquivo até o passo 5 fechar.
+- [ ] **3.** **Contagens antes.** Anote os três números:
+      ```
+      npx wrangler d1 execute mais-aprovacao-db --remote --command \
+        "SELECT (SELECT count(*) FROM questions) AS questions,
+                (SELECT count(*) FROM alternatives) AS alternatives,
+                (SELECT count(*) FROM explanations) AS explanations;"
+      ```
+- [ ] **4.** `npx wrangler d1 migrations apply mais-aprovacao-db --remote` —
       aplica as **três** migrações pendentes juntas: `0003_military_praxagora`
       (`CREATE TABLE admins`), `0004_flippant_lilandra`
       (`ALTER TABLE users DROP COLUMN role`) e `0005_safe_vampiro`
@@ -838,26 +851,45 @@ Worker que está em produção agora lê a coluna que ela apaga.
       que estiver pendente — não dá para aplicar só a primeira sem tirar
       arquivo da pasta, e isso é frágil demais para produção. É por isso que a
       ordem certa é publicar o Worker antes, não separar as migrações.
-- [ ] **3.** `npm run admin:senha -- <email>` para cada um dos três emails —
-      depende da tabela `admins`, criada no passo 2.
-- [ ] **4.** Deploy do Pages (fase 9) com o painel novo.
-- [ ] **5.** Configuração do Access — subseção "Configuração da aplicação
+- [ ] **5.** **Contagens depois.** Rode o mesmo comando do passo 3. Os três
+      números precisam estar **iguais** aos anotados. Se algum caiu, o
+      `ON DELETE CASCADE` disparou: pare aqui e restaure do arquivo do passo 2.
+- [ ] **6.** `npm run admin:senha -- <email>` para cada um dos três emails —
+      depende da tabela `admins`, criada no passo 4.
+- [ ] **7.** Deploy do Pages (fase 9) com o painel novo.
+- [ ] **8.** Configuração do Access — subseção "Configuração da aplicação
       Access", na fase 5.
-- [ ] **6.** Conferência: janela anônima → IdP → a tela de login mostra o
+- [ ] **9.** Conferência: janela anônima → IdP → a tela de login mostra o
       email certo; uma identidade fora do `ADMIN_EMAILS` vê "não é
       administrador"; `npm run admin:senha -- <email> --remover` derruba a
       sessão viva na requisição seguinte (e depois recriar a senha de quem foi
-      removido por engano).
+      removido por engano). O `admin:senha` sem `--remover` também derruba
+      sessão viva, porque carimba `updated_at` e `requireSessaoAdmin` recusa
+      sessão anterior a ele — é o caminho de emergência para expulsar quem
+      roubou um cookie.
+
+> **Se a `0005` falhar no meio, antes de tentar de novo:** ela cria
+> `__save_alternatives` e `__save_explanations` para segurar as filhas durante
+> o rebuild (e `__new_questions` para a tabela nova), e apaga as três no
+> caminho. Uma falha entre um ponto e outro deixa tabela para trás, e a
+> tentativa seguinte morre em **`table already exists`** — erro que não tem
+> nada a ver com a causa original, o que despista. Veja o que sobrou com
+> `SELECT name FROM sqlite_master WHERE name GLOB '__*';` (GLOB, não LIKE: o
+> `_` do LIKE é curinga). **Leia as linhas antes de apagar**: se o
+> `DROP TABLE questions` já tiver passado, as `__save_*` são a única cópia das
+> filhas — nesse caso restaure do backup do passo 2, não improvise. Só quando
+> souber que são resíduo é que se apaga
+> (`DROP TABLE __save_alternatives;` e as demais) e se tenta de novo.
 
 > **Por que o Worker vai antes das migrações — parece ao contrário, mas não
 > é.** O Worker novo nunca seleciona `users.role`: o Drizzle lista as colunas
 > do schema, e a coluna já saiu do schema antes deste deploy. Entre o passo 1
-> e o passo 2, o `INSERT` do webhook da Hotmart ainda não sabe que a coluna
+> e o passo 4, o `INSERT` do webhook da Hotmart ainda não sabe que a coluna
 > vai sumir — mas ela ainda existe no banco (a migração `0004` só a dropa no
-> passo 2), então o `INSERT` cai no `DEFAULT` dela. Resultado: o **login e o
+> passo 4), então o `INSERT` cai no `DEFAULT` dela. Resultado: o **login e o
 > cadastro do aluno não têm janela de quebra**. O que fica quebrado nesses
 > minutos é só o painel admin — que já está em transição e no qual ninguém
-> consegue entrar mesmo, até o passo 4 publicar o painel novo. Inverter a
+> consegue entrar mesmo, até o passo 7 publicar o painel novo. Inverter a
 > ordem (migrar antes de publicar o Worker) é o erro perigoso: o Worker *em
 > produção*, o antigo, ainda seleciona `role` por nome, e a coluna já teria
 > sumido.
@@ -887,9 +919,9 @@ Worker que está em produção agora lê a coluna que ela apaga.
 > `SELECT COUNT(*) FROM explanations` contra o número de questões antes de
 > assumir que o acervo está íntegro.
 
-Entre os passos 1 e 4 o painel publicado (o antigo, ainda no ar) chama rotas
+Entre os passos 1 e 7 o painel publicado (o antigo, ainda no ar) chama rotas
 que já deixaram de existir no Worker novo: janela de minutos, sem usuário fora
-das três pessoas do time. Inverter 1 e 4 — publicar o painel novo antes do
+das três pessoas do time. Inverter 1 e 7 — publicar o painel novo antes do
 Worker novo — é pior, não igual: o painel novo chamaria `/admin/auth/*` num
 Worker que nunca teve essas rotas, e nem a tela de "não é administrador" (que
 depende de `GET /admin/auth/contexto`) funcionaria.
