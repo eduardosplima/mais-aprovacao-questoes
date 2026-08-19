@@ -110,25 +110,24 @@ test("o cabeçalho segue o padrão de ícone junto do texto", async ({ page }) =
   }
 });
 
-test("o <select> abre mão da aparência nativa, e o <input> não ganha seta", async ({
+test("o <select> honra o padding do autor, e o <input> não ganha seta", async ({
   page,
 }) => {
   await entrar(page);
 
-  // Afirma a CAUSA, não o sintoma. O sintoma — o Safari descartar o
-  // padding-left do autor enquanto `appearance: auto` valer — só é
-  // observável no WebKit, que esta suíte ainda não roda (ver
-  // docs/proxima-fase-pendencias.md, item 1). No chromium o padding é
-  // honrado dos dois jeitos, então `padding-left: 44px` passaria mesmo sem a
-  // correção e não serviria de regressão nenhuma.
-  await expect(page.getByLabel("Situação")).toHaveCSS("appearance", "none");
+  // Afirma o SINTOMA, não a causa. `appearance: none` é o meio; o fim é o
+  // Safari honrar o padding-left do autor — e ele só o descarta enquanto a
+  // aparência nativa valer. Com o WebKit na suíte, esta asserção distingue o
+  // código corrigido do quebrado; a antiga (`appearance` = `none`) apenas
+  // repetia a linha de CSS que ela mesma deveria estar verificando.
+  await expect(page.getByLabel("Situação")).toHaveCSS("padding-left", "44px");
 
   await page.goto("/questoes/editar");
-  await expect(page.getByLabel("Tipo")).toHaveCSS("appearance", "none");
+  await expect(page.getByLabel("Tipo")).toHaveCSS("padding-left", "44px");
   await expect(
     page.getByLabel("Tipo").locator("xpath=..").locator("svg"),
   ).toHaveCount(2);
-  await expect(page.getByLabel("Assunto")).toHaveCSS("appearance", "none");
+  await expect(page.getByLabel("Assunto")).toHaveCSS("padding-left", "44px");
 
   // O campo Ano é <input> dentro do mesmo Controle e NÃO leva seta: um campo
   // de texto com seta de lista mentiria sobre o que ele é. Um svg só — o
