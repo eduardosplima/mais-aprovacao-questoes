@@ -134,7 +134,13 @@ export function ModalTrocarSenha({
             value={nova}
             onChange={(e) => {
               setNova(e.target.value);
-              if (erros.nova) setErros((x) => ({ ...x, nova: undefined }));
+              // Corrigir a nova senha também pode sanar a divergência que
+              // gerou o erro de confirmação — sem limpar os dois, a mensagem
+              // ficava presa no campo "Confirme a nova senha" mesmo depois
+              // de ele já bater com o valor novo.
+              if (erros.nova || erros.confirmacao) {
+                setErros((x) => ({ ...x, nova: undefined, confirmacao: undefined }));
+              }
             }}
           />
         </Campo>

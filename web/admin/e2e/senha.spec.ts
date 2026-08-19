@@ -23,6 +23,13 @@ test("a troca exige a senha atual, e o erro cai no campo que o causou", async ({
   await modal.getByLabel("Confirme a nova senha").fill("nova-senha-comprida");
   await modal.getByRole("button", { name: "Salvar" }).click();
 
+  // Não basta a frase aparecer em algum lugar do modal — ela precisa estar
+  // marcada no campo "Senha atual" via aria-invalid, senão uma implementação
+  // que jogasse tudo na linha geral passaria com o mesmo texto.
+  await expect(modal.getByLabel("Senha atual")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
   await expect(modal.getByText("Senha atual incorreta.")).toBeVisible();
 });
 
@@ -35,6 +42,10 @@ test("senha nova curta é recusada, e o erro cai no campo da nova senha", async 
   await modal.getByLabel("Confirme a nova senha").fill("curta12345");
   await modal.getByRole("button", { name: "Salvar" }).click();
 
+  // Mesma lógica: a frase sozinha não prova o campo, o aria-invalid prova.
+  await expect(
+    modal.getByLabel("Nova senha", { exact: true }),
+  ).toHaveAttribute("aria-invalid", "true");
   await expect(
     modal.getByText("A senha precisa ter pelo menos 12 caracteres."),
   ).toBeVisible();
@@ -57,6 +68,25 @@ test("a confirmação precisa bater, e isso nem chega no servidor", async ({
 
   await expect(modal.getByText("A confirmação não confere.")).toBeVisible();
   expect(saiu).toBe(false);
+});
+
+// I1: o erro de confirmação nasceu do envio, não de digitar em "Confirme a
+// nova senha" — corrigir pelo outro lado (a "Nova senha", até bater com o
+// que já estava em "Confirme") também precisa apagar a mensagem. Sem isso
+// ela fica presa num campo que já está correto.
+test("o erro de confirmação também some ao corrigir pela Nova senha, não só pela confirmação", async ({
+  page,
+}) => {
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill(SENHA);
+  await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida");
+  await modal.getByLabel("Confirme a nova senha").fill("outra-coisa-comprida");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+
+  await expect(modal.getByText("A confirmação não confere.")).toBeVisible();
+
+  await modal.getByLabel("Nova senha", { exact: true }).fill("outra-coisa-comprida");
+  await expect(modal.getByText("A confirmação não confere.")).toHaveCount(0);
 });
 
 // 5b: o tip é ao vivo. Sem ele, a pessoa só descobre a divergência depois de
