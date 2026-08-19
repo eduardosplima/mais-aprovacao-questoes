@@ -47,11 +47,13 @@ export function ModalTrocarSenha({
   const [erros, setErros] = useState<Erros>({});
   const [enviando, setEnviando] = useState(false);
   const avisar = useToast();
-  // Cancelar não cancela a requisição que já saiu: o `catch` roda depois que
-  // fechar() limpou tudo e reescreve o erro por cima do estado limpo, que
-  // então aparece na próxima abertura. A marca faz a resposta tardia ser
-  // ignorada em vez de ressuscitar o modal fechado.
-  const descartada = useRef(false);
+  // Cancelar não cancela a requisição que já saiu, e um booleano único não
+  // basta: cancelar A e reenviar (B) antes de A responder faria o `catch`
+  // de A ver B como "não descartado" e escrever erro velho por cima do
+  // estado de B, além de destravar o botão com B ainda em voo. O contador
+  // dá identidade a cada requisição — mesmo mecanismo de
+  // app/taxonomias/page.tsx e app/page.tsx.
+  const idRequisicao = useRef(0);
 
   // O tip ao vivo (spec §4): com os dois preenchidos e diferentes, a
   // divergência aparece enquanto se digita. Os dois campos são type=password,
@@ -61,15 +63,18 @@ export function ModalTrocarSenha({
     nova !== "" && confirmacao !== "" && nova !== confirmacao;
 
   function fechar() {
-    descartada.current = true;
+    // Invalida qualquer requisição em voo: a resposta que chegar depois já
+    // não bate mais com idRequisicao.current, então cai nos `return` do
+    // catch/finally abaixo em vez de reescrever o estado que este fechar()
+    // acabou de limpar.
+    idRequisicao.current++;
     setAtual("");
     setNova("");
     setConfirmacao("");
     setErros({});
     // fechar() acontece tanto pelo Cancelar quanto pelo sucesso do envio, e
-    // o finally de enviar() não mexe em enviando quando descartada.current
-    // está marcada — sem isto aqui, o botão ficava preso em "Aguarde…" na
-    // reabertura.
+    // o finally de enviar() não mexe em enviando quando o id não bate mais —
+    // sem isto aqui, o botão ficava preso em "Aguarde…" na reabertura.
     setEnviando(false);
     aoFechar();
   }
@@ -93,13 +98,14 @@ export function ModalTrocarSenha({
 
     setErros({});
     setEnviando(true);
-    descartada.current = false;
+    const id = ++idRequisicao.current;
     try {
       await api.trocarSenha(atual, nova);
+      if (id !== idRequisicao.current) return;
       avisar("Senha trocada.");
       fechar();
     } catch (falha) {
-      if (descartada.current) return;
+      if (id !== idRequisicao.current) return;
       // O erro pertence ao campo que o causou — mesmo tratamento que o 409 de
       // taxonomia recebe. Cair tudo numa linha genérica obrigaria o operador
       // a adivinhar qual dos três campos está errado.
@@ -111,7 +117,7 @@ export function ModalTrocarSenha({
         setErros({ geral: mensagemDe(falha) });
       }
     } finally {
-      if (!descartada.current) setEnviando(false);
+      if (id === idRequisicao.current) setEnviando(false);
     }
   }
 

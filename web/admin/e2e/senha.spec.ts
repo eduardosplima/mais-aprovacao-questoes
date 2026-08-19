@@ -267,3 +267,72 @@ test("o erro geral some ao voltar a digitar", async ({ page }) => {
   await modal.getByLabel("Senha atual").fill(`${SENHA}x`);
   await expect(geral).toHaveCount(0);
 });
+
+// Achado da revisão da Task 7: um booleano único não tem identidade por
+// requisição. Cancelar A e reenviar antes de A responder faz o catch de A
+// enxergar o reenvio (B) como "não descartado" — escreve o erro velho de A
+// por cima do estado de B, e o finally de A destrava o botão com B ainda em
+// voo. O contador de geração corrige isso: a resposta de A só mexe no
+// estado se ainda for a requisição mais recente.
+test("resposta atrasada de uma requisição cancelada não atrapalha o envio seguinte", async ({
+  page,
+}) => {
+  let liberarA: (() => void) | undefined;
+  let liberarB: (() => void) | undefined;
+  let chamadas = 0;
+  await page.route("**/admin/auth/senha", async (rota) => {
+    chamadas += 1;
+    if (chamadas === 1) {
+      await new Promise<void>((resolve) => {
+        liberarA = resolve;
+      });
+      return rota.fulfill({ status: 400, json: { error: "senha_atual_incorreta" } });
+    }
+    await new Promise<void>((resolve) => {
+      liberarB = resolve;
+    });
+    return rota.fulfill({ status: 200, json: { ok: true } });
+  });
+
+  const modal = await abrirTrocarSenha(page);
+  await modal.getByLabel("Senha atual").fill("qualquer-coisa-comprida");
+  await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida");
+  await modal.getByLabel("Confirme a nova senha").fill("nova-senha-comprida");
+  await modal.getByRole("button", { name: "Salvar" }).click();
+  // A saiu e está pendurada em liberarA — só o teste a libera.
+  await expect.poll(() => chamadas).toBe(1);
+
+  await modal.getByRole("button", { name: "Cancelar" }).click();
+
+  await page.getByRole("button", { name: "Trocar senha" }).click();
+  const reaberto = page.getByRole("dialog");
+  await reaberto.getByLabel("Senha atual").fill(SENHA);
+  await reaberto.getByLabel("Nova senha", { exact: true }).fill("outra-senha-comprida");
+  await reaberto.getByLabel("Confirme a nova senha").fill("outra-senha-comprida");
+  await reaberto.getByRole("button", { name: "Salvar" }).click();
+  // B saiu e está pendurada em liberarB — A continua pendurada também.
+  await expect.poll(() => chamadas).toBe(2);
+
+  // A responde agora, com B ainda em voo. Se a resposta de A mexesse no
+  // estado, o erro dela apareceria aqui e o botão destravaria antes da hora.
+  // O seletor não pode ser pelo nome acessível "Salvar": em carregando o
+  // texto do próprio botão vira "Aguarde…", e é exatamente isso que este
+  // teste precisa continuar enxergando.
+  const botaoSalvar = reaberto.locator('button[type="submit"]');
+  liberarA?.();
+  // Ausência não dá para flagrar no primeiro poll: se checar agora, o
+  // catch/finally de A ainda pode não ter rodado, e a asserção passaria por
+  // sorte antes do bug aparecer. Espera a resposta chegar de verdade e o
+  // catch/finally terem a chance de rodar antes de confirmar que nada mudou.
+  await page.waitForResponse(
+    (res) => res.url().includes("/admin/auth/senha") && res.status() === 400,
+  );
+  await page.waitForTimeout(300);
+  await expect(reaberto.getByText("Senha atual incorreta.")).toHaveCount(0);
+  await expect(botaoSalvar).toHaveText("Aguarde…");
+
+  // B responde por último, e é a resposta dela que conta.
+  liberarB?.();
+  await expect(page.getByText("Senha trocada.")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
