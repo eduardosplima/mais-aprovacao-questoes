@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
 /**
- * Só o rótulo, a mensagem de erro e o espaçamento. O controle vem por
- * `children` de propósito: input, select e textarea têm APIs diferentes
- * demais para caberem numa prop `tipo` sem virar um componente que faz três
- * coisas.
+ * Só o rótulo, a mensagem e o espaçamento. A mensagem tem três formas
+ * mutuamente exclusivas — `erro`, `aviso` e `dica`, nesta precedência —, e no
+ * máximo uma aparece por vez. O controle vem por `children` de propósito:
+ * input, select e textarea têm APIs diferentes demais para caberem numa prop
+ * `tipo` sem virar um componente que faz três coisas.
  */
 export function Campo({
   rotulo,
