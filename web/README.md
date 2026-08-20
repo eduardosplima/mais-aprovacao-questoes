@@ -175,6 +175,16 @@ Playwright sobe abre o mesmo arquivo SQLite do D1 local
 um jeito que não parece contenção — parece defeito do painel. Rode em
 sequência.
 
+**Encerre o `npm run dev` antes de rodar a suíte.** O Playwright sobe os
+próprios servidores e **não reaproveita** um que já esteja de pé
+(`reuseExistingServer: false`), então com o `dev` aberto a suíte para logo no
+começo com `http://127.0.0.1:8787/health is already used`. É falha barulhenta
+de propósito: antes ela reaproveitava o servidor vivo, herdava o desgaste
+acumulado de execuções anteriores, e isso reaparecia como timeout de
+`page.goto` só no WebKit — um sintoma que não parecia ter nada a ver com a
+causa. Ver o bloco de verificação de
+[`plans/2026-08-19-ajustes-finos.md`](../docs/superpowers/plans/2026-08-19-ajustes-finos.md).
+
 A suíte roda em **chromium e WebKit** — o cliente trabalha em macOS, então o
 Safari é navegador de primeira classe aqui, não cobertura extra.
 
