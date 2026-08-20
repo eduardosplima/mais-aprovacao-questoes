@@ -5,18 +5,20 @@
 > por engano o que foi fechado de propósito. Os detalhes moram nos runbooks e
 > nos planos linkados; aqui fica só o que orienta a decisão.
 >
-> Atualizado em **2026-08-19**, quando a separação do login do admin foi
-> publicada. O WebKit, que já deu nome a este documento, saiu da lista de
-> pendências em 18/08: a suíte e2e roda verde em chromium e WebKit. O registro
-> do que era e do que foi encontrado ficou mais abaixo, porque duas coisas que
-> ele afirmava estavam erradas e vale saber por quê.
+> Atualizado em **2026-08-20**, ao fechar a rodada de ajustes finos do painel.
+> A separação do login do admin foi publicada em 19/08. O WebKit, que já deu
+> nome a este documento, saiu da lista de pendências em 18/08: a suíte e2e roda
+> verde em chromium e WebKit. O registro do que era e do que foi encontrado
+> ficou mais abaixo, porque duas coisas que ele afirmava estavam erradas e vale
+> saber por quê.
 
-## Estado — 2026-08-19
+## Estado — 2026-08-20
 
 | Frente | Estado |
 |---|---|
 | **Sub-projeto 1** — fundação: auth própria, webhook Hotmart, reconciliação, cron | Construído e **publicado** |
 | **Sub-projeto 2** — API admin + painel administrativo | Construído e **publicado**. O painel funciona ponta a ponta |
+| **Ajustes finos do painel** — 13 tarefas, [plano](superpowers/plans/2026-08-19-ajustes-finos.md) | Fechada em **2026-08-20**. Suítes verdes nos dois navegadores, typecheck, build e conferência a olho registrados |
 | **Login do admin** — separado do sub-projeto 2, spec própria ([`2026-08-18-login-admin-design.md`](superpowers/specs/2026-08-18-login-admin-design.md)) | Construído e **publicado** em 2026-08-19 |
 | **Sub-projetos 3 e 4** | Não iniciados |
 | **Fase 12** do runbook — verificação contra o sandbox | Em andamento, e é onde a atenção está |
@@ -78,11 +80,43 @@ viram pré-requisito — estão marcados como tal em
 [`superpowers/plans/2026-08-07-painel-follow-ups.md`](superpowers/plans/2026-08-07-painel-follow-ups.md),
 que é o ledger da dívida do painel.
 
+## Adiado, com decisão em aberto
+
+**Os rótulos de auditoria `DISPUTE`/`PROTEST` e `CANCELED`/`EXPIRED`.** Estava
+listado como "não pendente", o que era falso: nada foi decidido, só adiado.
+
+O que a conferência dos payloads achou, em dois pontos de
+`api/src/webhooks/hotmart.ts`:
+
+- `PURCHASE_PROTEST` chega com `purchase.status: "DISPUTE"`, e o
+  `REVOKING_EVENTS` (`:224`) grava `"PROTEST"`.
+- `PURCHASE_CANCELED` e `PURCHASE_EXPIRED` caem no mesmo `handleExpired`
+  (`:332-333`), que grava `"EXPIRED"` nos dois. Da coluna não dá para
+  distinguir boleto vencido de compra cancelada.
+
+**Não afetam acesso**, e isso é garantido por desenho: `api/src/db/users.ts:99`
+registra que `access_until > now` é o único predicado, e que `status` não
+participa. O custo é de leitura — a coluna que alguém consulta num incidente
+conta uma história ligeiramente errada.
+
+**O que o registro antigo não dizia:** a reconciliação diária compara
+`existing.status !== sub.status` contra o vocabulário da própria Hotmart
+(`api/src/jobs/reconcile.ts:166`). Hoje isso é inerte, porque o cron não casa
+nada sem o ucode. **Depois que o ucode entrar**, cada linha divergente será
+contada como `corrected` na primeira passagem e reescrita para o rótulo da
+Hotmart — ou seja, o `PROTEST` se auto-corrige para `DISPUTE`, com ruído nas
+métricas do cron. O `EXPIRED` de `PURCHASE_CANCELED` só se corrige se aquela
+assinatura aparecer na listagem.
+
+Decidir antes de virar a fase 12, portanto — não depois.
+
 ## Dependência que corre sozinha
 
 `nanoid` 3.3.18 sai do cooldown de 14 dias em **2026-08-21 16:41 UTC**. É o
 último achado do audit nos dois workspaces; depois dele os dois ficam limpos
-pela primeira vez. Não bloqueia nada e não exige decisão — só a data.
+pela primeira vez. Não bloqueia nada e não exige decisão — só a data, e a
+conferência tem que ser **em horas**, não pela data virar: foi assim que o
+`postcss` quase entrou seis horas cedo demais em 07/08.
 
 ---
 
@@ -162,11 +196,23 @@ em vez da tela que dizem medir. Agora medem a certa.
 ## A dívida do painel mora em outro lugar
 
 Polimento, lacuna de cobertura e dívida de empacotamento do sub-projeto 2 têm
-ledger próprio, reconferido contra o código em 2026-08-18:
+ledger próprio, reconferido contra o código pela terceira vez em 2026-08-19:
 [`superpowers/plans/2026-08-07-painel-follow-ups.md`](superpowers/plans/2026-08-07-painel-follow-ups.md).
-Os dois itens que faziam o painel mentir para o operador foram corrigidos
-naquela data; o que resta ali é acessibilidade, tipos, cosmético e os três
-pré-requisitos do sub-projeto 4.
+
+**A rodada de ajustes finos esvaziou quase tudo.** Acessibilidade, qualidade de
+erro no editor, tipos e cosmético estão fechados; as sobras do login e as do
+modal de trocar senha também. O que continua aberto ali são **três itens, e só
+eles**:
+
+| Item | Natureza |
+|---|---|
+| As três arestas de empacotamento do `web/ui` | **Pré-requisito do sub-projeto 4**, não polimento. Cada uma vira defeito no dia em que existir um segundo consumidor do design system — e o sub-projeto 4 é exatamente isso. Tratar no kickoff dele |
+| `nanoid` 3.3.18 | Corre sozinho, ver a seção acima |
+| Busca por texto e modo escuro | Declarados fora de escopo desde o início, não esquecidos |
+
+Um ledger que encolheu tanto merece a advertência que ele mesmo carrega: **é a
+terceira vez que aquela lista drifta no diagnóstico antes de driftar no
+sintoma.** Quem for agir sobre uma entrada de lá relê o código primeiro.
 
 ---
 
@@ -178,4 +224,5 @@ Para não reabrir por engano o que já foi decidido:
 |---|---|
 | Dark theme | Decidido não fazer. O Turnstile foi fixado em `light` por causa disso |
 | Vídeo sem gabarito bloqueando o salvamento | Comportamento novo e aprovado. Se incomodar, são ~4 linhas em `web/admin/src/lib/validacao.ts` |
-| Rótulos `DISPUTE`/`PROTEST` e `CANCELED`/`EXPIRED` | Divergências de auditoria achadas na conferência dos payloads da Hotmart. Não afetam acesso; ficaram para uma rodada futura |
+| Escape descartando as senhas digitadas do `ModalTrocarSenha` | **Decidido em 2026-08-20: fica como está.** Escape é intenção — quem aperta está pedindo para sair. Confirmar antes de descartar não será implementado. O clique no fundo, que era o acidente, já foi fechado |
+| Auto-submit do Apple Passwords na tela de login | **Decidido em 2026-08-20: não fazer.** É cosmético e de pouca relevância para o usuário final, e a sessão dedicada que o investigaria não vale o esforço. O que já foi apurado sobre o comportamento do Safari fica registrado na §7 de [`2026-08-19-ajustes-painel-design.md`](superpowers/specs/2026-08-19-ajustes-painel-design.md), caso alguém reabra por outro motivo |

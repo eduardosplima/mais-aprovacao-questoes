@@ -272,10 +272,11 @@ Levantadas na revisão desta rodada e deixadas de fora de propósito — nenhuma
   quando "Nova senha" não está vazia.
 - ~~O clique no backdrop descarta três senhas digitadas sem confirmação~~
   **Resolvido em 2026-08-19** — o fundo deixou de fechar os quatro diálogos.
-  **Continua aberto:** o Escape faz o mesmo descarte, e continua fazendo. A
-  decisão fechou o acidente e deixou em pé a intenção — quem for reabrir isto
-  precisa decidir se um diálogo com conteúdo digitado deve confirmar antes de
-  descartar.
+  **Decidido em 2026-08-20: o Escape fica como está.** Ele continua
+  descartando as senhas digitadas, e isso é intenção, não acidente — quem
+  aperta Escape num diálogo está pedindo para sair dele. Confirmar antes de
+  descartar não será implementado. O backdrop era o acidente, e fechou; esta
+  entrada não tem mais nada em aberto.
 - ~~O tip de divergência entra pelo `Campo`, que renderiza `role="alert"` —
   alerta assertivo para um aviso de conveniência.~~ **Resolvido em
   2026-08-19** — o `Campo` ganhou a prop `aviso`, com `role="status"`; o tip
@@ -342,23 +343,3 @@ Esse aviso saiu do `web/README.md` nesta rodada de ajustes finos
 risco não é estético — é que o frontend do aluno copie o `Modal` e nasça
 divergindo da regra que herdou por escrito.~~ A dívida fechou antes disso —
 não há mais prioridade a rastrear aqui.
-
-## Auto-submit do Apple Passwords — para a sessão dedicada
-
-Registrado em `docs/superpowers/specs/2026-08-19-ajustes-painel-design.md`
-§7, copiado aqui para a sessão dedicada não recomeçar do zero.
-
-> **Auto-submit do Apple Passwords.** O que esta sessão apurou, para não ser
-> reapurado: o comportamento existe desde o Safari 12.1 e é decisão do
-> Safari, não do site; a Apple **não o documenta em lugar nenhum**; a
-> documentação de Password AutoFill promete, para formulário partido em
-> páginas, "tap and fill" — preencher, não enviar; o caminho de MFA é outro
-> (`autocomplete="one-time-code"`), com auto-submit amplamente relatado, o
-> que significa que existe pelo menos um caminho em que o Safari envia sem
-> usuário nem senha na tela. As alavancas plausíveis e não testadas são:
-> campo `autocomplete="username"` somente-leitura com o email do Access,
-> `action` e `method` no `<form>` (hoje não há nenhum dos dois), e conferir
-> se o preenchimento do Safari chega ao estado do React — este último é
-> risco, não correção: se o auto-submit passar a funcionar e o `onChange`
-> não disparar, o formulário envia senha vazia e a tela acusa "senha
-> inválida" para uma senha correta.
