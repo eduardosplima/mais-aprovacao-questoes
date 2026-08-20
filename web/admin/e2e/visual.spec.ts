@@ -104,9 +104,17 @@ test("o cabeçalho segue o padrão de ícone junto do texto", async ({ page }) =
   await entrar(page);
 
   for (const nome of ["Trocar senha", "Sair"]) {
-    await expect(
-      page.getByRole("button", { name: nome }).locator("svg"),
-    ).toHaveCount(1);
+    const botao = page.getByRole("button", { name: nome });
+    await expect(botao.locator("svg")).toHaveCount(1);
+
+    // Contar svg prova presença, não posição: passaria com o ícone depois do
+    // texto. Aqui o ícone é rótulo, não vetor, então vem antes — e a
+    // comparação usa childNodes porque o Botao renderiza os filhos crus, e o
+    // texto é nó de texto: firstElementChild o ignoraria e acharia o mesmo
+    // <svg> de qualquer jeito. É o mesmo raciocínio do teste da paginação.
+    expect(
+      await botao.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+    ).toBe("svg");
   }
 });
 
