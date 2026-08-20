@@ -18,6 +18,11 @@
 > - Suíte da API: verde, rodada em sequência.
 > - `npm run typecheck`: limpo nos dois workspaces.
 > - Os sete critérios do §9 da spec: conferidos um a um.
+>
+> **Nota sobre o critério 4, "conferido em 375px de largura":** a suíte
+> responsiva (`caminho-critico.spec.ts`) não testa 375px — testa `320, 360,
+> 390`, três larguras de aparelho real que cercam o valor da prosa. Escolha
+> deliberada, documentada no próprio arquivo de teste, não lacuna.
 
 ## Global Constraints
 

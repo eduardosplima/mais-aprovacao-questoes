@@ -64,15 +64,6 @@ herdada — é redescoberta, geralmente divergindo.
 2. **Toda outra ação → `Botao` com ícone + texto.** Fora da tabela o botão
    aparece uma vez, e precisa se explicar sem hover — `title` não existe em
    toque. **Sem exceção.**
-
-   > **Três botões ainda não cumprem esta regra**, e isso é dívida com
-   > correção já decidida, não licença: o `Cancelar` e o confirmar do `Modal`
-   > (`ui/src/Modal.tsx`), que aparecem nos três diálogos do painel, e o
-   > `Entrar` do login. A correção — dar ao `Modal` um slot de ícone e criar
-   > um `IconeEntrar` — está registrada em
-   > [`docs/superpowers/plans/2026-08-07-painel-follow-ups.md`](../docs/superpowers/plans/2026-08-07-painel-follow-ups.md).
-   > **Quem for consumir o `web/ui` antes disso não deve copiar o `Modal`
-   > como exemplo da regra** — ele é o contraexemplo dela.
 3. **O ícone vem antes do texto, exceto em ação direcional**, onde ele vai do
    lado para onde aponta. Nos outros botões o ícone é *rótulo* (disquete =
    salvar) e rótulo antecede o que nomeia; numa ação direcional ele é *vetor*,
