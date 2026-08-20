@@ -229,8 +229,14 @@ test("o tip ao vivo é polido; o erro de envio continua assertivo", async ({
 test("cancelar com a requisição em voo não guarda o erro para a próxima abertura", async ({
   page,
 }) => {
+  // A rota fica pendurada até o teste soltar, em vez de dormir um tanto fixo:
+  // é o teste que decide quando a resposta chega, então "em voo" é fato e não
+  // aposta no relógio — mesma técnica do caso logo abaixo.
+  let liberar: (() => void) | undefined;
   await page.route("**/admin/auth/senha", async (rota) => {
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await new Promise<void>((resolve) => {
+      liberar = resolve;
+    });
     return rota.fulfill({ status: 400, json: { error: "senha_atual_incorreta" } });
   });
 
@@ -239,10 +245,20 @@ test("cancelar com a requisição em voo não guarda o erro para a próxima aber
   await modal.getByLabel("Nova senha", { exact: true }).fill("nova-senha-comprida");
   await modal.getByLabel("Confirme a nova senha").fill("nova-senha-comprida");
   await modal.getByRole("button", { name: "Salvar" }).click();
+  // A requisição saiu e está presa no handler — só o teste a libera.
+  await expect.poll(() => liberar !== undefined).toBe(true);
+
   await modal.getByRole("button", { name: "Cancelar" }).click();
 
-  // A resposta chega agora, com o modal já fechado.
-  await page.waitForTimeout(1200);
+  // A resposta chega agora, com o modal já fechado. `finished()` espera o
+  // corpo inteiro chegar à página, e não só o cabeçalho: depois dele a volta
+  // do `fetch` — e o `catch` que escreveria o erro — já está na fila da
+  // página, antes de qualquer coisa que este teste faça a seguir.
+  liberar?.();
+  const resposta = await page.waitForResponse(
+    (res) => res.url().includes("/admin/auth/senha") && res.status() === 400,
+  );
+  await resposta.finished();
 
   await page.getByRole("button", { name: "Trocar senha" }).click();
   const reaberto = page.getByRole("dialog");
