@@ -6,12 +6,12 @@
 > [`runbook-deploy-producao.md`](runbook-deploy-producao.md) — rodar antes de
 > considerar a Fundação pronta.
 
-## Estado — 2026-08-17
+## Estado — 2026-08-20
 
 | Seção | Estado |
 |---|---|
 | 1. Endpoint da API de dados | ✅ **fechada** — ver os achados abaixo |
-| 2. Fixtures contra evento real | 🟡 oito conferidos e aprovados; falta `PURCHASE_EXPIRED` e dois campos a confirmar numa compra de assinatura |
+| 2. Fixtures contra evento real | 🟡 **nove** conferidos e aprovados — o `PURCHASE_EXPIRED` chegou em 2026-08-20. Continuam faltando os dois campos, que só uma compra de assinatura real confirma |
 | 3–6. Fluxo ponta a ponta, recuperação, cancelamento, idempotência | ⬜ |
 | 7. Reconciliação | 🔴 **bloqueada** — `HOTMART_SUBSCRIPTION_UCODES` ainda é placeholder |
 | 8. Turnstile e segredos | ⬜ |
@@ -157,7 +157,8 @@ foi verificada na segunda página (`page_token` = o token acima):
 > estar verdes contra um payload que a Hotmart não envia.
 
 Oito payloads do sandbox conferidos em 2026-08-17, passados pelo schema zod
-real de `webhooks/hotmart.ts` — não a olho.
+real de `webhooks/hotmart.ts` — não a olho. O nono, o `PURCHASE_EXPIRED`,
+chegou em **2026-08-20** e passou pelo mesmo crivo.
 
 - [x] Webhook do sandbox apontado para um coletor e payloads salvos.
 - [x] **Os oito parseiam.** Nenhum devolveria `invalid_payload` (400).
@@ -167,7 +168,34 @@ real de `webhooks/hotmart.ts` — não a olho.
 - [x] `SUBSCRIPTION_CANCELLATION` — **confirmado que não traz `product.ucode`**,
       e que o `subscriber.code` e o `date_next_charge` ficam na raiz de `data`.
       É a premissa de `handleCancellation` e da seção 5.
-- [ ] `PURCHASE_EXPIRED` — **não foi capturado**. É o único que falta.
+- [x] `PURCHASE_EXPIRED` — capturado em 2026-08-20. Parseia; não devolveria
+      `invalid_payload`. O que sobrevive ao `safeParse`, na íntegra:
+
+```json
+{
+  "id": "03644c90-1b7d-4422-8db3-eca1de2d3fb4",
+  "event": "PURCHASE_EXPIRED",
+  "data": {
+    "product": { "ucode": "fb056612-bcc6-4217-9e6d-2a5d1110ac2f" },
+    "buyer": {
+      "email": "testeComprador271101postman15@example.com",
+      "name": "Teste Comprador",
+      "document": "69526128664"
+    },
+    "purchase": { "transaction": "HP16015479281022", "status": "EXPIRED" },
+    "subscription": {
+      "status": "ACTIVE",
+      "plan": { "name": "plano de teste" },
+      "subscriber": { "code": "I9OT62C3" }
+    }
+  }
+}
+```
+
+      Endereço, telefone, CPF do produtor, frete, comissões, afiliados,
+      `order_bump`, `variants`, `event_tickets` e `offer.metadata` — tudo
+      descartado pela allowlist. O `buyer.document` sobrevive **por desenho**:
+      é o insumo do `document_hash`, e nunca é persistido em claro.
 
 ### O que se confirmou
 
@@ -190,13 +218,18 @@ Isso é a seção 9 provada na origem, antes mesmo de olhar log.
 
 | Campo | Fixture | Payload do sandbox |
 |---|---|---|
-| `purchase.date_next_charge` | presente | **ausente nos oito** |
-| `purchase.recurrence_number` | presente | **ausente nos oito** |
+| `purchase.date_next_charge` | presente | **ausente nos nove** |
+| `purchase.recurrence_number` | presente | **ausente nos nove** |
 
 **Não conclua que a Hotmart não os envia.** Estes payloads são o "Produto test
 postback2" — `product.id: 0`, produto físico, frete dos Correios, order bump,
 ingressos. É o payload de demonstração genérico, não uma compra de assinatura.
 O que se pode afirmar é que os dois campos continuam **não confirmados**.
+
+O `PURCHASE_EXPIRED` de 20/08 é o nono da mesma família e **não move esta
+agulha**: mesmo produto de demonstração, mesmas duas ausências. Ele soma
+evidência do padrão e nada de confirmação — o teste continua sendo uma compra
+de assinatura de verdade, na seção 3.
 
 O código não quebra em nenhum dos casos — os dois têm fallback deliberado. O
 que importa é o que cada fallback custa se a ausência for real:
@@ -211,16 +244,55 @@ O segundo é o sério: é LGPD, não cosmética.
 - [ ] Resolver os dois de uma vez na seção 3, com uma compra de teste num
       produto de **assinatura** de verdade. É o único jeito de saber.
 
-### Duas divergências de auditoria, sem efeito no acesso
+### As divergências de auditoria, sem efeito no acesso
 
-Nenhuma das duas muda quem tem acesso — a decisão é sempre por data. É a coluna
-`status`, que alguém leria num incidente, que fica mentindo:
+Nenhuma muda quem tem acesso — a decisão é sempre por data, e
+`api/src/db/users.ts:99` registra que `access_until > now` é o único predicado
+e que `status` não participa. É a coluna `status`, que alguém leria num
+incidente, que fica mentindo:
 
 - `PURCHASE_PROTEST` traz `purchase.status: "DISPUTE"`; o código grava
-  `"PROTEST"` (`REVOKING_EVENTS`).
-- `PURCHASE_CANCELED` cai em `handleExpired` e grava `"EXPIRED"`.
+  `"PROTEST"` (`REVOKING_EVENTS`, `hotmart.ts:224`).
+- `PURCHASE_CANCELED` cai em `handleExpired` (`:332-333`) e grava `"EXPIRED"`.
+
+> **O payload de 20/08 alargou o problema, e vale ler antes de decidir.**
+>
+> **1. `EXPIRED` não é rótulo emprestado — para o `PURCHASE_EXPIRED` ele é o
+> certo.** O payload traz `purchase.status: "EXPIRED"`, exatamente o que
+> `handleExpired` grava. A divergência é só do `PURCHASE_CANCELED`, que toma
+> emprestado o rótulo do vizinho por dividir o mesmo handler. Da coluna não dá
+> para distinguir boleto vencido de compra cancelada; o payload prova que a
+> Hotmart *distingue*.
+>
+> **2. O payload traz DOIS campos de status, e eles discordam entre si.**
+> `purchase.status: "EXPIRED"` e `subscription.status: "ACTIVE"`, na mesma
+> mensagem. A compra expirou; a assinatura, segundo a própria Hotmart, segue
+> ativa.
+>
+> **3. A coluna mistura dois vocabulários, e a mistura não é intencional.**
+> `handlePurchaseApproved` (`:182`) grava
+> `event.data?.subscription?.status ?? "ACTIVE"` — vocabulário de
+> **assinatura**, o mesmo dos oito status que a §1 enumerou e o mesmo que a
+> reconciliação escreve. Já `handleExpired`, `handleDelayed` e
+> `handleRevocation` gravam rótulos derivados do **nome do evento**, não de
+> campo nenhum do payload. Dois dos três produtores da coluna falam
+> assinatura; só os handlers de revogação falam outra língua. `DELAYED` é o
+> único que coincide nas duas, por acaso.
+>
+> **4. Depois do ucode, a coluna vira ping-pong nesses casos.** Se este mesmo
+> payload chegasse para uma assinatura existente, `handleExpired` gravaria
+> `EXPIRED`, e o cron seguinte — lendo `ACTIVE` da API de dados — contaria
+> `statusDivergiu` e reescreveria para `ACTIVE` (`reconcile.ts:166,177`),
+> marcando a linha como `corrected`. Hoje isso é inerte porque o filtro de
+> ucode não casa nada. **É a partir do ucode que vira ruído recorrente nas
+> métricas do cron.**
+>
+> Ressalva que vale para os quatro pontos: este é o produto de demonstração.
+> A combinação `EXPIRED` + `ACTIVE` pode ser artefato do gerador de payloads,
+> não semântica de uma assinatura real.
 
 - [ ] Decidir se vale alinhar os rótulos ao vocabulário da Hotmart.
+      **Decidir antes de virar a fase 12**, pelo ponto 4 acima.
 
 ---
 
