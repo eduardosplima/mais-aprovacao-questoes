@@ -335,9 +335,8 @@ o dono recusou: a cláusula legitimava como desenho o que é dívida. A
 cláusula foi removida do `README` na mesma decisão, e o texto de lá passou a
 dizer que os três botões eram o contraexemplo da regra — inclusive avisando
 quem fosse consumir o `web/ui` para não copiar o `Modal` como exemplo.
-~~Esse aviso continua no `web/README.md`.~~ Esse aviso saiu do
-`web/README.md` nesta rodada de ajustes finos (Task 13), junto com o bloco
-inteiro que o continha.
+Esse aviso saiu do `web/README.md` nesta rodada de ajustes finos
+(Task 13), junto com o bloco inteiro que o continha.
 
 ~~**Prioridade:** antes de o sub-projeto 4 começar a consumir o `web/ui`. O
 risco não é estético — é que o frontend do aluno copie o `Modal` e nasça
