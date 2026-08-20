@@ -302,12 +302,18 @@ Levantadas na revisão desta rodada e deixadas de fora de propósito — nenhuma
 > para não copiar o `Modal` como exemplo saiu junto — a regra 2 não tem mais
 > contraexemplo dentro do `web/ui`.
 
-> Decidido pelo dono em **2026-08-19**, ao fechar a rodada de ajustes. Vai
-> ser disparado em sessão própria — está aqui para não se perder, não para
-> ser feito de passagem.
+> **Registro histórico a partir daqui — escrito quando a dívida ainda estava
+> aberta, preservado pelo raciocínio, não porque descreva o estado atual.**
+> O estado atual é o da nota de fechamento acima.
 
-A regra 2 do `web/README.md` diz que toda ação fora de linha de tabela é
-`Botao` com ícone + texto, **sem exceção**. Três botões ainda não cumprem:
+~~Decidido pelo dono em **2026-08-19**, ao fechar a rodada de ajustes. Vai
+ser disparado em sessão própria — está aqui para não se perder, não para
+ser feito de passagem.~~ A sessão veio na mesma rodada de ajustes finos, e a
+dívida fechou pela nota do topo desta seção.
+
+~~A regra 2 do `web/README.md` diz que toda ação fora de linha de tabela é
+`Botao` com ícone + texto, **sem exceção**. Três botões ainda não cumprem:~~
+Os três botões que não cumpriam, no momento em que isto foi escrito:
 
 | Onde | Botão |
 |---|---|
@@ -315,23 +321,28 @@ A regra 2 do `web/README.md` diz que toda ação fora de linha de tabela é
 | `web/ui/src/Modal.tsx` | o confirmar (`Salvar` / `Excluir` / o rótulo que o chamador passar) |
 | `web/admin/src/app/login/page.tsx` | o `Entrar` |
 
-**O que fazer:** dar ao `Modal` um slot de ícone para cada um dos dois botões
-— o de confirmar precisa aceitar o ícone que o chamador escolher, porque
-`Excluir` e `Salvar` não são a mesma ação —, e criar um `IconeEntrar` para o
-login. Os ícones de cancelar e salvar já existem (`IconeCancelar`,
-`IconeSalvar`, `IconeExcluir`).
+**O que fazer** (feito nesta rodada): dar ao `Modal` um slot de ícone para
+cada um dos dois botões — o de confirmar precisa aceitar o ícone que o
+chamador escolher, porque `Excluir` e `Salvar` não são a mesma ação —, e
+criar um `IconeEntrar` para o login. Os ícones de cancelar e salvar já
+existiam (`IconeCancelar`, `IconeSalvar`, `IconeExcluir`).
 
-**Por que não foi feito na rodada de ajustes.** A revisão final ofereceu duas
-saídas: qualificar a regra com uma cláusula de exceção, ou dar o slot ao
-`Modal`. Eu (Claude) escolhi a cláusula para não parar a rodada, e o dono
-recusou: a cláusula legitimava como desenho o que é dívida. A cláusula foi
-removida do `README` na mesma decisão, e o texto de lá passou a dizer que os
-três botões são o contraexemplo da regra — inclusive avisando quem for
-consumir o `web/ui` para não copiar o `Modal` como exemplo.
+~~**Por que não foi feito na rodada de ajustes.**~~ **Por que não tinha sido
+feito na rodada de ajustes anterior.** A revisão final daquela rodada
+ofereceu duas saídas: qualificar a regra com uma cláusula de exceção, ou dar
+o slot ao `Modal`. Eu (Claude) escolhi a cláusula para não parar a rodada, e
+o dono recusou: a cláusula legitimava como desenho o que é dívida. A
+cláusula foi removida do `README` na mesma decisão, e o texto de lá passou a
+dizer que os três botões eram o contraexemplo da regra — inclusive avisando
+quem fosse consumir o `web/ui` para não copiar o `Modal` como exemplo.
+~~Esse aviso continua no `web/README.md`.~~ Esse aviso saiu do
+`web/README.md` nesta rodada de ajustes finos (Task 13), junto com o bloco
+inteiro que o continha.
 
-**Prioridade:** antes de o sub-projeto 4 começar a consumir o `web/ui`. O
+~~**Prioridade:** antes de o sub-projeto 4 começar a consumir o `web/ui`. O
 risco não é estético — é que o frontend do aluno copie o `Modal` e nasça
-divergindo da regra que herdou por escrito.
+divergindo da regra que herdou por escrito.~~ A dívida fechou antes disso —
+não há mais prioridade a rastrear aqui.
 
 ## Auto-submit do Apple Passwords — para a sessão dedicada
 
