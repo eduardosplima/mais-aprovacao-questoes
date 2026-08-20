@@ -214,6 +214,47 @@ test("renomear para um nome que já existe explica dentro do modal", async ({ pa
   await expect(page.locator("table").getByText("Quadrix")).toBeVisible();
 });
 
+// O 409 tem campo culpado; uma queda de rede não tem. Mandar as duas para o
+// campo pinta de vermelho, e marca `aria-invalid`, um nome que pode estar
+// perfeito — acusa o campo por um problema que não é dele. O rodapé do
+// diálogo (a prop `erro` do Modal) é o lugar do erro sem dono, e é o que o
+// ModalTrocarSenha já fazia.
+test("falha sem campo culpado no renomear cai no rodapé do diálogo, não no campo", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  await page.getByLabel("Nome", { exact: true }).fill("Idecan");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Idecan")).toBeVisible();
+
+  // Rede caída: o fetch rejeita sem status nem corpo, que é o caso sem
+  // nenhum campo responsável possível.
+  await page.route("**/admin/taxonomy/**", async (rota) => {
+    if (rota.request().method() === "PATCH") return rota.abort();
+    return rota.fallback();
+  });
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Idecan" })
+    .click();
+  const dialogo = page.getByRole("dialog");
+  const campo = dialogo.getByLabel("Novo nome");
+  await campo.fill("Idecan RJ");
+  await dialogo.getByRole("button", { name: "Salvar" }).click();
+
+  await expect(dialogo.getByRole("alert")).toContainText(
+    /não foi possível falar com o servidor/i,
+  );
+  // A prova de que a mensagem está no rodapé e não no campo: o campo não é
+  // acusado. Uma implementação que jogasse tudo em `erroRenomear` mostraria
+  // exatamente o mesmo texto e falharia só aqui.
+  await expect(campo).not.toHaveAttribute("aria-invalid", "true");
+  await expect(dialogo).toBeVisible();
+});
+
 // O modal de excluir fica aberto quando a exclusão falha — `aExcluir` só zera
 // no sucesso. Mandar a mensagem para o toast, na borda da tela, é falar para
 // alguém que está olhando para o centro.
