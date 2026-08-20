@@ -35,12 +35,20 @@ export default defineConfig({
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
+  // `reuseExistingServer: false` nos dois, e não `!process.env.CI`: os dois
+  // servidores de desenvolvimento degradam com o tempo de vida, e o WebKit é
+  // o único dos dois motores que transforma essa degradação em timeout duro
+  // de 30s no `page.goto`. Com o reaproveitamento ligado, um `next dev` vivo
+  // de execuções anteriores era herdado — o desgaste se acumulava entre
+  // invocações, não só dentro de uma. Cada `npm test` agora sobe processo
+  // novo e derruba no fim. Custa uns 20s de boot; paga com uma suíte que não
+  // depende de há quanto tempo a máquina está rodando testes.
   webServer: [
     {
       command: "npm run dev",
       cwd: "../../../api",
       url: "http://127.0.0.1:8787/health",
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 60_000,
     },
     {
@@ -48,7 +56,7 @@ export default defineConfig({
       cwd: "..",
       url: "https://localhost:3000/login",
       ignoreHTTPSErrors: true,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120_000,
     },
   ],
