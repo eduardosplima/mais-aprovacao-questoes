@@ -36,10 +36,16 @@
 > false` nos dois servidores, a suíte ficou verde em duas execuções completas
 > seguidas. Nada foi mascarado: nem retry no projeto webkit, nem timeout maior.
 >
-> **O que não foi feito, e por isso fica sem marca:** a "Conferência a olho, no
-> navegador" da Verificação final. Ela pede dois `npm run dev` e olhos humanos
-> na aba; cada coisa que ela lista está provada por teste automatizado ou pela
-> saída do build, mas a conferência visual em si não aconteceu.
+> **A conferência a olho aconteceu em 2026-08-20**, feita pelo dono, no
+> **Firefox**, contra o roteiro de 21 itens que cobre login, cabeçalho, modal
+> de senha, taxonomias, paginação e editor. Ela ficou sem marca por um dia
+> justamente porque pede olhos humanos: cada coisa que ela lista está provada
+> por teste automatizado ou pela saída do build, mas "parece certo na tela" não
+> é coisa que suíte alguma responde.
+>
+> O navegador fica registrado porque importa aqui: a suíte e2e roda em chromium
+> e WebKit, e o Firefox não é exercitado por ela — esta conferência é a única
+> passada que o painel teve nesse motor.
 >
 > **Três marcas com ressalva, para não valerem mais do que aparentam:**
 >
@@ -1788,7 +1794,7 @@ Esperado: build limpo, `icon.png` presente em `admin/out/`.
 7. Suítes verdes, typecheck limpo.
 8. As entradas do ledger estão fechadas com data, e o `web/README.md` não avisa mais para não copiar o `Modal`.
 
-- [ ] **Conferência a olho, no navegador**
+- [x] **Conferência a olho, no navegador**
 
 ```bash
 cd api && npm run dev    # num terminal
