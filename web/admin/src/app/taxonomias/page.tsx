@@ -15,6 +15,7 @@ import {
   IconeEditar,
   IconeExcluir,
   IconeNivel,
+  IconeSalvar,
   Modal,
   Tabela,
   useToast,
@@ -22,7 +23,7 @@ import {
   type ComponenteIcone,
 } from "@mais/ui";
 import { Layout } from "@/componentes/Layout";
-import { api, type Termo, type TipoTermo } from "@/lib/api";
+import { api, ApiError, type Termo, type TipoTermo } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
 // Banca primeiro: é a taxonomia que a operação mais cadastra.
@@ -48,7 +49,11 @@ export default function PaginaTaxonomias() {
   const [aRenomear, setARenomear] = useState<Termo | null>(null);
   const [novoNome, setNovoNome] = useState("");
   const [erroRenomear, setErroRenomear] = useState<string | null>(null);
+  const [erroRenomearGeral, setErroRenomearGeral] = useState<string | null>(
+    null,
+  );
   const [aExcluir, setAExcluir] = useState<Termo | null>(null);
+  const [erroExcluir, setErroExcluir] = useState<string | null>(null);
   const [renomeando, setRenomeando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
   const avisar = useToast();
@@ -115,6 +120,7 @@ export default function PaginaTaxonomias() {
       return;
     }
     setErroRenomear(null);
+    setErroRenomearGeral(null);
     setRenomeando(true);
     try {
       await api.renomearTermo(alvo.id, limpo);
@@ -122,10 +128,18 @@ export default function PaginaTaxonomias() {
       avisar("Termo renomeado.");
       await carregar();
     } catch (falha) {
-      // Inline, e não em toast: o toast fica acima do overlay e é fácil de
-      // não notar com o modal ainda aberto na frente. O erro pertence ao
-      // campo que o causou — é o mesmo tratamento que o cadastro dá ao 409.
-      setErroRenomear(mensagemDe(falha));
+      // Dentro do diálogo nos dois ramos — o toast fica acima do overlay e é
+      // fácil de não notar com o modal na frente. O que muda é onde: o 409 é
+      // sobre o nome que acabou de ser digitado, e pertence ao campo. Uma
+      // queda de rede, um 500 ou um 404 não dizem nada sobre o que está no
+      // campo — mandá-los para lá pinta de vermelho, e marca `aria-invalid`,
+      // um valor que pode estar perfeito. Esses vão para o rodapé, como o
+      // ModalTrocarSenha já faz.
+      if (falha instanceof ApiError && falha.codigo === "duplicate") {
+        setErroRenomear(mensagemDe(falha));
+      } else {
+        setErroRenomearGeral(mensagemDe(falha));
+      }
     } finally {
       setRenomeando(false);
     }
@@ -134,6 +148,7 @@ export default function PaginaTaxonomias() {
   async function excluir() {
     if (!aExcluir) return;
     const alvo = aExcluir;
+    setErroExcluir(null);
     setExcluindo(true);
     try {
       await api.excluirTermo(alvo.id);
@@ -141,7 +156,9 @@ export default function PaginaTaxonomias() {
       avisar("Termo excluído.");
       await carregar();
     } catch (falha) {
-      avisar(mensagemDe(falha), "erro");
+      // Dentro do diálogo, e não em toast: o modal continua aberto no caminho
+      // de falha, então a mensagem precisa estar onde os olhos já estão.
+      setErroExcluir(mensagemDe(falha));
     } finally {
       setExcluindo(false);
     }
@@ -160,13 +177,17 @@ export default function PaginaTaxonomias() {
               setARenomear(t);
               setNovoNome(t.name);
               setErroRenomear(null);
+              setErroRenomearGeral(null);
             }}
           />
           <BotaoIcone
             variante="perigo"
             rotulo={`Excluir ${t.name}`}
             icone={<IconeExcluir />}
-            onClick={() => setAExcluir(t)}
+            onClick={() => {
+              setAExcluir(t);
+              setErroExcluir(null);
+            }}
           />
         </div>
       ),
@@ -201,26 +222,33 @@ export default function PaginaTaxonomias() {
       </div>
 
       <Card className="p-4 md:p-5 mb-5">
-        <form onSubmit={adicionar} className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <div className="flex-1">
-            <Campo rotulo="Nome" htmlFor="novo-termo" erro={erro ?? undefined}>
-              <input
-                id="novo-termo"
-                className={`${CONTROLE} ${erro ? CONTROLE_INVALIDO : ""}`}
-                aria-invalid={erro ? true : undefined}
-                value={nome}
-                maxLength={120}
-                onChange={(e) => {
-                  setNome(e.target.value);
-                  if (erro) setErro(null);
-                }}
-              />
-            </Campo>
-          </div>
-          <Botao type="submit" carregando={salvando}>
-            <IconeAdicionar />
-            Adicionar
-          </Botao>
+        <form onSubmit={adicionar}>
+          <Campo rotulo="Nome" htmlFor="novo-termo" erro={erro ?? undefined}>
+            {/* O botão é irmão do input, e não do bloco do campo: assim o <p>
+                de erro cresce ABAIXO dos dois e não tem como empurrar um sem
+                empurrar o outro. Com o botão fora do Campo, `items-end`
+                alinhava pela base do bloco, que muda de altura quando o erro
+                aparece. */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="flex-1">
+                <input
+                  id="novo-termo"
+                  className={`${CONTROLE} ${erro ? CONTROLE_INVALIDO : ""}`}
+                  aria-invalid={erro ? true : undefined}
+                  value={nome}
+                  maxLength={120}
+                  onChange={(e) => {
+                    setNome(e.target.value);
+                    if (erro) setErro(null);
+                  }}
+                />
+              </div>
+              <Botao type="submit" carregando={salvando} className="shrink-0">
+                <IconeAdicionar />
+                Adicionar
+              </Botao>
+            </div>
+          </Campo>
         </form>
       </Card>
 
@@ -245,11 +273,14 @@ export default function PaginaTaxonomias() {
         aberto={aRenomear !== null}
         titulo="Renomear termo"
         rotuloConfirmar="Salvar"
+        iconeConfirmar={<IconeSalvar />}
         carregando={renomeando}
+        erro={erroRenomearGeral ?? undefined}
         aoConfirmar={() => void renomear()}
         aoCancelar={() => {
           setARenomear(null);
           setErroRenomear(null);
+          setErroRenomearGeral(null);
         }}
       >
         <Campo
@@ -266,6 +297,10 @@ export default function PaginaTaxonomias() {
             onChange={(e) => {
               setNovoNome(e.target.value);
               if (erroRenomear) setErroRenomear(null);
+              // O erro geral não pertence a campo nenhum, então nenhum
+              // onChange o limparia sozinho — e ele ficaria na tela enquanto
+              // a pessoa reescreve o nome.
+              if (erroRenomearGeral) setErroRenomearGeral(null);
             }}
           />
         </Campo>
@@ -276,9 +311,14 @@ export default function PaginaTaxonomias() {
         titulo="Excluir termo?"
         perigo
         rotuloConfirmar="Excluir"
+        iconeConfirmar={<IconeExcluir />}
         carregando={excluindo}
+        erro={erroExcluir ?? undefined}
         aoConfirmar={() => void excluir()}
-        aoCancelar={() => setAExcluir(null)}
+        aoCancelar={() => {
+          setAExcluir(null);
+          setErroExcluir(null);
+        }}
       >
         O termo some das listas de escolha, mas as questões já cadastradas
         continuam exibindo o nome dele.

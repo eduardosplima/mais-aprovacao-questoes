@@ -1,20 +1,31 @@
 import type { ReactNode } from "react";
 
 /**
- * Só o rótulo, a mensagem de erro e o espaçamento. O controle vem por
- * `children` de propósito: input, select e textarea têm APIs diferentes
- * demais para caberem numa prop `tipo` sem virar um componente que faz três
- * coisas.
+ * Só o rótulo, a mensagem e o espaçamento. A mensagem tem três formas
+ * mutuamente exclusivas — `erro`, `aviso` e `dica`, nesta precedência —, e no
+ * máximo uma aparece por vez. O controle vem por `children` de propósito:
+ * input, select e textarea têm APIs diferentes demais para caberem numa prop
+ * `tipo` sem virar um componente que faz três coisas.
  */
 export function Campo({
   rotulo,
   erro,
+  aviso,
   dica,
   htmlFor,
   children,
 }: {
   rotulo: string;
   erro?: string;
+  /**
+   * Mesma aparência do `erro` e etiqueta ARIA diferente: `role="status"` é
+   * polido — entra na fila do leitor de tela em vez de interromper o que
+   * está sendo falado.
+   *
+   * Para o aviso que aparece enquanto a pessoa digita, e que ela não pediu.
+   * Um erro que responde a uma ação disparada continua sendo `erro`.
+   */
+  aviso?: string;
   dica?: string;
   htmlFor?: string;
   children: ReactNode;
@@ -25,7 +36,14 @@ export function Campo({
         {rotulo}
       </label>
       {children}
-      {dica && !erro && <p className="text-[12.5px] text-txt-3">{dica}</p>}
+      {dica && !erro && !aviso && (
+        <p className="text-[12.5px] text-txt-3">{dica}</p>
+      )}
+      {aviso && !erro && (
+        <p role="status" className="text-[12.5px] font-semibold text-erro">
+          {aviso}
+        </p>
+      )}
       {erro && (
         <p role="alert" className="text-[12.5px] font-semibold text-erro">
           {erro}

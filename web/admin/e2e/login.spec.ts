@@ -17,9 +17,9 @@ test("falha de rede no /admin/auth/me mostra a orientação, não tela em branco
 }) => {
   await page.route("**/admin/auth/me", (rota) => rota.abort());
   await page.goto("/");
-  await expect(page.locator("main").getByRole("alert")).toContainText(
-    /recarregue a página/i,
-  );
+  const alerta = page.locator("main").getByRole("alert");
+  await expect(alerta).toBeVisible();
+  await expect(alerta).toContainText(/recarregue a página/i);
 });
 
 test("a tela mostra o email do Access e não pede email", async ({ page }) => {
@@ -35,9 +35,9 @@ test("senha errada mostra a mensagem e não entra", async ({ page }) => {
   await page.getByLabel("Senha").fill("senha-errada-mas-longa");
   await page.getByRole("button", { name: "Entrar" }).click();
 
-  await expect(page.locator("main").getByRole("alert")).toHaveText(
-    /senha inválida/i,
-  );
+  const alerta = page.locator("main").getByRole("alert");
+  await expect(alerta).toBeVisible();
+  await expect(alerta).toHaveText(/senha inválida/i);
   await expect(page).toHaveURL(/\/login/);
 });
 
@@ -111,7 +111,9 @@ test("admin sem senha é mandado ao time de desenvolvimento", async ({
     rota.fulfill({ json: { email: EMAIL, ehAdmin: true, temSenha: false } }),
   );
   await page.goto("/login");
-  await expect(page.locator("main").getByRole("alert")).toContainText(
+  const alerta = page.locator("main").getByRole("alert");
+  await expect(alerta).toBeVisible();
+  await expect(alerta).toContainText(
     /entre em contato com o time de desenvolvimento/i,
   );
   await expect(page.getByLabel("Senha")).toHaveCount(0);
@@ -143,5 +145,33 @@ test("o rodapé nomeia o Cloudflare Access por extenso", async ({ page }) => {
   await page.goto("/login");
   await expect(
     page.getByRole("link", { name: "Encerrar sessão do Cloudflare Access" }),
+  ).toBeVisible();
+});
+
+test("o botão Entrar tem ícone junto do texto", async ({ page }) => {
+  await page.goto("/login");
+  await aguardarFormularioVivo(page);
+
+  const entrar = page.getByRole("button", { name: "Entrar" });
+  await expect(entrar.locator("svg")).toHaveCount(1);
+  // Ícone é rótulo, não vetor: vem antes do texto — childNodes[0] prova a
+  // ordem, e não só a presença (raciocínio completo no teste da paginação
+  // em visual.spec.ts).
+  expect(
+    await entrar.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+});
+
+// O rodapé já chamava o produto pelo nome completo, e o corpo da mesma tela
+// dizia só "Access" — duas formas do mesmo nome próprio a dez linhas de
+// distância, sendo que é o produto que autentica a pessoa.
+test("o corpo nomeia o Cloudflare Access por extenso, como o rodapé", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await aguardarFormularioVivo(page);
+
+  await expect(
+    page.getByText(/Você entrou pelo Cloudflare Access como/),
   ).toBeVisible();
 });

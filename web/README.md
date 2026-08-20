@@ -64,15 +64,6 @@ herdada — é redescoberta, geralmente divergindo.
 2. **Toda outra ação → `Botao` com ícone + texto.** Fora da tabela o botão
    aparece uma vez, e precisa se explicar sem hover — `title` não existe em
    toque. **Sem exceção.**
-
-   > **Três botões ainda não cumprem esta regra**, e isso é dívida com
-   > correção já decidida, não licença: o `Cancelar` e o confirmar do `Modal`
-   > (`ui/src/Modal.tsx`), que aparecem nos três diálogos do painel, e o
-   > `Entrar` do login. A correção — dar ao `Modal` um slot de ícone e criar
-   > um `IconeEntrar` — está registrada em
-   > [`docs/superpowers/plans/2026-08-07-painel-follow-ups.md`](../docs/superpowers/plans/2026-08-07-painel-follow-ups.md).
-   > **Quem for consumir o `web/ui` antes disso não deve copiar o `Modal`
-   > como exemplo da regra** — ele é o contraexemplo dela.
 3. **O ícone vem antes do texto, exceto em ação direcional**, onde ele vai do
    lado para onde aponta. Nos outros botões o ícone é *rótulo* (disquete =
    salvar) e rótulo antecede o que nomeia; numa ação direcional ele é *vetor*,
@@ -85,6 +76,52 @@ herdada — é redescoberta, geralmente divergindo.
 
 <Botao variante="secundario"><IconeAnterior />Anterior</Botao>
 <Botao variante="secundario">Próxima<IconeProxima /></Botao>
+```
+
+### Diálogos
+
+1. **Enquanto há diálogo aberto, o erro mora dentro dele.** No campo, quando
+   existe campo responsável — o 409 de renomear um termo; no rodapé do
+   diálogo, pela prop `erro` do `Modal`, quando não existe campo culpado.
+   Toast só quando não há diálogo na frente: ele nasce na borda da tela, acima
+   do overlay, e é fácil de não ver com o modal no centro.
+
+   A regra é ancorada no **estado do diálogo**, não no nome da ação. O caso
+   que parece exceção e não é: o excluir questão
+   (`admin/src/app/page.tsx`) fecha o modal *antes* de chamar a API, de forma
+   otimista — quando o erro chega não há diálogo na frente, e o toast é o
+   único lugar que sobra.
+
+2. **O `Campo` tem três mensagens mutuamente exclusivas**, nesta precedência:
+   `erro` > `aviso` > `dica`. `erro` e `aviso` são idênticos na tela — mesmo
+   vermelho, mesmo peso — e diferem só na etiqueta ARIA. O `erro` é
+   `role="alert"`, que interrompe o leitor de tela, e responde a uma ação que
+   a pessoa acabou de disparar. O `aviso` é `role="status"`, polido: entra na
+   fila em vez de interromper, e existe para o alerta que aparece **enquanto
+   se digita** e que ninguém pediu.
+
+3. **Clique no fundo escuro não fecha diálogo.** Escape e `Cancelar` fecham.
+   Um clique fora é acidente com a mesma frequência que é intenção, e no modal
+   de trocar senha o acidente custa três senhas digitadas — por isso a regra é
+   única para os diálogos todos, e não uma prop que cada consumidor teria de
+   descobrir e decidir certo.
+
+   **O que a regra não resolve:** Escape continua descartando o que foi
+   digitado, sem confirmação. Ela fecha o acidente e deixa em pé o descarte
+   deliberado; essa metade é dívida aberta, registrada no ledger
+   ([`docs/superpowers/plans/2026-08-07-painel-follow-ups.md`](../docs/superpowers/plans/2026-08-07-painel-follow-ups.md)).
+
+```tsx
+<Modal
+  aberto={aExcluir !== null}
+  titulo="Excluir termo?"
+  perigo
+  rotuloConfirmar="Excluir"
+  iconeConfirmar={<IconeExcluir />}
+  erro={erroExcluir ?? undefined}   // sem campo culpado: rodapé do diálogo
+  aoConfirmar={...}
+  aoCancelar={...}
+>
 ```
 
 ## Setup

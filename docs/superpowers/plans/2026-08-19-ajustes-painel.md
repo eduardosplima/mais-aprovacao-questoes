@@ -10,6 +10,20 @@
 
 **Spec:** [`docs/superpowers/specs/2026-08-19-ajustes-painel-design.md`](../specs/2026-08-19-ajustes-painel-design.md)
 
+> **Verificação final executada em 2026-08-19**, no início da rodada de ajustes
+> finos e antes de qualquer mudança dela — para que um vermelho posterior não
+> ficasse ambíguo entre dívida desta rodada e regressão da seguinte.
+>
+> - Suíte do painel: verde, chromium e WebKit (`76` testes em cada).
+> - Suíte da API: verde, rodada em sequência.
+> - `npm run typecheck`: limpo nos dois workspaces.
+> - Os sete critérios do §9 da spec: conferidos um a um.
+>
+> **Nota sobre o critério 4, "conferido em 375px de largura":** a suíte
+> responsiva (`caminho-critico.spec.ts`) não testa 375px — testa `320, 360,
+> 390`, três larguras de aparelho real que cercam o valor da prosa. Escolha
+> deliberada, documentada no próprio arquivo de teste, não lacuna.
+
 ## Global Constraints
 
 - **Nenhum pacote npm novo.** Nem dependência, nem devDependency, nem `npx` de pacote que não esteja no `package.json`. Regra do `~/.claude/CLAUDE.md` §5, e nada nesta rodada precisa de pacote.
@@ -34,7 +48,7 @@ Fecha o pedido 2 e a primeira metade do §2 da spec. O campo Senha deixa de acio
 - Consumes: `Campo`, `CONTROLE`, `CONTROLE_INVALIDO` de `@mais/ui` (já exportados).
 - Produces: nada que outra tarefa consuma.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar ao fim de `web/admin/e2e/login.spec.ts`:
 
@@ -69,7 +83,7 @@ test("o rodapé nomeia o Cloudflare Access por extenso", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npx playwright test e2e/login.spec.ts --project=chromium
@@ -77,7 +91,7 @@ cd web && npx playwright test e2e/login.spec.ts --project=chromium
 
 Esperado: FAIL nos dois casos novos. O primeiro falha porque "Informe a senha." não existe; o segundo, porque o link ainda diz "Encerrar também a sessão do Access".
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Em `web/admin/src/app/login/page.tsx`:
 
@@ -134,7 +148,7 @@ Trocar o texto do rodapé:
           Encerrar sessão do Cloudflare Access
 ```
 
-- [ ] **Step 4: Rodar nos dois navegadores**
+- [x] **Step 4: Rodar nos dois navegadores**
 
 ```bash
 cd web && npx playwright test e2e/login.spec.ts
@@ -142,7 +156,7 @@ cd web && npx playwright test e2e/login.spec.ts
 
 Esperado: PASS, chromium e WebKit.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/admin/src/app/login/page.tsx web/admin/e2e/login.spec.ts
@@ -175,7 +189,7 @@ Duas props no `web/ui`, e a adoção da primeira nos modais de taxonomia — que
 **Interfaces:**
 - Produces: `Modal` passa a aceitar `carregando?: boolean` e `idFormulario?: string`. A Task 3 depende das duas.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar a `web/admin/e2e/taxonomias.spec.ts`:
 
@@ -212,7 +226,7 @@ test("dois cliques em Salvar renomeiam uma vez só", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npx playwright test e2e/taxonomias.spec.ts --project=chromium -g "uma vez só"
@@ -220,7 +234,7 @@ cd web && npx playwright test e2e/taxonomias.spec.ts --project=chromium -g "uma 
 
 Esperado: FAIL com `expect(chamadas).toBe(1)` recebendo `2`.
 
-- [ ] **Step 3: Implementar as props no `web/ui`**
+- [x] **Step 3: Implementar as props no `web/ui`**
 
 Em `web/ui/src/Modal.tsx`, na assinatura:
 
@@ -271,7 +285,7 @@ E o botão de confirmar:
 
 > O `Cancelar`, o clique no overlay e o Escape continuam funcionando durante o envio, de propósito: a requisição em voo termina de qualquer jeito, e o aviso de sucesso é toast — aparece mesmo com o modal já fechado. Travar a saída daria a impressão de que fechar cancelaria algo, e não cancelaria.
 
-- [ ] **Step 4: Ligar o `carregando` nos modais de taxonomia**
+- [x] **Step 4: Ligar o `carregando` nos modais de taxonomia**
 
 Em `web/admin/src/app/taxonomias/page.tsx`, acrescentar o estado:
 
@@ -321,7 +335,7 @@ Fazer o mesmo em `excluir()` com `setExcluindo`. E passar as props aos dois `Mod
         aoConfirmar={() => void excluir()}
 ```
 
-- [ ] **Step 5: Rodar nos dois navegadores**
+- [x] **Step 5: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm run typecheck && npx playwright test e2e/taxonomias.spec.ts
@@ -329,7 +343,7 @@ cd web && npm run typecheck && npx playwright test e2e/taxonomias.spec.ts
 
 Esperado: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/ui/src/Modal.tsx web/admin/src/app/taxonomias/page.tsx web/admin/e2e/taxonomias.spec.ts
@@ -365,7 +379,7 @@ O maior item da rodada. Fecha os pedidos 5a, 5b e 5c.
 - Consumes: `Modal` com `carregando` e `idFormulario` (Task 2); `api.trocarSenha(senhaAtual, nova)`; `useToast()`.
 - Produces: `<ModalTrocarSenha aberto={boolean} aoFechar={() => void} />`, consumido pela Task 4 no cabeçalho.
 
-- [ ] **Step 1: Escrever a suíte que falha**
+- [x] **Step 1: Escrever a suíte que falha**
 
 Substituir `web/admin/e2e/senha.spec.ts` inteiro:
 
@@ -499,7 +513,7 @@ test("Enter no campo envia, sem passar pelo botão", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npx playwright test e2e/senha.spec.ts --project=chromium
@@ -507,7 +521,7 @@ cd web && npx playwright test e2e/senha.spec.ts --project=chromium
 
 Esperado: FAIL em todos — não existe botão "Trocar senha" que abra diálogo (hoje é um `<Link>` para `/senha`).
 
-- [ ] **Step 3: Criar o componente**
+- [x] **Step 3: Criar o componente**
 
 Criar `web/admin/src/componentes/ModalTrocarSenha.tsx`:
 
@@ -686,7 +700,7 @@ export function ModalTrocarSenha({
 
 > **`aoConfirmar={() => undefined}`** não é descuido: com `idFormulario`, o botão vira `type="submit"` do `<form>` e o `onClick` deixa de ser chamado. A prop continua sendo obrigatória na assinatura do `Modal` porque todos os outros chamadores dependem dela.
 
-- [ ] **Step 4: Conferir que `ApiError` é exportado**
+- [x] **Step 4: Conferir que `ApiError` é exportado**
 
 ```bash
 grep -n "export class ApiError\|export { ApiError\|codigo" web/admin/src/lib/api.ts | head
@@ -694,7 +708,7 @@ grep -n "export class ApiError\|export { ApiError\|codigo" web/admin/src/lib/api
 
 Esperado: `ApiError` exportada com a propriedade `codigo`. `sessao.tsx` já a importa de `./api`, então o import acima está correto. Se o nome da propriedade for outro, ajustar as duas comparações de `falha.codigo` no Step 3.
 
-- [ ] **Step 5: Ligar no Layout e apagar a rota**
+- [x] **Step 5: Ligar no Layout e apagar a rota**
 
 Em `web/admin/src/componentes/Layout.tsx`, acrescentar o estado e o componente. O botão em si é da Task 4; aqui ele entra ainda sem ícone, só trocando o `<Link>` por um `<Botao>`:
 
@@ -728,7 +742,7 @@ Apagar a rota:
 rm -r web/admin/src/app/senha
 ```
 
-- [ ] **Step 6: Rodar nos dois navegadores**
+- [x] **Step 6: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm run typecheck && npx playwright test e2e/senha.spec.ts
@@ -736,7 +750,7 @@ cd web && npm run typecheck && npx playwright test e2e/senha.spec.ts
 
 Esperado: PASS nos oito casos, chromium e WebKit.
 
-- [ ] **Step 7: Rodar a suíte inteira**
+- [x] **Step 7: Rodar a suíte inteira**
 
 ```bash
 cd web && npm test
@@ -744,7 +758,7 @@ cd web && npm test
 
 Esperado: verde. Esta é a tarefa que apaga uma rota — se algum outro arquivo navegava para `/senha`, é aqui que aparece.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A web/admin/src/componentes/ModalTrocarSenha.tsx web/admin/src/componentes/Layout.tsx web/admin/src/app web/admin/e2e/senha.spec.ts
@@ -780,7 +794,7 @@ MSG
 **Interfaces:**
 - Produces: `IconeChave` e `IconeSair` exportados de `@mais/ui`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar a `web/admin/e2e/visual.spec.ts`:
 
@@ -796,7 +810,7 @@ test("o cabeçalho segue o padrão de ícone junto do texto", async ({ page }) =
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npx playwright test e2e/visual.spec.ts --project=chromium -g "cabeçalho"
@@ -804,7 +818,7 @@ cd web && npx playwright test e2e/visual.spec.ts --project=chromium -g "cabeçal
 
 Esperado: FAIL — os botões existem (Task 3) mas sem `svg`.
 
-- [ ] **Step 3: Criar os dois ícones**
+- [x] **Step 3: Criar os dois ícones**
 
 Em `web/ui/src/Icone.tsx`, ao fim da seção `---- ações ----`:
 
@@ -833,7 +847,7 @@ export function IconeSair(p: PropsIcone) {
 
 Em `web/ui/src/index.ts`, acrescentar `IconeChave` e `IconeSair` à lista exportada de `./Icone`.
 
-- [ ] **Step 4: Usar no cabeçalho**
+- [x] **Step 4: Usar no cabeçalho**
 
 Em `web/admin/src/componentes/Layout.tsx`:
 
@@ -856,7 +870,7 @@ E o gap do ledger, na `div` do cabeçalho (`Layout.tsx:54`), trocando `gap-x-4` 
 gap-x-4 md:gap-x-6
 ```
 
-- [ ] **Step 5: Conferir em 375px**
+- [x] **Step 5: Conferir em 375px**
 
 ```bash
 cd web && npx playwright test e2e/visual.spec.ts
@@ -864,7 +878,7 @@ cd web && npx playwright test e2e/visual.spec.ts
 
 Depois, à mão: `cd web && npm run dev`, abrir `http://localhost:3000` em 375px de largura e conferir que o cabeçalho quebra em linhas sem cortar nenhum botão. Dois botões com texto ocupam mais que um link e um botão — o `flex-wrap` deve absorver, e é isto que se está verificando.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/ui/src/Icone.tsx web/ui/src/index.ts web/admin/src/componentes/Layout.tsx web/admin/e2e/visual.spec.ts
@@ -893,7 +907,7 @@ MSG
 **Interfaces:**
 - Produces: `IconeAnterior` e `IconeProxima` exportados de `@mais/ui`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar a `web/admin/e2e/visual.spec.ts`:
 
@@ -939,7 +953,7 @@ test("a paginação leva a seta do lado para onde aponta", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npx playwright test e2e/visual.spec.ts --project=chromium -g "paginação"
@@ -947,7 +961,7 @@ cd web && npx playwright test e2e/visual.spec.ts --project=chromium -g "paginaç
 
 Esperado: FAIL — `toHaveCount(1)` recebe `0`.
 
-- [ ] **Step 3: Criar os dois ícones**
+- [x] **Step 3: Criar os dois ícones**
 
 Em `web/ui/src/Icone.tsx`, junto de `IconeSeta`:
 
@@ -977,7 +991,7 @@ export function IconeProxima(p: PropsIcone) {
 
 Exportar as duas em `web/ui/src/index.ts`.
 
-- [ ] **Step 4: Usar na paginação**
+- [x] **Step 4: Usar na paginação**
 
 Em `web/admin/src/app/page.tsx`, no bloco de paginação:
 
@@ -1005,7 +1019,7 @@ Em `web/admin/src/app/page.tsx`, no bloco de paginação:
 
 Importar os dois de `@mais/ui`.
 
-- [ ] **Step 5: Rodar nos dois navegadores**
+- [x] **Step 5: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm run typecheck && npx playwright test e2e/visual.spec.ts
@@ -1013,7 +1027,7 @@ cd web && npm run typecheck && npx playwright test e2e/visual.spec.ts
 
 Esperado: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/ui/src/Icone.tsx web/ui/src/index.ts web/admin/src/app/page.tsx web/admin/e2e/visual.spec.ts
@@ -1040,7 +1054,7 @@ Item 4 do ledger. Mesma classe de defeito que a regra do §2 corrige nas outras 
 - Modify: `web/admin/src/app/questoes/editar/page.tsx` (o `<Campo rotulo="Enunciado">`)
 - Test: `web/admin/e2e/validacao.spec.ts`
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Acrescentar a `web/admin/e2e/validacao.spec.ts`:
 
@@ -1070,7 +1084,7 @@ test("o Enunciado vazio ganha borda de erro, não só mensagem", async ({
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npx playwright test e2e/validacao.spec.ts --project=chromium -g "Enunciado vazio"
@@ -1078,7 +1092,7 @@ cd web && npx playwright test e2e/validacao.spec.ts --project=chromium -g "Enunc
 
 Esperado: FAIL — a cor não muda.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Em `web/admin/src/componentes/Editor.tsx`, acrescentar a prop na assinatura do componente (`invalido = false`, tipo `invalido?: boolean`) e trocar o wrapper:
 
@@ -1109,7 +1123,7 @@ Em `web/admin/src/app/questoes/editar/page.tsx`:
             </Campo>
 ```
 
-- [ ] **Step 4: Rodar nos dois navegadores**
+- [x] **Step 4: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm run typecheck && npx playwright test e2e/validacao.spec.ts
@@ -1117,7 +1131,7 @@ cd web && npm run typecheck && npx playwright test e2e/validacao.spec.ts
 
 Esperado: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/admin/src/componentes/Editor.tsx web/admin/src/app/questoes/editar/page.tsx web/admin/e2e/validacao.spec.ts
@@ -1143,7 +1157,7 @@ Item 9 do ledger. Com o WebKit na suíte existe um navegador onde o `padding-lef
 **Files:**
 - Modify: `web/admin/e2e/visual.spec.ts` (o caso "o `<select>` abre mão da aparência nativa…")
 
-- [ ] **Step 1: Trocar a asserção**
+- [x] **Step 1: Trocar a asserção**
 
 Substituir o caso inteiro por:
 
@@ -1176,7 +1190,7 @@ test("o <select> honra o padding do autor, e o <input> não ganha seta", async (
 });
 ```
 
-- [ ] **Step 2: Provar que a asserção pega o defeito**
+- [x] **Step 2: Provar que a asserção pega o defeito**
 
 Remover temporariamente `appearance-none` da classe do `<select>` de Situação em `web/admin/src/app/page.tsx` e rodar:
 
@@ -1192,7 +1206,7 @@ cd web && npx playwright test e2e/visual.spec.ts
 
 Esperado: PASS nos dois navegadores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add web/admin/e2e/visual.spec.ts
@@ -1218,7 +1232,7 @@ Item 1 do ledger. `toContainText` passa em elemento presente porém oculto; os d
 **Files:**
 - Modify: `web/admin/e2e/login.spec.ts`
 
-- [ ] **Step 1: Apertar as duas**
+- [x] **Step 1: Apertar as duas**
 
 No caso "contexto que falha mostra a orientação de recarregar":
 
@@ -1236,7 +1250,7 @@ No caso "email fora da allowlist vê a recusa, sem campo de senha":
   await expect(alerta).toContainText(/não é administrador/i);
 ```
 
-- [ ] **Step 2: Rodar**
+- [x] **Step 2: Rodar**
 
 ```bash
 cd web && npx playwright test e2e/login.spec.ts
@@ -1244,7 +1258,7 @@ cd web && npx playwright test e2e/login.spec.ts
 
 Esperado: PASS nos dois navegadores. Os dois elementos já estão renderizados hoje — isto é rigor de asserção, não correção de falso verde.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add web/admin/e2e/login.spec.ts
@@ -1269,7 +1283,7 @@ Item 8 do ledger, com causa diferente da registrada. O aviso do `next/image` nã
 - Modify: `web/admin/src/componentes/Layout.tsx`
 - Modify: `web/admin/src/app/login/page.tsx`
 
-- [ ] **Step 1: Conferir a proporção do arquivo**
+- [x] **Step 1: Conferir a proporção do arquivo**
 
 ```bash
 python3 -c "
@@ -1282,7 +1296,7 @@ print(w, 'x', h, '=>', round(w/h, 4))
 
 Esperado: `1983 x 793 => 2.5006`. Se o arquivo tiver mudado, recalcular os pares abaixo mantendo a proporção medida.
 
-- [ ] **Step 2: Corrigir as duas declarações**
+- [x] **Step 2: Corrigir as duas declarações**
 
 `Layout.tsx`: `width={180} height={68}` → `width={180} height={72}` (2,5).
 
@@ -1290,7 +1304,7 @@ Esperado: `1983 x 793 => 2.5006`. Se o arquivo tiver mudado, recalcular os pares
 
 As classes (`h-10 md:h-[68px] w-auto` e `h-14 w-auto`) **não mudam**: é o `w-auto` que mantém a proporção real na renderização, e ele nunca foi o problema.
 
-- [ ] **Step 3: Verificar no navegador**
+- [x] **Step 3: Verificar no navegador**
 
 ```bash
 cd web && npm run dev
@@ -1298,7 +1312,7 @@ cd web && npm run dev
 
 Abrir `http://localhost:3000/login` e `http://localhost:3000` com o console aberto. Esperado: **nenhum** aviso do `next/image` sobre proporção. O logo deve continuar com o mesmo tamanho visual — quem manda no tamanho é a classe, não a prop.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web/admin/src/componentes/Layout.tsx web/admin/src/app/login/page.tsx
@@ -1329,7 +1343,7 @@ Fecha os itens de documento e registra as três entradas do ledger que morreram 
 - Modify: `docs/runbook-deploy-producao.md` (seção "Publicar a separação do login do admin")
 - Modify: `docs/superpowers/plans/2026-08-07-painel-follow-ups.md`
 
-- [ ] **Step 1: As duas regras no `web/README.md`**
+- [x] **Step 1: As duas regras no `web/README.md`**
 
 Acrescentar, depois do bloco "Atenção para quem for consumir `ui/`":
 
@@ -1396,7 +1410,7 @@ herdada — é redescoberta, geralmente divergindo.
 Este é o arquivo que o sub-projeto 4 vai ler — a regra precisa caber aqui sem
 a spec ao lado.
 
-- [ ] **Step 2: Os códigos de erro do `api/README.md`**
+- [x] **Step 2: Os códigos de erro do `api/README.md`**
 
 Acrescentar à tabela as linhas que faltam (nove, contando as duas que a separação do login trouxe e que o ledger não listava):
 
@@ -1420,7 +1434,7 @@ grep -rn "invalid_credentials\|senha_atual_incorreta\|weak_password\|captcha_fai
 
 Ajustar a tabela ao que o código de fato emite. **O README precisa refletir a API, não este plano.**
 
-- [ ] **Step 3: "cinco checagens" → seis**
+- [x] **Step 3: "cinco checagens" → seis**
 
 ```bash
 grep -rn "cinco checagens" docs web api
@@ -1428,7 +1442,7 @@ grep -rn "cinco checagens" docs web api
 
 Esperado: três ocorrências. Trocar as três por "seis checagens", acrescentando em cada uma a menção à sexta — a que compara o `iat` do token com o `updated_at` da credencial, e que é o que faz `admin:senha` derrubar sessão viva.
 
-- [ ] **Step 4: Troubleshooting do relógio no runbook**
+- [x] **Step 4: Troubleshooting do relógio no runbook**
 
 Na seção "Publicar a separação do login do admin" de `docs/runbook-deploy-producao.md`, depois do passo 9, acrescentar:
 
@@ -1442,7 +1456,7 @@ Na seção "Publicar a separação do login do admin" de `docs/runbook-deploy-pr
 > manual, pode ser minutos.
 ```
 
-- [ ] **Step 5: Reconferir o ledger**
+- [x] **Step 5: Reconferir o ledger**
 
 Em `docs/superpowers/plans/2026-08-07-painel-follow-ups.md`, marcar como resolvidos os itens fechados por esta rodada (duplo clique, Enunciado, gap do cabeçalho, `visual.spec.ts`, asserções do login, logo, e as três sobras do login), com a data 2026-08-19. E registrar as **três entradas que a releitura do código derrubou**:
 
@@ -1472,7 +1486,7 @@ Em `docs/superpowers/plans/2026-08-07-painel-follow-ups.md`, marcar como resolvi
 
 E acrescentar o registro do Apple Passwords, copiando o último item do §7 da spec — inclusive as três alavancas não testadas, para a sessão dedicada não recomeçar do zero.
 
-- [ ] **Step 6: Conferir que nenhum link quebrou**
+- [x] **Step 6: Conferir que nenhum link quebrou**
 
 ```bash
 grep -rn "/senha\b" docs web/README.md api/README.md | grep -v node_modules
@@ -1480,7 +1494,7 @@ grep -rn "/senha\b" docs web/README.md api/README.md | grep -v node_modules
 
 Esperado: nenhuma referência à rota `/senha` como caminho navegável. Se houver, corrigir para descrever o modal.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add web/README.md api/README.md docs web/admin/src/lib/sessao.tsx
@@ -1508,7 +1522,7 @@ MSG
 
 Depois da Task 10, com tudo commitado:
 
-- [ ] **Suíte do painel, os dois navegadores**
+- [x] **Suíte do painel, os dois navegadores**
 
 ```bash
 cd web && npm run typecheck && npm test
@@ -1516,7 +1530,7 @@ cd web && npm run typecheck && npm test
 
 Esperado: verde nos dois. Anotar a contagem de casos.
 
-- [ ] **Suíte da API, em sequência — nunca junto**
+- [x] **Suíte da API, em sequência — nunca junto**
 
 ```bash
 cd api && npm test
@@ -1524,4 +1538,4 @@ cd api && npm test
 
 Esperado: verde. Nenhuma tarefa desta rodada toca `api/src`, então uma falha aqui é contenção de D1 com a suíte anterior, não regressão — nesse caso, esperar e repetir.
 
-- [ ] **Os sete critérios de pronto do §9 da spec**, conferidos um a um contra o que foi entregue.
+- [x] **Os sete critérios de pronto do §9 da spec**, conferidos um a um contra o que foi entregue.

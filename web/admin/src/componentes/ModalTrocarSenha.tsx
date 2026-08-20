@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Campo, CONTROLE, CONTROLE_INVALIDO, Modal, useToast } from "@mais/ui";
+import { useRef, useState } from "react";
+import {
+  Campo,
+  CONTROLE,
+  CONTROLE_INVALIDO,
+  IconeSalvar,
+  Modal,
+  useToast,
+} from "@mais/ui";
 import { api, ApiError } from "@/lib/api";
 import { mensagemDe } from "@/lib/erros";
 
@@ -40,6 +47,18 @@ export function ModalTrocarSenha({
   const [erros, setErros] = useState<Erros>({});
   const [enviando, setEnviando] = useState(false);
   const avisar = useToast();
+  // Cancelar não cancela a requisição que já saiu, e um booleano único não
+  // basta: cancelar A e reenviar (B) antes de A responder faria o `catch`
+  // de A ver B como "não descartado" e escrever erro velho por cima do
+  // estado de B, além de destravar o botão com B ainda em voo. O contador
+  // dá identidade a cada requisição — mesmo mecanismo de
+  // app/taxonomias/page.tsx e app/page.tsx.
+  const idRequisicao = useRef(0);
+  // O erro de "Nova senha" tem duas origens: validação local (some ao digitar,
+  // porque digitar é o que a corrige) e recusa do servidor, que enuncia a
+  // regra a cumprir — essa precisa ficar na tela enquanto a pessoa tenta
+  // cumpri-la, e só sai no envio seguinte.
+  const novaDoServidor = useRef(false);
 
   // O tip ao vivo (spec §4): com os dois preenchidos e diferentes, a
   // divergência aparece enquanto se digita. Os dois campos são type=password,
@@ -49,15 +68,30 @@ export function ModalTrocarSenha({
     nova !== "" && confirmacao !== "" && nova !== confirmacao;
 
   function fechar() {
+    // Invalida qualquer requisição em voo: a resposta que chegar depois já
+    // não bate mais com idRequisicao.current, então cai nos `return` do
+    // catch/finally abaixo em vez de reescrever o estado que este fechar()
+    // acabou de limpar.
+    idRequisicao.current++;
     setAtual("");
     setNova("");
     setConfirmacao("");
     setErros({});
+    // fechar() acontece tanto pelo Cancelar quanto pelo sucesso do envio, e
+    // o finally de enviar() não mexe em enviando quando o id não bate mais —
+    // sem isto aqui, o botão ficava preso em "Aguarde…" na reabertura.
+    setEnviando(false);
     aoFechar();
   }
 
   async function enviar(evento: React.FormEvent) {
     evento.preventDefault();
+
+    // A marca diz qual é a origem do erro que está na tela agora: um envio
+    // novo invalida a origem anterior sempre, tenha ele passado na validação
+    // local ou não — por isso o reset vem antes do retorno antecipado da
+    // validação, não depois.
+    novaDoServidor.current = false;
 
     // Conferência local: mandar duas senhas para o servidor comparar seria
     // uma ida à rede para descobrir o que já dá para saber aqui.
@@ -65,7 +99,10 @@ export function ModalTrocarSenha({
     if (!atual) encontrados.atual = "Informe a senha atual.";
     if (!nova) encontrados.nova = "Informe a nova senha.";
     if (!confirmacao) encontrados.confirmacao = "Confirme a nova senha.";
-    else if (nova !== confirmacao) {
+    // `nova &&` porque com ela vazia a divergência é consequência, não causa:
+    // o campo que precisa de conteúdo é o de cima, e é dele que a pessoa
+    // precisa ouvir.
+    else if (nova && nova !== confirmacao) {
       encontrados.confirmacao = "A confirmação não confere.";
     }
     if (Object.keys(encontrados).length > 0) {
@@ -75,37 +112,56 @@ export function ModalTrocarSenha({
 
     setErros({});
     setEnviando(true);
+    const id = ++idRequisicao.current;
     try {
       await api.trocarSenha(atual, nova);
+      if (id !== idRequisicao.current) return;
       avisar("Senha trocada.");
       fechar();
     } catch (falha) {
+      if (id !== idRequisicao.current) return;
       // O erro pertence ao campo que o causou — mesmo tratamento que o 409 de
       // taxonomia recebe. Cair tudo numa linha genérica obrigaria o operador
       // a adivinhar qual dos três campos está errado.
       if (falha instanceof ApiError && falha.codigo === "senha_atual_incorreta") {
         setErros({ atual: mensagemDe(falha) });
       } else if (falha instanceof ApiError && falha.codigo === "weak_password") {
+        novaDoServidor.current = true;
         setErros({ nova: mensagemDe(falha) });
       } else {
         setErros({ geral: mensagemDe(falha) });
       }
     } finally {
-      setEnviando(false);
+      if (id === idRequisicao.current) setEnviando(false);
     }
   }
 
-  const erroConfirmacao = erros.confirmacao ?? (divergem ? "A confirmação não confere." : undefined);
+  // O erro de envio e o tip ao vivo têm a mesma frase e papéis diferentes: o
+  // primeiro responde a uma ação e interrompe; o segundo aparece sozinho e
+  // espera a vez.
+  const avisoDivergencia =
+    !erros.confirmacao && divergem ? "A confirmação não confere." : undefined;
+  // O campo está de fato inválido nos dois casos — o aria-invalid e a borda
+  // vermelha não distinguem, só a etiqueta do texto distingue.
+  const confirmacaoInvalida = Boolean(erros.confirmacao) || divergem;
+
+  // O erro geral não pertence a nenhum campo, então nenhum `onChange` o
+  // limpava — e ele ficava na tela enquanto a pessoa reescrevia tudo.
+  function limparGeral() {
+    setErros((x) => (x.geral ? { ...x, geral: undefined } : x));
+  }
 
   return (
     <Modal
       aberto={aberto}
       titulo="Trocar senha"
       rotuloConfirmar="Salvar"
+      iconeConfirmar={<IconeSalvar />}
       carregando={enviando}
       idFormulario={ID_FORM}
       aoConfirmar={() => undefined}
       aoCancelar={fechar}
+      erro={erros.geral}
     >
       <form id={ID_FORM} onSubmit={enviar} noValidate className="flex flex-col gap-4">
         <Campo rotulo="Senha atual" htmlFor="atual" erro={erros.atual}>
@@ -119,6 +175,7 @@ export function ModalTrocarSenha({
             value={atual}
             onChange={(e) => {
               setAtual(e.target.value);
+              limparGeral();
               if (erros.atual) setErros((x) => ({ ...x, atual: undefined }));
             }}
           />
@@ -134,7 +191,10 @@ export function ModalTrocarSenha({
             value={nova}
             onChange={(e) => {
               setNova(e.target.value);
-              if (erros.nova) setErros((x) => ({ ...x, nova: undefined }));
+              limparGeral();
+              if (erros.nova && !novaDoServidor.current) {
+                setErros((x) => ({ ...x, nova: undefined }));
+              }
               // erros.confirmacao tem duas causas possíveis (mais abaixo, na
               // validação local): campo vazio ou divergência. Só a segunda é
               // resolvida por aqui — se "Confirme a nova senha" continua
@@ -153,29 +213,26 @@ export function ModalTrocarSenha({
         <Campo
           rotulo="Confirme a nova senha"
           htmlFor="confirmacao"
-          erro={erroConfirmacao}
+          erro={erros.confirmacao}
+          aviso={avisoDivergencia}
         >
           <input
             id="confirmacao"
             type="password"
             autoComplete="new-password"
             aria-required
-            aria-invalid={erroConfirmacao ? true : undefined}
-            className={`${CONTROLE} ${erroConfirmacao ? CONTROLE_INVALIDO : ""}`}
+            aria-invalid={confirmacaoInvalida ? true : undefined}
+            className={`${CONTROLE} ${confirmacaoInvalida ? CONTROLE_INVALIDO : ""}`}
             value={confirmacao}
             onChange={(e) => {
               setConfirmacao(e.target.value);
+              limparGeral();
               if (erros.confirmacao) {
                 setErros((x) => ({ ...x, confirmacao: undefined }));
               }
             }}
           />
         </Campo>
-        {erros.geral && (
-          <p role="alert" className="text-[13.5px] font-semibold text-erro">
-            {erros.geral}
-          </p>
-        )}
       </form>
     </Modal>
   );

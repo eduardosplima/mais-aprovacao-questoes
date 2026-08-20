@@ -10,6 +10,61 @@
 
 **Spec:** [`docs/superpowers/specs/2026-08-19-ajustes-finos-design.md`](../specs/2026-08-19-ajustes-finos-design.md)
 
+> **Verificação final executada em 2026-08-19**, depois da onda de correções
+> que fechou os três Important da revisão final da branch. Os quatro comandos
+> rodaram em sequência e em primeiro plano, nunca concorrentes — o `wrangler
+> dev` que o Playwright sobe e o vitest do `api/` abrem o mesmo SQLite do D1
+> local.
+>
+> - Suíte do painel: **verde**, `186` testes (93 em cada navegador), 8.2min.
+> - Suíte da API: **verde**, `371` testes em 33 arquivos, 14.4s.
+> - `npm run typecheck`: limpo em `ui`, `admin` e `admin/e2e`.
+> - `npm run build`: limpo, com `admin/out/icon.png` e o `<link rel="icon">`
+>   gerados pela convenção do App Router.
+> - Os oito critérios do §11 da spec: conferidos um a um. O critério 6 ("o
+>   favicon aparece na aba") foi conferido na saída do build, que é onde a §10
+>   da própria spec manda conferi-lo — não numa aba de navegador.
+>
+> **A primeira tentativa desta verificação foi vermelha, e o registro é dela
+> também:** 183/184, `[webkit] taxonomias.spec.ts:78`, timeout de `page.goto`
+> — a 7ª ocorrência em 7 execuções completas da suíte desde que ela cresceu de
+> 152 para 184 testes. A causa era o `reuseExistingServer: !process.env.CI` do
+> `playwright.config.ts`: localmente sempre `true`, ele fazia cada `npm test`
+> herdar o `next dev` e o `wrangler dev` da execução anterior, e os dois
+> degradam com o tempo de vida acumulado — o WebKit é o único dos dois motores
+> que converte essa degradação em timeout duro. Com `reuseExistingServer:
+> false` nos dois servidores, a suíte ficou verde em duas execuções completas
+> seguidas. Nada foi mascarado: nem retry no projeto webkit, nem timeout maior.
+>
+> **A conferência a olho aconteceu em 2026-08-20**, feita pelo dono, no
+> **Firefox**, contra o roteiro de 21 itens que cobre login, cabeçalho, modal
+> de senha, taxonomias, paginação e editor. Ela ficou sem marca por um dia
+> justamente porque pede olhos humanos: cada coisa que ela lista está provada
+> por teste automatizado ou pela saída do build, mas "parece certo na tela" não
+> é coisa que suíte alguma responde.
+>
+> O navegador fica registrado porque importa aqui: a suíte e2e roda em chromium
+> e WebKit, e o Firefox não é exercitado por ela — esta conferência é a única
+> passada que o painel teve nesse motor.
+>
+> **Três marcas com ressalva, para não valerem mais do que aparentam:**
+>
+> - **Task 7, Step 3** foi implementado, mas não como o plano escreveu: o
+>   booleano `descartada` não tem identidade por requisição, e o ruling da
+>   revisão o trocou pelo contador `idRequisicao`, que é o padrão já usado em
+>   `app/taxonomias/page.tsx` e `app/page.tsx`.
+> - **Task 8, Step 3** partiu de uma referência morta (o plano manda pendurar a
+>   marca nova em `descartada`, que a Task 7 já tinha eliminado); foi corrigida
+>   no despacho.
+> - **Task 13, Step 4** saiu com a contagem corrigida por ruling — fecharam
+>   **dez** entradas do ledger, e o commit do plano dizia "nove".
+>
+> A onda de correções que veio depois destas 13 tarefas não está no plano, por
+> ser posterior a ele: subseção "Diálogos" no `web/README.md`, o `catch` de
+> `renomear()` separando erro com campo culpado de erro sem, o cabeçalho do
+> `Campo` atualizado, o caso de temporização de `senha.spec.ts` reescrito de
+> forma determinística, e o `reuseExistingServer` acima.
+
 ## Global Constraints
 
 - **Nenhum pacote npm novo.** Nem dependência, nem devDependency, nem `npx` de pacote que não esteja no `package.json`. Regra do `~/.claude/CLAUDE.md` §5. O favicon é gerado com o `magick` (`/opt/homebrew/bin/magick`) ou o `sips`, que já estão na máquina — nada é baixado.
@@ -34,7 +89,7 @@ Esta tarefa não escreve código. Ela prova o estado em que a árvore está **an
 - Consumes: nada.
 - Produces: a garantia, para todas as tarefas seguintes, de que a suíte estava verde em `a542f23`.
 
-- [ ] **Step 1: Confirmar que a árvore está limpa e no commit esperado**
+- [x] **Step 1: Confirmar que a árvore está limpa e no commit esperado**
 
 ```bash
 git status --short
@@ -43,7 +98,7 @@ git log --oneline -1
 
 Esperado: nenhuma saída do `status`; o `log` mostra `4abb173` (a spec) ou `a542f23` se a spec ainda não estiver commitada. Se houver arquivo modificado, **pare** — a linha de base precisa ser do código publicado, não de trabalho em voo.
 
-- [ ] **Step 2: Rodar a suíte do painel, nos dois navegadores**
+- [x] **Step 2: Rodar a suíte do painel, nos dois navegadores**
 
 ```bash
 cd web && npm test
@@ -53,7 +108,7 @@ Esperado: verde. A suíte sobe os dois servidores sozinha (Next com TLS e `wrang
 
 Anote o número de testes por navegador — ele entra no registro do Step 5.
 
-- [ ] **Step 3: Rodar a suíte da API, em sequência**
+- [x] **Step 3: Rodar a suíte da API, em sequência**
 
 Só depois que o comando anterior terminou e devolveu o prompt. Rodar junto faz os dois disputarem `api/.wrangler/state`.
 
@@ -63,7 +118,7 @@ cd api && npm test
 
 Esperado: verde.
 
-- [ ] **Step 4: Conferir os sete critérios de pronto da spec anterior**
+- [x] **Step 4: Conferir os sete critérios de pronto da spec anterior**
 
 Abrir `docs/superpowers/specs/2026-08-19-ajustes-painel-design.md`, seção §9, e conferir um a um contra o que existe hoje. Os sete, resumidos:
 
@@ -82,7 +137,7 @@ cd web && npm run typecheck
 
 **Se algum critério não fechar, pare e relate ao dono.** Corrigir dívida de ontem não é decisão desta rodada.
 
-- [ ] **Step 5: Marcar os checkboxes do plano anterior**
+- [x] **Step 5: Marcar os checkboxes do plano anterior**
 
 Em `docs/superpowers/plans/2026-08-19-ajustes-painel.md`, trocar `- [ ]` por `- [x]` em todos os steps das dez tarefas e na seção "Verificação final" — as dez foram entregues (commits `6acf6a8`..`a15336a`), e o plano registrar isso é o ponto.
 
@@ -99,7 +154,7 @@ Acrescentar, logo abaixo do cabeçalho do arquivo (depois da linha `**Spec:**`),
 > - Os sete critérios do §9 da spec: conferidos um a um.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-19-ajustes-painel.md
@@ -134,7 +189,7 @@ EOF
 - Consumes: `IconeCancelar`, `IconeSalvar`, `IconeExcluir` de `web/ui/src/Icone.tsx` (já existem).
 - Produces: `Modal` passa a aceitar `iconeConfirmar?: ReactNode`. Tasks 3 e 4 editam o mesmo arquivo depois desta.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Em `web/admin/e2e/visual.spec.ts`, no fim do arquivo:
 
@@ -207,7 +262,7 @@ Em `web/admin/e2e/lista.spec.ts`, dentro do teste existente que abre o diálogo 
   ).toHaveCount(1);
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- visual.spec.ts senha.spec.ts lista.spec.ts
@@ -215,7 +270,7 @@ cd web && npm run test -w admin -- visual.spec.ts senha.spec.ts lista.spec.ts
 
 Esperado: FALHA nos três, com `Expected: 1, Received: 0` — os botões do `Modal` não têm `svg` nenhum hoje.
 
-- [ ] **Step 3: Implementar no `web/ui`**
+- [x] **Step 3: Implementar no `web/ui`**
 
 Em `web/ui/src/Modal.tsx`, o import no topo:
 
@@ -269,7 +324,7 @@ E a linha de botões:
 
 O ícone some junto com o texto quando `carregando` é verdadeiro — o `Botao` troca os `children` inteiros por "Aguarde…", e é o comportamento certo.
 
-- [ ] **Step 4: Passar o ícone nos quatro chamadores**
+- [x] **Step 4: Passar o ícone nos quatro chamadores**
 
 `web/admin/src/app/page.tsx` — acrescentar `IconeExcluir` já está importado; adicionar a prop ao `<Modal>` da linha 304:
 
@@ -301,7 +356,7 @@ no de excluir (linha 278).
       iconeConfirmar={<IconeSalvar />}
 ```
 
-- [ ] **Step 5: Rodar nos dois navegadores**
+- [x] **Step 5: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
@@ -310,7 +365,7 @@ cd web && npm run typecheck
 
 Esperado: tudo verde, typecheck limpo.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/ui/src/Modal.tsx web/admin/src/app/page.tsx web/admin/src/app/taxonomias/page.tsx web/admin/src/componentes/ModalTrocarSenha.tsx web/admin/e2e/visual.spec.ts web/admin/e2e/senha.spec.ts web/admin/e2e/lista.spec.ts
@@ -340,7 +395,7 @@ EOF
 - Consumes: `Modal` da Task 2.
 - Produces: `Modal` passa a aceitar `erro?: string`. A Task 7 usa essa prop no `ModalTrocarSenha`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Em `web/admin/e2e/taxonomias.spec.ts`, no fim do arquivo:
 
@@ -383,7 +438,7 @@ test("a falha ao excluir explica dentro do próprio diálogo", async ({
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- taxonomias.spec.ts
@@ -391,7 +446,7 @@ cd web && npm run test -w admin -- taxonomias.spec.ts
 
 Esperado: FALHA — hoje a mensagem sai em toast, fora do `role="dialog"`, então `dialogo.getByRole("alert")` não encontra nada.
 
-- [ ] **Step 3: Implementar a prop no `web/ui`**
+- [x] **Step 3: Implementar a prop no `web/ui`**
 
 Em `web/ui/src/Modal.tsx`, acrescentar `erro` à assinatura (depois de `carregando`) e ao tipo:
 
@@ -423,7 +478,7 @@ E o corpo, entre o `children` e a linha de botões:
         <div className="flex gap-3 justify-end">
 ```
 
-- [ ] **Step 4: Ligar no excluir termo**
+- [x] **Step 4: Ligar no excluir termo**
 
 Em `web/admin/src/app/taxonomias/page.tsx`, acrescentar o estado junto dos outros (perto de `erroRenomear`, linha 50):
 
@@ -475,14 +530,14 @@ Também limpar ao **abrir**, no `BotaoIcone` da coluna Ações — senão o erro
             }}
 ```
 
-- [ ] **Step 5: Rodar nos dois navegadores**
+- [x] **Step 5: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
 cd web && npm run typecheck
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/ui/src/Modal.tsx web/admin/src/app/taxonomias/page.tsx web/admin/e2e/taxonomias.spec.ts
@@ -514,7 +569,7 @@ EOF
 - Consumes: `Modal` das Tasks 2 e 3.
 - Produces: comportamento novo para os quatro diálogos. Nenhuma prop nova.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Em `web/admin/e2e/taxonomias.spec.ts`, no fim do arquivo:
 
@@ -550,7 +605,7 @@ test("clicar no fundo escuro não fecha o diálogo; Escape fecha", async ({
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- taxonomias.spec.ts
@@ -558,7 +613,7 @@ cd web && npm run test -w admin -- taxonomias.spec.ts
 
 Esperado: FALHA na primeira asserção depois do clique — hoje o clique no fundo fecha o diálogo.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Em `web/ui/src/Modal.tsx`, o `div` do fundo perde o `onClick`, e o diálogo perde o `stopPropagation` que existia só por causa dele:
 
@@ -581,7 +636,7 @@ Em `web/ui/src/Modal.tsx`, o `div` do fundo perde o `onClick`, e o diálogo perd
 
 O `stopPropagation` sai porque a mudança desta tarefa o deixou órfão — ele impedia que o clique dentro do diálogo subisse até um handler que não existe mais.
 
-- [ ] **Step 4: Rodar nos dois navegadores**
+- [x] **Step 4: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
@@ -590,7 +645,7 @@ cd web && npm run typecheck
 
 Atenção: se algum teste existente fechava um diálogo clicando fora, ele vai falhar aqui — e a correção é trocar o clique por `Escape` ou pelo botão `Cancelar`, não reverter o comportamento.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/ui/src/Modal.tsx web/admin/e2e/taxonomias.spec.ts
@@ -623,7 +678,7 @@ EOF
 - Consumes: `Campo` como está hoje.
 - Produces: `Campo` passa a aceitar `aviso?: string`. Precedência: `erro` > `aviso` > `dica`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Em `web/admin/e2e/senha.spec.ts`, no fim do arquivo:
 
@@ -666,7 +721,7 @@ cd web && npm run test -w admin -- senha.spec.ts --grep "tip ao vivo"
 
 Se falhar na cor, ajustar a asserção para o valor que o navegador reportou. Se falhar no `role`, é o defeito que esta tarefa corrige.
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- senha.spec.ts
@@ -674,7 +729,7 @@ cd web && npm run test -w admin -- senha.spec.ts
 
 Esperado: FALHA em `toHaveAttribute("role", "status")` — hoje o tip entra pelo `erro` do `Campo`, que renderiza `role="alert"`.
 
-- [ ] **Step 3: Implementar no `web/ui`**
+- [x] **Step 3: Implementar no `web/ui`**
 
 Em `web/ui/src/Campo.tsx`:
 
@@ -726,7 +781,7 @@ export function Campo({
 }
 ```
 
-- [ ] **Step 4: Ligar no `ModalTrocarSenha`**
+- [x] **Step 4: Ligar no `ModalTrocarSenha`**
 
 Em `web/admin/src/componentes/ModalTrocarSenha.tsx`, substituir a linha de `erroConfirmacao` (a que combina os dois) por:
 
@@ -759,14 +814,14 @@ E o `Campo` da confirmação:
             className={`${CONTROLE} ${confirmacaoInvalida ? CONTROLE_INVALIDO : ""}`}
 ```
 
-- [ ] **Step 5: Rodar nos dois navegadores**
+- [x] **Step 5: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
 cd web && npm run typecheck
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/ui/src/Campo.tsx web/admin/src/componentes/ModalTrocarSenha.tsx web/admin/e2e/senha.spec.ts
@@ -802,7 +857,7 @@ EOF
 - Consumes: o `Svg` e o `PropsIcone` internos de `Icone.tsx`.
 - Produces: `IconeEntrar`, exportado por `@mais/ui`.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Em `web/admin/e2e/login.spec.ts`, no fim do arquivo:
 
@@ -831,7 +886,7 @@ test("o corpo nomeia o Cloudflare Access por extenso, como o rodapé", async ({
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- login.spec.ts
@@ -839,7 +894,7 @@ cd web && npm run test -w admin -- login.spec.ts
 
 Esperado: FALHA nos dois — não há `svg` no botão, e o texto ainda é "pelo Access".
 
-- [ ] **Step 3: Criar o ícone**
+- [x] **Step 3: Criar o ícone**
 
 Em `web/ui/src/Icone.tsx`, no fim do arquivo (logo depois de `IconeSair`, que é seu espelho):
 
@@ -857,7 +912,7 @@ export function IconeEntrar(p: PropsIcone) {
 
 Em `web/ui/src/index.ts`, acrescentar `IconeEntrar` à lista exportada de `./Icone`, logo antes de `IconeSair`.
 
-- [ ] **Step 4: Usar no login e trocar o texto**
+- [x] **Step 4: Usar no login e trocar o texto**
 
 Em `web/admin/src/app/login/page.tsx`, acrescentar `IconeEntrar` ao import de `@mais/ui`; trocar a linha 84:
 
@@ -872,14 +927,14 @@ e pôr o ícone no botão de submit:
               Entrar
 ```
 
-- [ ] **Step 5: Rodar nos dois navegadores**
+- [x] **Step 5: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
 cd web && npm run typecheck
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/ui/src/Icone.tsx web/ui/src/index.ts web/admin/src/app/login/page.tsx web/admin/e2e/login.spec.ts
@@ -909,7 +964,7 @@ EOF
 - Consumes: a prop `erro` do `Modal` (Task 3).
 - Produces: nada que outra tarefa consuma.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Em `web/admin/e2e/senha.spec.ts`, no fim do arquivo:
 
@@ -960,7 +1015,7 @@ test("o erro geral some ao voltar a digitar", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- senha.spec.ts
@@ -968,7 +1023,7 @@ cd web && npm run test -w admin -- senha.spec.ts
 
 Esperado: FALHA nos dois — o erro reaparece na reabertura, e o geral não some ao digitar.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Em `web/admin/src/componentes/ModalTrocarSenha.tsx`, acrescentar o import de `useRef`:
 
@@ -1045,14 +1100,14 @@ e acrescentar ao `<Modal>`:
       erro={erros.geral}
 ```
 
-- [ ] **Step 4: Rodar nos dois navegadores**
+- [x] **Step 4: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
 cd web && npm run typecheck
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/admin/src/componentes/ModalTrocarSenha.tsx web/admin/e2e/senha.spec.ts
@@ -1083,7 +1138,7 @@ EOF
 - Consumes: o `ModalTrocarSenha` como a Task 7 o deixou.
 - Produces: nada que outra tarefa consuma.
 
-- [ ] **Step 1: Escrever os testes que falham**
+- [x] **Step 1: Escrever os testes que falham**
 
 Em `web/admin/e2e/senha.spec.ts`, no fim do arquivo:
 
@@ -1125,7 +1180,7 @@ test("a exigência de tamanho do servidor sobrevive à digitação", async ({
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- senha.spec.ts
@@ -1133,7 +1188,7 @@ cd web && npm run test -w admin -- senha.spec.ts
 
 Esperado: FALHA nos dois — hoje a confirmação é acusada com a nova vazia, e a exigência some no primeiro caractere.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Em `enviar()`, a validação local: a divergência só é acusada quando a nova tem conteúdo.
 
@@ -1183,14 +1238,14 @@ No `onChange` de "Nova senha", a limpeza passa a ser condicional:
               }
 ```
 
-- [ ] **Step 4: Rodar nos dois navegadores**
+- [x] **Step 4: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
 cd web && npm run typecheck
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/admin/src/componentes/ModalTrocarSenha.tsx web/admin/e2e/senha.spec.ts
@@ -1220,7 +1275,7 @@ EOF
 - Consumes: o `ModalTrocarSenha` como as Tasks 7 e 8 o deixaram.
 - Produces: nada. É tarefa só de teste — o comportamento já está certo, e o que falta é a prova.
 
-- [ ] **Step 1: Escrever os testes**
+- [x] **Step 1: Escrever os testes**
 
 Em `web/admin/e2e/senha.spec.ts`, no fim do arquivo:
 
@@ -1259,7 +1314,7 @@ test("os três campos declaram aria-required", async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Rodar**
+- [x] **Step 2: Rodar**
 
 ```bash
 cd web && npm run test -w admin -- senha.spec.ts
@@ -1269,13 +1324,13 @@ Esperado: PASSA nos dois. Aqui o teste não falha primeiro de propósito — é 
 
 Se `aria-required` falhar, conferir o atributo renderizado: `aria-required` sem valor em JSX vira `aria-required="true"` no DOM.
 
-- [ ] **Step 3: Rodar nos dois navegadores**
+- [x] **Step 3: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web/admin/e2e/senha.spec.ts
@@ -1303,7 +1358,7 @@ EOF
 - Consumes: `Campo`, `Botao`, `CONTROLE`, `CONTROLE_INVALIDO` de `@mais/ui`.
 - Produces: nada. Não toca o `web/ui`.
 
-- [ ] **Step 1: Escrever o teste que falha**
+- [x] **Step 1: Escrever o teste que falha**
 
 Em `web/admin/e2e/taxonomias.spec.ts`, no fim do arquivo:
 
@@ -1338,7 +1393,7 @@ test("o botão Adicionar continua alinhado ao input quando o erro aparece", asyn
 });
 ```
 
-- [ ] **Step 2: Rodar e ver falhar**
+- [x] **Step 2: Rodar e ver falhar**
 
 ```bash
 cd web && npm run test -w admin -- taxonomias.spec.ts
@@ -1346,7 +1401,7 @@ cd web && npm run test -w admin -- taxonomias.spec.ts
 
 Esperado: FALHA na última asserção. Anotar o valor real que o `expect` reportar — é o deslocamento verdadeiro, e ele substitui o "~26px" estimado na spec quando o ledger for atualizado na Task 13.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
 
 Em `web/admin/src/app/taxonomias/page.tsx`, o form passa a ter o botão dentro do `Campo`, como irmão do input:
 
@@ -1383,7 +1438,7 @@ Em `web/admin/src/app/taxonomias/page.tsx`, o form passa a ter o botão dentro d
 
 `sm:items-center` e não `items-end`: o input tem 50px de altura e o botão 46px, e centralizar é o que parece alinhado. Abaixo de `sm` a linha vira coluna, como já era.
 
-- [ ] **Step 4: Rodar nos dois navegadores**
+- [x] **Step 4: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
@@ -1392,7 +1447,7 @@ cd web && npm run typecheck
 
 Atenção especial ao caso de 375px em `caminho-critico.spec.ts`: a tela de taxonomias não pode ganhar rolagem horizontal.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/admin/src/app/taxonomias/page.tsx web/admin/e2e/taxonomias.spec.ts
@@ -1422,7 +1477,7 @@ EOF
 - Consumes: `web/admin/public/logo.png` (somente leitura).
 - Produces: o ícone que o App Router liga sozinho. Nenhum outro arquivo depende dele.
 
-- [ ] **Step 1: Medir a caixa do símbolo**
+- [x] **Step 1: Medir a caixa do símbolo**
 
 O símbolo — o "Q" com o "+" recortado — ocupa a parte esquerda do arquivo. A caixa é **medida**, não chutada: recortar a fatia esquerda e pedir ao ImageMagick o retângulo do conteúdo dentro dela.
 
@@ -1433,7 +1488,7 @@ magick web/admin/public/logo.png -crop 760x793+0+0 +repage -fuzz 8% -trim -forma
 
 Saída no formato `LARGURAxALTURA+X+Y` — anotar os quatro números. A fatia de 760px de largura pega o símbolo inteiro e para antes do "M" de "Mais" (o texto começa por volta de x=780).
 
-- [ ] **Step 2: Gerar o ícone quadrado**
+- [x] **Step 2: Gerar o ícone quadrado**
 
 Com os números do Step 1, montar um quadrado centralizado no símbolo, com respiro. Chamando a caixa medida de `L`, `A`, `X`, `Y`:
 
@@ -1453,7 +1508,7 @@ echo "caixa=${L}x${A}+${X}+${Y}  quadrado=${LADO}+${OX}+${OY}"
 magick web/admin/public/logo.png -crop "${LADO}x${LADO}+${OX}+${OY}" +repage -resize 256x256 web/admin/src/app/icon.png
 ```
 
-- [ ] **Step 3: Conferir o resultado a olho**
+- [x] **Step 3: Conferir o resultado a olho**
 
 ```bash
 magick identify web/admin/src/app/icon.png
@@ -1464,7 +1519,7 @@ Esperado: `256x256`, e o símbolo inteiro visível, centralizado, sem cortar bor
 
 O arquivo precisa ter poucos KB — se passar de ~60KB, acrescentar `-strip` ao comando.
 
-- [ ] **Step 4: Provar que o Next liga o ícone sozinho**
+- [x] **Step 4: Provar que o Next liga o ícone sozinho**
 
 ```bash
 cd web && npm run build
@@ -1486,7 +1541,7 @@ export const metadata: Metadata = {
 
 e mover o arquivo para `web/admin/public/icon.png`. Essa é a única circunstância em que o `layout.tsx` é tocado nesta rodada.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add web/admin/src/app/icon.png
@@ -1517,7 +1572,7 @@ EOF
 - Consumes: nada.
 - Produces: nada. Tarefa de rigor de teste.
 
-- [ ] **Step 1: Apertar as três do login**
+- [x] **Step 1: Apertar as três do login**
 
 `toContainText`/`toHaveText` isoladas passam num elemento presente porém oculto. As três ganham `toBeVisible` encadeado antes — mesmo padrão que os outros dois casos do arquivo já adotaram.
 
@@ -1547,7 +1602,7 @@ Linha ~114 (admin sem senha):
   );
 ```
 
-- [ ] **Step 2: O cabeçalho passa a provar ordem, não presença**
+- [x] **Step 2: O cabeçalho passa a provar ordem, não presença**
 
 Em `web/admin/e2e/visual.spec.ts`, substituir o corpo do teste "o cabeçalho segue o padrão de ícone junto do texto":
 
@@ -1571,7 +1626,7 @@ test("o cabeçalho segue o padrão de ícone junto do texto", async ({ page }) =
 });
 ```
 
-- [ ] **Step 3: Rodar nos dois navegadores**
+- [x] **Step 3: Rodar nos dois navegadores**
 
 ```bash
 cd web && npm test
@@ -1579,7 +1634,7 @@ cd web && npm test
 
 Esperado: verde. Estas asserções são mais estritas sobre comportamento que já está certo — se alguma falhar, é defeito real e precisa ser investigado, não afrouxado.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web/admin/e2e/login.spec.ts web/admin/e2e/visual.spec.ts
@@ -1607,13 +1662,13 @@ EOF
 - Consumes: tudo o que as Tasks 2 a 12 entregaram.
 - Produces: o registro. É o que impede a lista de drifar pela quarta vez.
 
-- [ ] **Step 1: O `web/README.md` para de avisar sobre o `Modal`**
+- [x] **Step 1: O `web/README.md` para de avisar sobre o `Modal`**
 
 Remover inteiro o bloco de citação das linhas 68-76 (o que começa em "**Três botões ainda não cumprem esta regra**" e termina em "ele é o contraexemplo dela"). A regra 2 fica sem ressalva, que é o estado que ela sempre deveria ter tido.
 
 Conferir que a regra 3 (ícone antes do texto, exceto em ação direcional) continua logo abaixo, intacta.
 
-- [ ] **Step 2: Fechar as entradas do ledger**
+- [x] **Step 2: Fechar as entradas do ledger**
 
 Em `docs/superpowers/plans/2026-08-07-painel-follow-ups.md`:
 
@@ -1664,7 +1719,7 @@ três ganharam `toBeVisible` encadeado.
 
 **Não marcar como resolvido nada que esta rodada não tenha tocado.** As três arestas de empacotamento, o auto-submit do Apple Passwords e o `nanoid` continuam exatamente como estão.
 
-- [ ] **Step 3: Conferir que nenhum link quebrou**
+- [x] **Step 3: Conferir que nenhum link quebrou**
 
 ```bash
 cd /Users/zava/Develop/projects/zava/mais-aprovacao-questoes
@@ -1673,7 +1728,7 @@ grep -rn "2026-08-07-painel-follow-ups\|web/README" docs web/README.md | grep -v
 
 Conferir que os caminhos citados continuam existindo.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add web/README.md docs/superpowers/plans/2026-08-07-painel-follow-ups.md
@@ -1698,7 +1753,7 @@ EOF
 
 Esta é a verificação **desta** rodada. A da rodada anterior foi a Task 1, e rodou antes de tudo — é o que torna qualquer vermelho daqui atribuível a esta rodada.
 
-- [ ] **Suíte do painel, os dois navegadores**
+- [x] **Suíte do painel, os dois navegadores**
 
 ```bash
 cd web && npm test
@@ -1706,7 +1761,7 @@ cd web && npm test
 
 Esperado: verde em chromium e WebKit, com os casos novos das Tasks 2 a 12.
 
-- [ ] **Suíte da API, em sequência — nunca junto**
+- [x] **Suíte da API, em sequência — nunca junto**
 
 ```bash
 cd api && npm test
@@ -1714,13 +1769,13 @@ cd api && npm test
 
 Esperado: verde. Nenhuma tarefa desta rodada tocou o `api/`, então um vermelho aqui é sinal de disputa do D1 — rodar de novo com a suíte do painel encerrada.
 
-- [ ] **Typecheck nos dois workspaces**
+- [x] **Typecheck nos dois workspaces**
 
 ```bash
 cd web && npm run typecheck
 ```
 
-- [ ] **Build, para o favicon**
+- [x] **Build, para o favicon**
 
 ```bash
 cd web && npm run build
@@ -1728,7 +1783,7 @@ cd web && npm run build
 
 Esperado: build limpo, `icon.png` presente em `admin/out/`.
 
-- [ ] **Os oito critérios de pronto do §11 da spec**, conferidos um a um contra o que foi entregue:
+- [x] **Os oito critérios de pronto do §11 da spec**, conferidos um a um contra o que foi entregue:
 
 1. A linha de base do §2 rodou antes da primeira mudança, com resultado registrado, e os checkboxes do plano anterior estão marcados.
 2. Nenhum toast aparece enquanto há diálogo aberto na frente.
@@ -1739,7 +1794,7 @@ Esperado: build limpo, `icon.png` presente em `admin/out/`.
 7. Suítes verdes, typecheck limpo.
 8. As entradas do ledger estão fechadas com data, e o `web/README.md` não avisa mais para não copiar o `Modal`.
 
-- [ ] **Conferência a olho, no navegador**
+- [x] **Conferência a olho, no navegador**
 
 ```bash
 cd api && npm run dev    # num terminal

@@ -104,9 +104,17 @@ test("o cabeçalho segue o padrão de ícone junto do texto", async ({ page }) =
   await entrar(page);
 
   for (const nome of ["Trocar senha", "Sair"]) {
-    await expect(
-      page.getByRole("button", { name: nome }).locator("svg"),
-    ).toHaveCount(1);
+    const botao = page.getByRole("button", { name: nome });
+    await expect(botao.locator("svg")).toHaveCount(1);
+
+    // Contar svg prova presença, não posição: passaria com o ícone depois do
+    // texto. Aqui o ícone é rótulo, não vetor, então vem antes — e a
+    // comparação usa childNodes porque o Botao renderiza os filhos crus, e o
+    // texto é nó de texto: firstElementChild o ignoraria e acharia o mesmo
+    // <svg> de qualquer jeito. É o mesmo raciocínio do teste da paginação.
+    expect(
+      await botao.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+    ).toBe("svg");
   }
 });
 
@@ -184,5 +192,57 @@ test("a paginação leva a seta do lado para onde aponta", async ({ page }) => {
     await proxima.evaluate(
       (b) => b.childNodes[b.childNodes.length - 1]?.nodeName.toLowerCase(),
     ),
+  ).toBe("svg");
+});
+
+test("os botões dos diálogos seguem o padrão de ícone junto do texto", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+  await page.getByLabel("Nome", { exact: true }).fill("Vunesp");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Vunesp")).toBeVisible();
+
+  // O diálogo de renomear: confirmar é "Salvar", e leva disquete.
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Vunesp" })
+    .click();
+  const renomear = page.getByRole("dialog");
+  const cancelarRenomear = renomear.getByRole("button", { name: "Cancelar" });
+  const salvarRenomear = renomear.getByRole("button", { name: "Salvar" });
+  await expect(cancelarRenomear.locator("svg")).toHaveCount(1);
+  await expect(salvarRenomear.locator("svg")).toHaveCount(1);
+  // Aqui o ícone é rótulo, não vetor: por isso vem antes do texto nos dois
+  // botões — childNodes[0] prova a ordem, não só a presença (ver o teste da
+  // paginação acima, que é onde o raciocínio completo mora).
+  expect(
+    await cancelarRenomear.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  expect(
+    await salvarRenomear.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  await cancelarRenomear.click();
+
+  // O de excluir: confirmar é "Excluir", e leva lixeira — não o mesmo ícone
+  // do salvar, que é justamente por isso que o ícone vem do chamador.
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Excluir Vunesp" })
+    .click();
+  const excluir = page.getByRole("dialog");
+  const cancelarExcluir = excluir.getByRole("button", { name: "Cancelar" });
+  const confirmarExcluir = excluir.getByRole("button", {
+    name: "Excluir",
+    exact: true,
+  });
+  await expect(cancelarExcluir.locator("svg")).toHaveCount(1);
+  await expect(confirmarExcluir.locator("svg")).toHaveCount(1);
+  expect(
+    await cancelarExcluir.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
+  ).toBe("svg");
+  expect(
+    await confirmarExcluir.evaluate((b) => b.childNodes[0]?.nodeName.toLowerCase()),
   ).toBe("svg");
 });

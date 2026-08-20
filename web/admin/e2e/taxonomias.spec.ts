@@ -213,3 +213,140 @@ test("renomear para um nome que já existe explica dentro do modal", async ({ pa
   await expect(dialogo.getByRole("alert")).toHaveText(/já existe um termo ativo/i);
   await expect(page.locator("table").getByText("Quadrix")).toBeVisible();
 });
+
+// O 409 tem campo culpado; uma queda de rede não tem. Mandar as duas para o
+// campo pinta de vermelho, e marca `aria-invalid`, um nome que pode estar
+// perfeito — acusa o campo por um problema que não é dele. O rodapé do
+// diálogo (a prop `erro` do Modal) é o lugar do erro sem dono, e é o que o
+// ModalTrocarSenha já fazia.
+test("falha sem campo culpado no renomear cai no rodapé do diálogo, não no campo", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  await page.getByLabel("Nome", { exact: true }).fill("Idecan");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Idecan")).toBeVisible();
+
+  // Rede caída: o fetch rejeita sem status nem corpo, que é o caso sem
+  // nenhum campo responsável possível.
+  await page.route("**/admin/taxonomy/**", async (rota) => {
+    if (rota.request().method() === "PATCH") return rota.abort();
+    return rota.fallback();
+  });
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Idecan" })
+    .click();
+  const dialogo = page.getByRole("dialog");
+  const campo = dialogo.getByLabel("Novo nome");
+  await campo.fill("Idecan RJ");
+  await dialogo.getByRole("button", { name: "Salvar" }).click();
+
+  await expect(dialogo.getByRole("alert")).toContainText(
+    /não foi possível falar com o servidor/i,
+  );
+  // A prova de que a mensagem está no rodapé e não no campo: o campo não é
+  // acusado. Uma implementação que jogasse tudo em `erroRenomear` mostraria
+  // exatamente o mesmo texto e falharia só aqui.
+  await expect(campo).not.toHaveAttribute("aria-invalid", "true");
+  await expect(dialogo).toBeVisible();
+});
+
+// O modal de excluir fica aberto quando a exclusão falha — `aExcluir` só zera
+// no sucesso. Mandar a mensagem para o toast, na borda da tela, é falar para
+// alguém que está olhando para o centro.
+test("a falha ao excluir explica dentro do próprio diálogo", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  await page.getByLabel("Nome", { exact: true }).fill("Cesgranrio");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Cesgranrio")).toBeVisible();
+
+  // Corrida real: outra pessoa excluiu o termo antes. Interceptado para ser
+  // determinístico.
+  await page.route("**/admin/taxonomy/**", async (rota) => {
+    if (rota.request().method() === "DELETE") {
+      return rota.fulfill({ status: 404, json: { error: "not_found" } });
+    }
+    return rota.fallback();
+  });
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Excluir Cesgranrio" })
+    .click();
+  const dialogo = page.getByRole("dialog");
+  await dialogo.getByRole("button", { name: "Excluir", exact: true }).click();
+
+  await expect(dialogo.getByRole("alert")).toBeVisible();
+  await expect(dialogo.getByRole("alert")).toContainText(
+    /não encontrado/i,
+  );
+  // E o diálogo continua aberto, que é a razão de a mensagem morar nele.
+  await expect(dialogo).toBeVisible();
+});
+
+// Regra única dos quatro diálogos: o fundo não fecha. O que motivou foi o
+// modal de senha, onde um clique por engano descarta três senhas digitadas —
+// mas uma prop por chamador obrigaria todo consumidor futuro do web/ui a
+// descobrir que ela existe e decidir certo.
+test("clicar no fundo escuro não fecha o diálogo; Escape fecha", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  await page.getByLabel("Nome", { exact: true }).fill("Quadrix");
+  await page.getByRole("button", { name: "Adicionar" }).click();
+  await expect(page.locator("table").getByText("Quadrix")).toBeVisible();
+
+  await page
+    .locator("table")
+    .getByRole("button", { name: "Renomear Quadrix" })
+    .click();
+  const dialogo = page.getByRole("dialog");
+  await expect(dialogo).toBeVisible();
+
+  // O canto superior esquerdo é fundo: o diálogo é centralizado e tem largura
+  // máxima de 28rem.
+  await page.mouse.click(5, 5);
+  await expect(dialogo).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(dialogo).toHaveCount(0);
+});
+
+// O form era `sm:items-end` e o botão era irmão do BLOCO do campo, não do
+// input: quando o <p> de erro aparecia dentro do Campo, o bloco crescia e
+// levava o botão junto, para baixo.
+test("o botão Adicionar continua alinhado ao input quando o erro aparece", async ({
+  page,
+}) => {
+  await entrar(page);
+  await page.goto("/taxonomias");
+
+  const input = page.getByLabel("Nome", { exact: true });
+  const botao = page.getByRole("button", { name: "Adicionar" });
+
+  const centro = async (alvo: typeof input) => {
+    const caixa = await alvo.boundingBox();
+    if (!caixa) throw new Error("elemento sem caixa");
+    return caixa.y + caixa.height / 2;
+  };
+
+  const antes = Math.abs((await centro(botao)) - (await centro(input)));
+  expect(antes).toBeLessThan(3);
+
+  // Campo vazio: o erro é inline e não chama a API.
+  await botao.click();
+  await expect(page.getByText("Informe o nome do termo.")).toBeVisible();
+
+  const depois = Math.abs((await centro(botao)) - (await centro(input)));
+  expect(depois).toBeLessThan(3);
+});

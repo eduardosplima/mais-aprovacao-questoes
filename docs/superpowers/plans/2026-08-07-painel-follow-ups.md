@@ -63,6 +63,15 @@ isso —, mas o empacotamento tem três arestas:
 > e a cópia anônima é mais difícil de achar que a duplicação nomeada era. Só a
 > releitura do código pegou; a releitura da lista teria dado por resolvido.
 
+> **Dívida nova, aberta em 2026-08-19.** A prop `iconeConfirmar` do `Modal`
+> (`ui/src/Modal.tsx`), que fechou a entrada "Ícone nos botões de diálogo e no
+> login" acima, é **opcional**. Nada tipado ou testado impede um consumidor
+> futuro do `web/ui` de omiti-la e quebrar a regra 2 do `web/README.md` em
+> silêncio — a garantia hoje é só documental, no comentário do tipo. O que
+> fecharia isto: tornar a prop obrigatória, ou um lint/teste que confira os
+> call sites do `Modal`. Nenhuma das duas foi decidida nesta rodada; fica
+> registrado para quando o sub-projeto 4 virar o segundo consumidor.
+
 ## Acessibilidade
 
 | Item | Efeito |
@@ -70,7 +79,7 @@ isso —, mas o empacotamento tem três arestas:
 | ~~A linha da `Tabela` responde só a mouse (`onClick` em `<tr>`/`<li>`, sem `tabIndex` nem `role`)~~ **Fechada em 2026-08-19 — não é defeito** | Ver a reconferência no topo do arquivo: a coluna Ações já tem "Editar", focável e anunciado; `tabIndex` na linha só acrescentaria paradas de tabulação redundantes |
 | ~~Um 409 ao renomear taxonomia aparece como toast enquanto o modal segue aberto, em vez de inline no campo~~ **Resolvido em 2026-08-18** | O erro do servidor passou a cair no próprio campo do modal, junto com a validação de nome vazio que entrou na mesma rodada. Coberto por `taxonomias.spec.ts`. |
 | ~~Falta guarda de duplo clique no botão Salvar do modal de renomear taxonomia~~ **Resolvido em 2026-08-19** | `Modal` (`web/ui`) ganhou a prop `carregando`, que desabilita o confirmar e troca o texto por "Aguarde…"; `taxonomias/page.tsx` passa `carregando={renomeando}` e `carregando={excluindo}` nos dois modais |
-| O erro de `excluir()` aparece em toast, enquanto o de `renomear()` cai inline no campo | Inconsistência entre dois modais irmãos, levantada na revisão da Task 2 desta rodada. Anterior a ela, fora do brief — fechar exigiria decidir se `excluir()` ganha um lugar inline (não tem campo de texto para carregar o erro) ou se `renomear()` volta a usar toast. Esta rodada **fortaleceu** o argumento para fechá-la, não o contrário: `excluir()` ganhou a guarda de duplo clique (`carregando={excluindo}`) e, no caminho de erro, o modal continua aberto — `aExcluir` só zera no sucesso —, então a falha aparece como toast na borda da tela enquanto o operador tem o modal na frente, olhando para o lugar errado |
+| ~~O erro de `excluir()` aparece em toast, enquanto o de `renomear()` cai inline no campo~~ **Resolvido em 2026-08-19** | O `Modal` ganhou a prop `erro`, e `excluir()` passou a usá-la. A regra que ficou: enquanto há diálogo aberto, o erro mora nele — no campo se houver campo culpado, no rodapé do diálogo se não houver. Excluir questão continua em toast e não é exceção: aquele fluxo fecha o diálogo antes de chamar a API |
 
 ## Qualidade de erro no editor
 
@@ -153,6 +162,12 @@ pelo histórico; o `rbac.ts` e o `role` que ele lia também não existem mais.
   atual.~~ **Fechada em 2026-08-19 — diagnóstico errado em metade.** Ver a
   reconferência no topo do arquivo: o GET extra é necessário, e o
   "Carregando…" piscando nunca existiu.
+- ~~O botão "Adicionar" de taxonomias descia junto com a mensagem de erro do
+  campo Nome — **28,75px**, medido em chromium e WebKit, não os "cerca de
+  26px" estimados sem medição.~~ **Resolvido em 2026-08-19** — o botão
+  passou a ser irmão do input, dentro do `Campo`, e não mais do bloco inteiro
+  do campo: o `<p>` de erro cresce abaixo dos dois e não tem como empurrar um
+  sem empurrar o outro.
 
 ## Fora do escopo deste plano, mas aberto no `api/`
 
@@ -232,10 +247,10 @@ parqueados de propósito, para não abrir uma segunda onda de correção. Nenhum
   troubleshooting entrou em `docs/runbook-deploy-producao.md`, depois do
   passo 9 de "Publicar a separação do login do admin".
 
-Ainda restam, do e2e do login: três outras asserções de
+~~Ainda restam, do e2e do login: três outras asserções de
 `web/admin/e2e/login.spec.ts` (por volta das linhas 20, 38 e 114) usam
-`toContainText`/`toHaveText` isoladas — o mesmo padrão frágil que os dois
-casos acima corrigiram, fora do escopo desta rodada.
+`toContainText`/`toHaveText` isoladas~~ — **resolvidas em 2026-08-19**, as
+três ganharam `toBeVisible` encadeado.
 
 ## Sobras do modal de trocar senha — 2026-08-19
 
@@ -243,38 +258,62 @@ Levantadas na revisão desta rodada e deixadas de fora de propósito — nenhuma
 é regressão, todas são dívida conhecida no `ModalTrocarSenha`
 (`web/admin/src/componentes/`).
 
-- Cancelar com a requisição em voo deixa o erro da resposta guardado para a
+- ~~Cancelar com a requisição em voo deixa o erro da resposta guardado para a
   próxima abertura. As senhas **são** limpas; o que sobra é a mensagem de
-  erro.
-- `erros.geral` nunca é limpo ao digitar, ao contrário dos erros de campo —
-  uma falha de rede fica na tela enquanto a pessoa reescreve tudo.
-- Com "Nova senha" vazia e "Confirme" preenchida, aparece "A confirmação não
-  confere." quando o problema real é o campo de cima estar vazio.
-- O clique no backdrop descarta três senhas digitadas sem confirmação — e o
-  Escape faz o mesmo (`Modal.tsx:55-57`), pelo mesmo caminho de cancelamento.
-- O tip de divergência entra pelo `Campo`, que renderiza `role="alert"` —
-  alerta assertivo para um aviso de conveniência.
-- O `onChange` de "Nova senha" limpa `erros.nova` incondicionalmente,
+  erro.~~ **Resolvido em 2026-08-19** — o contador `idRequisicao` invalida a
+  resposta atrasada, e `fechar()` zera `erros` no mesmo passo que zera os
+  campos.
+- ~~`erros.geral` nunca é limpo ao digitar, ao contrário dos erros de
+  campo~~ **Resolvido em 2026-08-19** — os três `onChange` chamam
+  `limparGeral()`.
+- ~~Com "Nova senha" vazia e "Confirme" preenchida, aparece "A confirmação não
+  confere." quando o problema real é o campo de cima estar vazio.~~
+  **Resolvido em 2026-08-19** — a validação local só aponta divergência
+  quando "Nova senha" não está vazia.
+- ~~O clique no backdrop descarta três senhas digitadas sem confirmação~~
+  **Resolvido em 2026-08-19** — o fundo deixou de fechar os quatro diálogos.
+  **Continua aberto:** o Escape faz o mesmo descarte, e continua fazendo. A
+  decisão fechou o acidente e deixou em pé a intenção — quem for reabrir isto
+  precisa decidir se um diálogo com conteúdo digitado deve confirmar antes de
+  descartar.
+- ~~O tip de divergência entra pelo `Campo`, que renderiza `role="alert"` —
+  alerta assertivo para um aviso de conveniência.~~ **Resolvido em
+  2026-08-19** — o `Campo` ganhou a prop `aviso`, com `role="status"`; o tip
+  de divergência passou a usá-la.
+- ~~O `onChange` de "Nova senha" limpa `erros.nova` incondicionalmente,
   apagando também a mensagem de `weak_password` vinda do servidor no primeiro
-  caractere digitado.
-- Falta cobertura e2e de que reabrir o modal mostra os campos limpos, e de
-  `aria-required`.
+  caractere digitado.~~ **Resolvido em 2026-08-19** — a marca
+  `novaDoServidor` impede a limpeza automática quando o erro veio do
+  servidor.
+- ~~Falta cobertura e2e de que reabrir o modal mostra os campos limpos, e de
+  `aria-required`.~~ **Resolvido em 2026-08-19** — `senha.spec.ts` ganhou os
+  dois casos.
 
 ## Sobras de rigor de teste — 2026-08-19
 
-- O teste do cabeçalho conta `svg` e prova presença, não a ordem "ícone antes
-  do texto" — passaria com o ícone do lado errado. É o padrão já existente no
-  arquivo, não regressão desta rodada. A paginação, essa sim, prova posição
-  (compara contra o texto, não elemento com elemento).
+- ~~O teste do cabeçalho conta `svg` e prova presença, não a ordem "ícone
+  antes do texto"~~ **Resolvido em 2026-08-19** — passou a comparar contra o
+  nó de texto, como o da paginação já fazia.
 
-## Ícone nos botões de diálogo e no login — **execução futura, decidida**
+## ~~Ícone nos botões de diálogo e no login~~ — **resolvido em 2026-08-19**
 
-> Decidido pelo dono em **2026-08-19**, ao fechar a rodada de ajustes. Vai
-> ser disparado em sessão própria — está aqui para não se perder, não para
-> ser feito de passagem.
+> O `Modal` ganhou `IconeCancelar` fixo no cancelar e a prop `iconeConfirmar`
+> para o confirmar; o login ganhou `IconeEntrar`. O aviso do `web/README.md`
+> para não copiar o `Modal` como exemplo saiu junto — a regra 2 não tem mais
+> contraexemplo dentro do `web/ui`.
 
-A regra 2 do `web/README.md` diz que toda ação fora de linha de tabela é
-`Botao` com ícone + texto, **sem exceção**. Três botões ainda não cumprem:
+> **Registro histórico a partir daqui — escrito quando a dívida ainda estava
+> aberta, preservado pelo raciocínio, não porque descreva o estado atual.**
+> O estado atual é o da nota de fechamento acima.
+
+~~Decidido pelo dono em **2026-08-19**, ao fechar a rodada de ajustes. Vai
+ser disparado em sessão própria — está aqui para não se perder, não para
+ser feito de passagem.~~ A sessão veio na mesma rodada de ajustes finos, e a
+dívida fechou pela nota do topo desta seção.
+
+~~A regra 2 do `web/README.md` diz que toda ação fora de linha de tabela é
+`Botao` com ícone + texto, **sem exceção**. Três botões ainda não cumprem:~~
+Os três botões que não cumpriam, no momento em que isto foi escrito:
 
 | Onde | Botão |
 |---|---|
@@ -282,23 +321,27 @@ A regra 2 do `web/README.md` diz que toda ação fora de linha de tabela é
 | `web/ui/src/Modal.tsx` | o confirmar (`Salvar` / `Excluir` / o rótulo que o chamador passar) |
 | `web/admin/src/app/login/page.tsx` | o `Entrar` |
 
-**O que fazer:** dar ao `Modal` um slot de ícone para cada um dos dois botões
-— o de confirmar precisa aceitar o ícone que o chamador escolher, porque
-`Excluir` e `Salvar` não são a mesma ação —, e criar um `IconeEntrar` para o
-login. Os ícones de cancelar e salvar já existem (`IconeCancelar`,
-`IconeSalvar`, `IconeExcluir`).
+**O que fazer** (feito nesta rodada): dar ao `Modal` um slot de ícone para
+cada um dos dois botões — o de confirmar precisa aceitar o ícone que o
+chamador escolher, porque `Excluir` e `Salvar` não são a mesma ação —, e
+criar um `IconeEntrar` para o login. Os ícones de cancelar e salvar já
+existiam (`IconeCancelar`, `IconeSalvar`, `IconeExcluir`).
 
-**Por que não foi feito na rodada de ajustes.** A revisão final ofereceu duas
-saídas: qualificar a regra com uma cláusula de exceção, ou dar o slot ao
-`Modal`. Eu (Claude) escolhi a cláusula para não parar a rodada, e o dono
-recusou: a cláusula legitimava como desenho o que é dívida. A cláusula foi
-removida do `README` na mesma decisão, e o texto de lá passou a dizer que os
-três botões são o contraexemplo da regra — inclusive avisando quem for
-consumir o `web/ui` para não copiar o `Modal` como exemplo.
+~~**Por que não foi feito na rodada de ajustes.**~~ **Por que não tinha sido
+feito na rodada de ajustes anterior.** A revisão final daquela rodada
+ofereceu duas saídas: qualificar a regra com uma cláusula de exceção, ou dar
+o slot ao `Modal`. Eu (Claude) escolhi a cláusula para não parar a rodada, e
+o dono recusou: a cláusula legitimava como desenho o que é dívida. A
+cláusula foi removida do `README` na mesma decisão, e o texto de lá passou a
+dizer que os três botões eram o contraexemplo da regra — inclusive avisando
+quem fosse consumir o `web/ui` para não copiar o `Modal` como exemplo.
+Esse aviso saiu do `web/README.md` nesta rodada de ajustes finos
+(Task 13), junto com o bloco inteiro que o continha.
 
-**Prioridade:** antes de o sub-projeto 4 começar a consumir o `web/ui`. O
+~~**Prioridade:** antes de o sub-projeto 4 começar a consumir o `web/ui`. O
 risco não é estético — é que o frontend do aluno copie o `Modal` e nasça
-divergindo da regra que herdou por escrito.
+divergindo da regra que herdou por escrito.~~ A dívida fechou antes disso —
+não há mais prioridade a rastrear aqui.
 
 ## Auto-submit do Apple Passwords — para a sessão dedicada
 
